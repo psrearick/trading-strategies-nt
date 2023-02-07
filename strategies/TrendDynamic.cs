@@ -41,9 +41,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         private SMA i_slow;
         private OrderFlowVWAP i_vwap;
         private ATR i_atr;
-		private	Series<double> i_midpoint_distance;
-		private SMA i_md_fast;
-		private SMA i_md_slow;
 		private PriceRange i_price_range;
 
         private bool maFastRising = false;
@@ -124,7 +121,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 				StopTargetHandling							= StopTargetHandling.PerEntryExecution;
 				BarsRequiredToTrade							= 20;
 				IsInstantiatedOnEachOptimizationIteration   = false;
-				IsOverlay 									= false;
 
 				StopLoss									= 6;
 				OpenTime									= DateTime.Parse("09:30", System.Globalization.CultureInfo.InvariantCulture);
@@ -146,18 +142,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 			}
 			
             if (State == State.DataLoaded) {
+                quantity            = Convert.ToInt32(DefaultQuantity);
+				
                 i_fast              = EMA(MAFastPeriod);
                 i_mid               = EMA(MAMidPeriod);
                 i_slow              = SMA(MASlowPeriod);
                 i_vwap              = OrderFlowVWAP(VWAPResolution.Standard, TradingHours.String2TradingHours("CME US Index Futures RTH"), VWAPStandardDeviations.Three, 1, 2, 3);
                 i_atr               = ATR(14);
-				i_midpoint_distance = new Series<double>(this);
-				i_md_slow			= SMA(i_midpoint_distance, MDSlow);
-				i_md_fast			= SMA(i_midpoint_distance, MDFast);
 				i_price_range		= PriceRange(MDFast, MDSlow, MDLookback, MDATR);
 				
 				
-                quantity            = Convert.ToInt32(DefaultQuantity);
+				AddChartIndicator(i_price_range);
 			}
 		}
 
