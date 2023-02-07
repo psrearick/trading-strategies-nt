@@ -42,6 +42,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private OrderFlowVWAP i_vwap;
         private ATR i_atr;
 		private PriceRange i_price_range;
+		private PriceAction i_price_action;
 
         private bool maFastRising = false;
         private bool maMidRising = false;
@@ -66,28 +67,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double atr = 0.0;
         private double executionAtr = 0.0;
 		private bool atrBelowThreshold = false;
-        private bool bar0up = false;
-        private bool bar1up = false;
-        private bool bar2up = false;
-        private bool bar0down = false;
-        private bool bar1down = false;
-        private bool bar2down = false;
         private bool twoBarsUp = false;
         private bool twoBarsDown = false;
         private bool threeBarsUp = false;
         private bool threeBarsDown = false;
         private bool upBars = false;
         private bool downBars = false;
-        private double range0 = 0.0;
-        private double range1 = 0.0;
-        private double range2 = 0.0;
-        private double range3 = 0.0;
-        private bool range0Bigger = false;
-        private bool range1Bigger = false;
-        private bool range2Bigger = false;
-        private bool range0Smaller = false;
-        private bool range1Smaller = false;
-        private bool range2Smaller = false;
         private bool twoSmallerBars = false;
         private bool twoBiggerBars = false;
         private bool threeSmallerBars = false;
@@ -150,7 +135,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 i_vwap              = OrderFlowVWAP(VWAPResolution.Standard, TradingHours.String2TradingHours("CME US Index Futures RTH"), VWAPStandardDeviations.Three, 1, 2, 3);
                 i_atr               = ATR(14);
 				i_price_range		= PriceRange(MDFast, MDSlow, MDLookback, MDATR);
-				
+				i_price_action		= PriceAction();
 				
 				AddChartIndicator(i_price_range);
 			}
@@ -210,37 +195,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 			//#####################
 			// Price Action
             //#####################
-			bar0up 		    = Close[0] > Close[1];
-			bar1up 		    = Close[1] > Close[2];
-			bar2up 		    = Close[2] > Close[3];
-			bar0down 		= !bar0up;
-			bar1down 		= !bar1up;
-			bar2down 		= !bar2up;
-			twoBarsUp		= bar0up && bar1up;
-			twoBarsDown	    = !bar0up && !bar1up;
-			threeBarsUp 	= twoBarsUp && bar2up;
-			threeBarsDown	= twoBarsDown && !bar2up;
-			upBars			= bar0up && (bar1up || bar2up);
-			downBars		= !bar0up && (!bar1up || !bar2up);
-			
-			range0		    = Math.Abs(Close[0] - Open[0]);
-			range1		    = Math.Abs(Close[1] - Open[1]);
-			range2		    = Math.Abs(Close[2] - Open[2]);
-			range3		    = Math.Abs(Close[3] - Open[3]);
-			
-			range0Bigger	= range0 > range1;
-			range1Bigger	= range1 > range2;
-			range2Bigger	= range2 > range3;
-			range0Smaller	= !range0Bigger;
-			range1Smaller	= !range1Bigger;
-			range2Smaller 	= !range2Bigger;
-
-			twoSmallerBars		= range0Smaller && range1Smaller;
-			twoBiggerBars		= range0Bigger && range1Bigger;
-			threeSmallerBars	= twoSmallerBars && range2Smaller;
-			threeBiggerBars	    = twoBiggerBars && range2Bigger;
-			smallerBars		    = range0Smaller && (range1Smaller || range2Smaller);
-			biggerBars			= range0Bigger && (range1Bigger || range2Bigger);
+			twoBarsUp			= i_price_action.ConsecutiveBarsUp(2);
+			twoBarsDown	    	= i_price_action.ConsecutiveBarsDown(2);
+			threeBarsUp			= i_price_action.ConsecutiveBarsUp(3);
+			threeBarsDown		= i_price_action.ConsecutiveBarsDown(3);
+			upBars				= i_price_action.BarIsUp(0) && i_price_action.LeastBarsUp(1, 2, 1);
+			downBars			= i_price_action.BarIsDown(0) && i_price_action.LeastBarsDown(1, 2, 1);
+			twoBiggerBars		= i_price_action.ConsecutiveBiggerBars(2);
+			twoSmallerBars		= i_price_action.ConsecutiveSmallerBars(2);
+			threeBiggerBars		= i_price_action.ConsecutiveBiggerBars(3);
+			threeSmallerBars	= i_price_action.ConsecutiveSmallerBars(3);
+			smallerBars 		= i_price_action.BarIsSmaller(0) && i_price_action.LeastSmallerBars(1, 2, 1);
+			biggerBars 			= i_price_action.BarIsBigger(0) && i_price_action.LeastBiggerBars(1, 2, 1);
 
             //###########################################################################
 			// Conditions
