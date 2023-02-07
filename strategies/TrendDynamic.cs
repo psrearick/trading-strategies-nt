@@ -36,23 +36,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private int tradeDirection	    = 0;
         private string ocoString;
 
-        private EMA i_fast;
-        private EMA i_mid;
-        private SMA i_slow;
         private OrderFlowVWAP i_vwap;
         private ATR i_atr;
 		private PriceRange i_price_range;
 		private PriceAction i_price_action;
+		private MABand i_ma_band;
 
-        private bool maFastRising = false;
-        private bool maMidRising = false;
-        private bool maSlowRising = false;
-        private bool maFastFalling = false;
-        private bool maMidFalling = false;
-        private bool maSlowFalling = false;
-        private double maFast = 0.0;
-        private double maMid = 0.0;
-        private double maSlow = 0.0;
         private bool maStackRising = false;
         private bool maStackFalling = false;
         private bool allMaRising = false;
@@ -67,16 +56,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double atr = 0.0;
         private double executionAtr = 0.0;
 		private bool atrBelowThreshold = false;
-        private bool twoBarsUp = false;
-        private bool twoBarsDown = false;
-        private bool threeBarsUp = false;
-        private bool threeBarsDown = false;
         private bool upBars = false;
         private bool downBars = false;
-        private bool twoSmallerBars = false;
-        private bool twoBiggerBars = false;
-        private bool threeSmallerBars = false;
-        private bool threeBiggerBars = false;
         private bool smallerBars = false;
         private bool biggerBars = false;
 		private bool highDistance = false;
@@ -129,13 +110,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.DataLoaded) {
                 quantity            = Convert.ToInt32(DefaultQuantity);
 				
-                i_fast              = EMA(MAFastPeriod);
-                i_mid               = EMA(MAMidPeriod);
-                i_slow              = SMA(MASlowPeriod);
                 i_vwap              = OrderFlowVWAP(VWAPResolution.Standard, TradingHours.String2TradingHours("CME US Index Futures RTH"), VWAPStandardDeviations.Three, 1, 2, 3);
                 i_atr               = ATR(14);
 				i_price_range		= PriceRange(MDFast, MDSlow, MDLookback, MDATR);
 				i_price_action		= PriceAction();
+				i_ma_band			= MABand(MAFastPeriod, MAMidPeriod, MASlowPeriod);
 				
 				AddChartIndicator(i_price_range);
 			}
@@ -156,19 +135,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 			//###########################################################################
 			// MOVING AVERAGES
 			//#####################
-			maFastRising		= IsRising(i_fast);
-			maMidRising		    = IsRising(i_mid);
-			maSlowRising		= IsRising(i_slow);
-            maFastFalling		= IsFalling(i_fast);
-            maMidFalling		= IsFalling(i_mid);
-            maSlowFalling		= IsFalling(i_slow);
-            maFast 			    = i_fast[0];
-			maMid  			    = i_mid[0];
-			maSlow 			    = i_slow[0];
-			maStackRising		= maFast > maMid && maMid > maSlow;
-			maStackFalling		= maFast < maMid && maMid < maSlow;
-			allMaRising		    = maFastRising && maMidRising && maSlowRising;
-			allMaFalling		= maFastFalling && maMidFalling && maSlowFalling;
+			maStackRising		= i_ma_band.maStackRising[0];
+			maStackFalling		= i_ma_band.maStackFalling[0];
+			allMaRising		    = i_ma_band.allMaRising[0];
+			allMaFalling		= i_ma_band.allMaFalling[0];
+			
 
 			//#####################
 			// VWAP
@@ -191,20 +162,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 			// Price Range
             //#####################
 			highDistance = i_price_range.Fast[0] > i_price_range.ATR[0];
+			lowDistance = i_price_range.Fast[0] < i_price_range.ATR[0];
 			
 			//#####################
 			// Price Action
             //#####################
-			twoBarsUp			= i_price_action.ConsecutiveBarsUp(2);
-			twoBarsDown	    	= i_price_action.ConsecutiveBarsDown(2);
-			threeBarsUp			= i_price_action.ConsecutiveBarsUp(3);
-			threeBarsDown		= i_price_action.ConsecutiveBarsDown(3);
 			upBars				= i_price_action.BarIsUp(0) && i_price_action.LeastBarsUp(1, 2, 1);
 			downBars			= i_price_action.BarIsDown(0) && i_price_action.LeastBarsDown(1, 2, 1);
-			twoBiggerBars		= i_price_action.ConsecutiveBiggerBars(2);
-			twoSmallerBars		= i_price_action.ConsecutiveSmallerBars(2);
-			threeBiggerBars		= i_price_action.ConsecutiveBiggerBars(3);
-			threeSmallerBars	= i_price_action.ConsecutiveSmallerBars(3);
 			smallerBars 		= i_price_action.BarIsSmaller(0) && i_price_action.LeastSmallerBars(1, 2, 1);
 			biggerBars 			= i_price_action.BarIsBigger(0) && i_price_action.LeastBiggerBars(1, 2, 1);
 
@@ -354,19 +318,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 		
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
-		[Display(Name="Moving Average Fast Period", Description="Moving Average Fast Period", Order=5, GroupName="Parameters")]
+		[Display(Name="Moving Average Fast Period", Description="Moving Average Fast Period", Order=5, GroupName="Moving Averages")]
 		public int MAFastPeriod
 		{ get; set; }
 		
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
-		[Display(Name="Moving Average Mid Period", Description="Moving Average Mid Period", Order=6, GroupName="Parameters")]
+		[Display(Name="Moving Average Mid Period", Description="Moving Average Mid Period", Order=6, GroupName="Moving Averages")]
 		public int MAMidPeriod
 		{ get; set; }
 		
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
-		[Display(Name="Moving Average Slow Period", Description="Moving Average Slow Period", Order=7, GroupName="Parameters")]
+		[Display(Name="Moving Average Slow Period", Description="Moving Average Slow Period", Order=7, GroupName="Moving Averages")]
 		public int MASlowPeriod
 		{ get; set; }
 		
