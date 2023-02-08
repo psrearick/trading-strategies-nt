@@ -38,7 +38,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private OrderFlowVWAP i_vwap;
         private ATR i_atr;
-		private PriceRange i_price_range;
+		private PriceRange2 i_price_range;
 		private PriceAction i_price_action;
 		private MABand i_ma_band;
 
@@ -101,11 +101,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 				MAMidPeriod									= 21;
 				MASlowPeriod								= 50;
 				ATRThreshold								= 25;
-				MDFast										= 28;
-				MDSlow										= 90;
-				MDLookback									= 12;
-				MDATR										= 14;
-//                Control                                     = 1;
+				PRMA										= 14;
+				PRSmoothing									= 2;
+				PRLookback									= 9;
+                Control                                     = 1;
 				IsUnmanaged									= true;
 			}
 
@@ -118,7 +117,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
                 i_vwap              = OrderFlowVWAP(VWAPResolution.Standard, TradingHours.String2TradingHours("CME US Index Futures RTH"), VWAPStandardDeviations.Three, 1, 2, 3);
                 i_atr               = ATR(14);
-				i_price_range		= PriceRange(MDFast, MDSlow, MDLookback, MDATR);
+				i_price_range		= PriceRange2(PRMA, PRSmoothing, PRLookback);
 				i_price_action		= PriceAction();
 				i_ma_band			= MABand(MAFastPeriod, MAMidPeriod, MASlowPeriod);
 				
@@ -163,15 +162,53 @@ namespace NinjaTrader.NinjaScript.Strategies
 			// ATR
             //#####################
             atr = i_atr[0];
-            atrBelowThreshold = ATRThreshold > atr;
+            atrBelowThreshold 			= ATRThreshold > atr;
+			
+
 
 			//#####################
 			// Price Range
             //#####################
-//			highDistance = i_price_range.Fast[0] > i_price_range.ATR[0];
-			highDistance = i_price_range.ATR[0] > i_price_range.Slow[0];
-			lowDistance = i_price_range.Fast[0] < i_price_range.ATR[0];
-
+			double reference	= i_price_range.Signal[0];
+			
+			bool prBelowUpper	= reference < i_price_range.UpperBand1[0];
+			bool prBelowMid 	= reference < i_price_range.MovingAverage[0];
+			bool prBelowLower	= reference < i_price_range.LowerBand1[0];
+			bool prAboveUpper 	= reference > i_price_range.UpperBand1[0];
+			bool prAboveMid		= reference > i_price_range.MovingAverage[0];
+			bool prAboveLower	= reference > i_price_range.LowerBand1[0];
+			bool prMiddle 		= prAboveLower && prBelowUpper;
+			
+			bool prControl = false;
+			
+			if (Control == 1) {
+				prControl = prBelowUpper;
+			}
+			
+			if (Control == 2) {
+				prControl = prBelowMid;
+			}
+			
+			if (Control == 3) {
+				prControl = prBelowLower;
+			}
+			
+			if (Control == 4) {
+				prControl = prAboveUpper;
+			}
+			
+			if (Control == 5) {
+				prControl = prAboveMid;
+			}
+			
+			if (Control == 6) {
+				prControl = prAboveLower;
+			}
+			
+			if (Control == 7) {
+				prControl = prMiddle;
+			}
+			
 			
 			//#####################
 			// Price Action
@@ -188,10 +225,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 			shortCondition	= false;
 			
 			
-			shortPatternMatched = true
-				&& maStackFalling
-				&& allMaFalling
-				&& i_price_action.LeastBarsDown(7, 9)
+//			shortPatternMatched = true
+//				&& maStackFalling
+//				&& allMaFalling
+////				&& i_price_action.LeastBarsDown(7, 9)
+////				&& prBelowLower
+////				&& prBelowMid
+////				&& prBelowUpper
+////				&& prMiddle
+//				&& prAboveUpper
+////				&& prAboveMid
+////				&& prAboveLower
 			;
 			
 			if (shortPatternMatched && patternHigh == 0 && patternLow == 0) {
@@ -217,7 +261,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 			longPatternMatched = true
 				&& maStackRising
 				&& allMaRising
-				&& i_price_action.LeastBarsUp(7, 9)
+//				&& i_price_action.LeastBarsUp(7, 9)
+//				&& prBelowLower
+//				&& prBelowMid
+//				&& prBelowUpper
+//				&& prMiddle
+//				&& prAboveUpper
+//				&& prAboveMid
+//				&& prAboveLower
+				&& prControl
 			;
 			
 			if (longPatternMatched && patternHigh == 0 && patternLow == 0) {
@@ -318,21 +370,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double usableProfitTarget		= baseProfitTarget;
 			double profitTargetDouble		= baseProfitTarget * 2;
 			
-			if (i_price_range.Fast[0] < (MAX(i_price_range.Fast, 40)[0] + MIN(i_price_range.Fast, 40)[0]) / 2) {
-				if (shortStopEntry != null) {
-					usableProfitTarget = profitTargetHalf;
-//					usableProfitTarget = profitTargetLow;
-//					usableProfitTarget = profitTargetDouble;
-				}
-			
-			} else if (shortStopEntry != null) {
+//			if (i_price_range.Fast[0] < (MAX(i_price_range.Slow, 40)[0] + MIN(i_price_range.Slow, 40)[0]) / 2) {
+//				if (shortStopEntry != null) {
 //					usableProfitTarget = profitTargetHalf;
+////					usableProfitTarget = profitTargetLow;
+////					usableProfitTarget = profitTargetDouble;
+//				}
+			
+//			} else if (shortStopEntry != null) {
+////					usableProfitTarget = profitTargetHalf;
 //					usableProfitTarget = profitTargetLow;
-					usableProfitTarget = profitTargetDouble;
-			}
-			else if (longStopEntry != null) {
-				usableProfitTarget = profitTargetDouble;
-			}
+////					usableProfitTarget = profitTargetDouble;
+//			} else if (longStopEntry != null) {
+//				usableProfitTarget = profitTargetDouble;
+//			}
 			
 			executionAtr					= ATR(14)[0];
 			double adjustedProfitTarget     = (executionAtr * usableProfitTarget) * TickSize;
@@ -413,33 +464,27 @@ namespace NinjaTrader.NinjaScript.Strategies
 		
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
-		[Display(Name="MA Fast", Description="Moving Average Fast", Order=9, GroupName="Price Range")]
-		public int MDFast
+		[Display(Name="MA Length", Description="Moving Average Length", Order=9, GroupName="Price Range")]
+		public int PRMA
 		{ get; set; }
 		
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
-		[Display(Name="MA Slow", Description="Moving Average Slow", Order=10, GroupName="Price Range")]
-		public int MDSlow
+		[Display(Name="Smoothing", Description="Smoothing Period", Order=10, GroupName="Price Range")]
+		public int PRSmoothing
 		{ get; set; }
 		
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
-		[Display(Name="Lookback Period", Description="Lookback Period", Order=11, GroupName="Price Range")]
-		public int MDLookback
+		[Display(Name="Lookback", Description="Lookback Period", Order=11, GroupName="Price Range")]
+		public int PRLookback
 		{ get; set; }
 		
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
-		[Display(Name="ATR Length", Description="ATR Length", Order=12, GroupName="Price Range")]
-		public int MDATR
+		[Display(Name="Control", Description="Control", Order=1, GroupName="Controller")]
+		public int Control
 		{ get; set; }
-		
-//		[NinjaScriptProperty]
-//		[Range(1, int.MaxValue)]
-//		[Display(Name="Control", Description="Control", Order=1, GroupName="Controller")]
-//		public int Control
-//		{ get; set; }
 		
 		#endregion
 	}
