@@ -28,7 +28,7 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //This namespace holds strategies in this folder and is required. Do not change it.
 namespace NinjaTrader.NinjaScript.Strategies
 {
-	public class TrendDynamic : Strategy
+	public class TrendShortStop : Strategy
 	{
         private Order entryOrder;
         private Order longStopEntry;
@@ -62,7 +62,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool biggerBars = false;
 		private bool highDistance = false;
 		private bool lowDistance = false;
-        
+		
+		
+		private double patternHigh = 0.0;
+		private double patternLow = 0.0;
+        private bool shortPatternMatched = false;
+        private bool longPatternMatched = false;
         private bool longCondition = false;
         private bool shortCondition = false;
         private int quantity = 0;
@@ -70,8 +75,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults) {
-				Description	                                = "Dynamic Trend-following strategy with tick resolution for accuracy";
-                Name		                                = "Dynamic Trend Tick Resolution";
+				Description	                                = "Short Trend";
+                Name		                                = "Short Trend";
 				EntriesPerDirection							= 1;
 				EntryHandling								= EntryHandling.AllEntries;
 				IsExitOnSessionCloseStrategy				= true;
@@ -100,7 +105,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				MDSlow										= 90;
 				MDLookback									= 12;
 				MDATR										= 14;
-                Control                                     = 1;
+//                Control                                     = 1;
 				IsUnmanaged									= true;
 			}
 
@@ -118,6 +123,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				i_ma_band			= MABand(MAFastPeriod, MAMidPeriod, MASlowPeriod);
 				
 				AddChartIndicator(i_price_range);
+				AddChartIndicator(i_ma_band);
 			}
 		}
 
@@ -165,127 +171,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 //			highDistance = i_price_range.Fast[0] > i_price_range.ATR[0];
 			highDistance = i_price_range.ATR[0] > i_price_range.Slow[0];
 			lowDistance = i_price_range.Fast[0] < i_price_range.ATR[0];
-			bool distanceFalling = IsFalling(i_price_range.Fast);
-			bool distanceRising = IsRising(i_price_range.Fast);
-			bool distanceFalling2 = IsFalling(i_price_range.ATR);
-			bool distanceRising2 = IsRising(i_price_range.ATR);
-			bool longDistanceControl = true;
-            bool shortDistanceControl = true;
-
-            if (Control == 1) {
-                longDistanceControl = distanceFalling;
-                shortDistanceControl = distanceFalling;
-            }
-
-            if (Control == 2) {
-                longDistanceControl = distanceFalling;
-                shortDistanceControl = distanceRising;
-            }
-
-            if (Control == 3) {
-                longDistanceControl = distanceFalling;
-                shortDistanceControl = distanceFalling2;
-            }
-
-            if (Control == 4) {
-                longDistanceControl = distanceFalling;
-                shortDistanceControl = distanceRising2;
-            }
-
-            if (Control == 5) {
-                longDistanceControl = distanceFalling2;
-                shortDistanceControl = distanceFalling;
-            }
-
-            if (Control == 6) {
-                longDistanceControl = distanceFalling2;
-                shortDistanceControl = distanceFalling2;
-            }
-
-            if (Control == 7) {
-                longDistanceControl = distanceFalling2;
-                shortDistanceControl = distanceRising;
-            }
-
-            if (Control == 8) {
-                longDistanceControl = distanceFalling2;
-                shortDistanceControl = distanceRising2;
-            }
-
-            if (Control == 9) {
-                longDistanceControl = distanceRising;
-                shortDistanceControl = distanceFalling;
-            }
-
-            if (Control == 10) {
-                longDistanceControl = distanceRising;
-                shortDistanceControl = distanceFalling2;
-            }
-
-            if (Control == 11) {
-                longDistanceControl = distanceRising;
-                shortDistanceControl = distanceRising;
-            }
-
-            if (Control == 12) {
-                longDistanceControl = distanceRising;
-                shortDistanceControl = distanceRising2;
-            }
-            if (Control == 13) {
-                longDistanceControl = distanceRising2;
-                shortDistanceControl = distanceFalling;
-            }
-
-            if (Control == 14) {
-                longDistanceControl = distanceRising2;
-                shortDistanceControl = distanceFalling2;
-            }
-
-            if (Control == 15) {
-                longDistanceControl = distanceRising2;
-                shortDistanceControl = distanceRising;
-            }
-
-            if (Control == 16) {
-                longDistanceControl = distanceRising2;
-                shortDistanceControl = distanceRising2;
-            }
-            if (Control == 17) {
-                shortDistanceControl = distanceFalling;
-            }
-
-            if (Control == 18) {
-                shortDistanceControl = distanceFalling2;
-            }
-
-            if (Control == 19) {
-                shortDistanceControl = distanceRising;
-            }
-
-            if (Control == 20) {
-                shortDistanceControl = distanceRising2;
-            }
-
-            if (Control == 21) {
-                longDistanceControl = distanceFalling;
-            }
-
-            if (Control == 22) {
-                longDistanceControl = distanceFalling2;
-            }
-
-            if (Control == 23) {
-                longDistanceControl = distanceRising;
-            }
-
-            if (Control == 24) {
-                longDistanceControl = distanceRising2;
-            }
-
-            if (Control == 25) {
-                longDistanceControl = true;
-                shortDistanceControl = true;
-            }
 
 			
 			//#####################
@@ -299,23 +184,61 @@ namespace NinjaTrader.NinjaScript.Strategies
             //###########################################################################
 			// Conditions
 			//###########################################################################
-			longCondition	= true
-				&& maStackRising
-				&& allMaRising
-				&& aboveVwap
-				&& atrBelowThreshold
-				&& highDistance
-				&& longDistanceControl
-			;
+			longCondition	= false;
+			shortCondition	= false;
 			
-			shortCondition = true
+			
+			shortPatternMatched = true
 				&& maStackFalling
 				&& allMaFalling
-				&& belowVwap
-				&& atrBelowThreshold
-				&& highDistance
-				&& shortDistanceControl
+				&& i_price_action.LeastBarsDown(7, 9)
 			;
+			
+			if (shortPatternMatched && patternHigh == 0 && patternLow == 0) {
+				longPatternMatched = false;
+				patternLow = MAX(Close, 5)[0];
+				patternHigh	= Math.Max(MAX(Open, 5)[0], MAX(Close, 5)[0]);
+			}
+			
+			if (Close[0] > patternHigh && patternHigh > 0 && shortPatternMatched) {
+				longPatternMatched = false;
+				patternHigh = 0.0;
+				patternLow = 0.0;
+			}
+			
+			if (Close[0] < patternLow && shortPatternMatched) {
+				longPatternMatched = false;
+				patternHigh = 0.0;
+				patternLow = 0.0;
+				
+				shortCondition = true;
+			}
+			
+			longPatternMatched = true
+				&& maStackRising
+				&& allMaRising
+				&& i_price_action.LeastBarsUp(7, 9)
+			;
+			
+			if (longPatternMatched && patternHigh == 0 && patternLow == 0) {
+				shortPatternMatched = false;
+				patternHigh = MAX(Close, 5)[0];
+				patternLow	= Math.Min(MIN(Open, 5)[0], MIN(Close, 5)[0]);
+			}
+			
+			if (Close[0] < patternLow && longPatternMatched) {
+				longPatternMatched = false;
+				patternHigh = 0.0;
+				patternLow = 0.0;
+			}
+			
+			if (Close[0] > patternHigh && patternHigh > 0 && longPatternMatched) {
+				longPatternMatched = false;
+				patternHigh = 0.0;
+				patternLow = 0.0;
+				
+				longCondition = true;
+			}
 
 			//###########################################################################
 			// Execute Trades
@@ -490,11 +413,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 		public int MDATR
 		{ get; set; }
 		
-		[NinjaScriptProperty]
-		[Range(1, int.MaxValue)]
-		[Display(Name="Control", Description="Control", Order=1, GroupName="Controller")]
-		public int Control
-		{ get; set; }
+//		[NinjaScriptProperty]
+//		[Range(1, int.MaxValue)]
+//		[Display(Name="Control", Description="Control", Order=1, GroupName="Controller")]
+//		public int Control
+//		{ get; set; }
 		
 		#endregion
 	}

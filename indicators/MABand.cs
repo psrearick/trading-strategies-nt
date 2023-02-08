@@ -56,7 +56,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 				Description									= @"Moving Average Band";
 				Name										= "_Moving Average Band";
 				Calculate									= Calculate.OnBarClose;
-				IsOverlay									= false;
+				IsOverlay									= true;
 				DisplayInDataBox							= true;
 				DrawOnPricePanel							= true;
 				DrawHorizontalGridLines						= true;
@@ -66,6 +66,10 @@ namespace NinjaTrader.NinjaScript.Indicators
 				//Disable this property if your indicator requires custom values that cumulate with each new market data event. 
 				//See Help Guide for additional information.
 				IsSuspendedWhileInactive					= true;
+				
+				AddPlot(Brushes.LimeGreen, "Fast");
+				AddPlot(Brushes.Blue, "Mid");
+				AddPlot(Brushes.Red, "Slow");
 			}
 			
             if (State == State.DataLoaded) {
@@ -102,6 +106,10 @@ namespace NinjaTrader.NinjaScript.Indicators
 				return;
 			}
 			
+			Fast[0] = i_fast[0];
+			Mid[0] = i_mid[0];
+			Slow[0] = i_slow[0];
+			
 			maFastRising[0]		= IsRising(i_fast);
 			maMidRising[0]		= IsRising(i_mid);
 			maSlowRising[0]		= IsRising(i_slow);
@@ -124,6 +132,27 @@ namespace NinjaTrader.NinjaScript.Indicators
 		}
 		
 		#region Properties
+		
+		[Browsable(false)]
+		[XmlIgnore]
+		public Series<double> Fast
+		{
+			get { return Values[0]; }
+		}
+
+		[Browsable(false)]
+		[XmlIgnore]
+		public Series<double> Mid
+		{
+			get { return Values[1]; }
+		}
+
+		[Browsable(false)]
+		[XmlIgnore]
+		public Series<double> Slow
+		{
+			get { return Values[2]; }
+		}
 		
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
