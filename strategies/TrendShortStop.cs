@@ -196,18 +196,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 			
 			if (shortPatternMatched && patternHigh == 0 && patternLow == 0) {
 				longPatternMatched = false;
-				patternLow = MAX(Close, 5)[0];
+				patternLow = MIN(Close, 5)[0];
 				patternHigh	= Math.Max(MAX(Open, 5)[0], MAX(Close, 5)[0]);
 			}
 			
 			if (Close[0] > patternHigh && patternHigh > 0 && shortPatternMatched) {
-				longPatternMatched = false;
+				shortPatternMatched = false;
 				patternHigh = 0.0;
 				patternLow = 0.0;
 			}
 			
 			if (Close[0] < patternLow && shortPatternMatched) {
-				longPatternMatched = false;
+				shortPatternMatched = false;
 				patternHigh = 0.0;
 				patternLow = 0.0;
 				
@@ -312,8 +312,30 @@ namespace NinjaTrader.NinjaScript.Strategies
         protected override void OnExecutionUpdate(Cbi.Execution execution, string executionId, double price, int quantity,
 			Cbi.MarketPosition marketPosition, string orderId, DateTime time)
 		{
+			double baseProfitTarget			= ProfitTarget;
+			double profitTargetLow			= baseProfitTarget * 0.2;
+			double profitTargetHalf			= (baseProfitTarget + profitTargetLow) / 2;
+			double usableProfitTarget		= baseProfitTarget;
+			double profitTargetDouble		= baseProfitTarget * 2;
+			
+			if (i_price_range.Fast[0] < (MAX(i_price_range.Fast, 40)[0] + MIN(i_price_range.Fast, 40)[0]) / 2) {
+				if (shortStopEntry != null) {
+					usableProfitTarget = profitTargetHalf;
+//					usableProfitTarget = profitTargetLow;
+//					usableProfitTarget = profitTargetDouble;
+				}
+			
+			} else if (shortStopEntry != null) {
+//					usableProfitTarget = profitTargetHalf;
+//					usableProfitTarget = profitTargetLow;
+					usableProfitTarget = profitTargetDouble;
+			}
+			else if (longStopEntry != null) {
+				usableProfitTarget = profitTargetDouble;
+			}
+			
 			executionAtr					= ATR(14)[0];
-			double adjustedProfitTarget     = (executionAtr * ProfitTarget) * TickSize;
+			double adjustedProfitTarget     = (executionAtr * usableProfitTarget) * TickSize;
 			double adjustedStopLoss		    = (executionAtr * StopLoss) * TickSize;
 			
 			if (longStopEntry != null && execution.Order == longStopEntry) {	
