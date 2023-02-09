@@ -41,6 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private PriceRange2 i_price_range;
 		private PriceAction i_price_action;
 		private MABand i_ma_band;
+		private EMA i_atr_ma;
 
         private bool maStackRising = false;
         private bool maStackFalling = false;
@@ -71,6 +72,21 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool longCondition = false;
         private bool shortCondition = false;
         private int quantity = 0;
+		
+		private bool prBelowLower = false;
+		private bool prBelowMid = false;
+		private bool prBelowUpper = false;
+		private bool prMiddle = false;
+		private bool prAboveUpper = false;
+		private bool prAboveMid = false;
+		private bool prAboveLower = false;
+		
+		private double ATRma = 0.0;
+		private bool belowAverageATR = false;
+		private bool aboveAverageATR = false;
+		
+		private int tradeCount = 0;
+        private string tradeLog = "";
 
 		protected override void OnStateChange()
 		{
@@ -116,10 +132,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 quantity            = Convert.ToInt32(DefaultQuantity);
 				
                 i_vwap              = OrderFlowVWAP(VWAPResolution.Standard, TradingHours.String2TradingHours("CME US Index Futures RTH"), VWAPStandardDeviations.Three, 1, 2, 3);
-                i_atr               = ATR(14);
+                i_atr               = ATR(4);
 				i_price_range		= PriceRange2(PRMA, PRSmoothing, PRLookback);
 				i_price_action		= PriceAction();
 				i_ma_band			= MABand(MAFastPeriod, MAMidPeriod, MASlowPeriod);
+				i_atr_ma			= EMA(i_atr, 9);
 				
 				AddChartIndicator(i_price_range);
 				AddChartIndicator(i_ma_band);
@@ -161,23 +178,52 @@ namespace NinjaTrader.NinjaScript.Strategies
 			//#####################
 			// ATR
             //#####################
-            atr = i_atr[0];
-            atrBelowThreshold 			= ATRThreshold > atr;
-			
-
+            atr 				= i_atr[0];
+            atrBelowThreshold 	= ATRThreshold > atr;
+			ATRma				= i_atr_ma[0];
+			belowAverageATR		= atr < (ATRma * 0.8);
+			aboveAverageATR		= atr > (ATRma * 1.2);
 
 			//#####################
 			// Price Range
             //#####################
 			double reference	= i_price_range.Signal[0];
 			
-			bool prBelowUpper	= reference < i_price_range.UpperBand1[0];
-			bool prBelowMid 	= reference < i_price_range.MovingAverage[0];
-			bool prBelowLower	= reference < i_price_range.LowerBand1[0];
-			bool prAboveUpper 	= reference > i_price_range.UpperBand1[0];
-			bool prAboveMid		= reference > i_price_range.MovingAverage[0];
-			bool prAboveLower	= reference > i_price_range.LowerBand1[0];
-			bool prMiddle 		= prAboveLower && prBelowUpper;
+			prBelowUpper	= reference < i_price_range.UpperBand1[0];
+			prBelowMid 	    = reference < i_price_range.MovingAverage[0];
+			prBelowLower	= reference < i_price_range.LowerBand1[0];
+			prAboveUpper 	= reference > i_price_range.UpperBand1[0];
+			prAboveMid		= reference > i_price_range.MovingAverage[0];
+			prAboveLower	= reference > i_price_range.LowerBand1[0];
+			prMiddle 		= prAboveLower && prBelowUpper;
+			
+			bool prShortCondition 	= false;
+			bool prLongCondition 	= false;
+			
+////			if (belowAverageATR || aboveAverageATR) {
+////				prLongCondition = prAboveMid;
+//				prShortCondition = (prAboveUpper || prBelowLower);
+////			} else {
+//				prLongCondition = (prAboveUpper || prBelowLower);
+////				prShortCondition = prAboveMid;
+////			}
+			
+////			if (belowAverageATR || aboveAverageATR) {
+//			if (aboveAverageATR) {
+//				prLongCondition = (prAboveUpper || prBelowLower);
+//				prShortCondition = (prAboveUpper || prBelowLower);
+//			} else if (belowAverageATR) {
+//				prLongCondition = prAboveLower;
+//				prShortCondition = prAboveLower;
+//			} else {
+////				prLongCondition = prAboveMid;
+////				prShortCondition = prAboveMid;
+//				prLongCondition = prBelowMid;
+//				prShortCondition = prBelowMid;
+//			}
+			
+			
+//			prCondition = prMiddle;
 			
 			bool prControl = false;
 			
@@ -233,9 +279,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 ////				&& prBelowMid
 ////				&& prBelowUpper
 ////				&& prMiddle
-//				&& prAboveUpper
+////				&& prAboveUpper
 ////				&& prAboveMid
 ////				&& prAboveLower
+////				&& prControl
+////				&& prShortCondition
 			;
 			
 			if (shortPatternMatched && patternHigh == 0 && patternLow == 0) {
@@ -269,7 +317,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 //				&& prAboveUpper
 //				&& prAboveMid
 //				&& prAboveLower
-				&& prControl
+//				&& prControl
+//				&& prLongCondition
 			;
 			
 			if (longPatternMatched && patternHigh == 0 && patternLow == 0) {
@@ -369,6 +418,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double profitTargetHalf			= (baseProfitTarget + profitTargetLow) / 2;
 			double usableProfitTarget		= baseProfitTarget;
 			double profitTargetDouble		= baseProfitTarget * 2;
+            
+//            if (!belowAverageATR && !aboveAverageATR) {
+//                usableProfitTarget = profitTargetHalf;
+//            }
+			
+//			if (belowAverageATR || aboveAverageATR) {
+//                usableProfitTarget = profitTargetLow;
+//            }
+			
+//			if (belowAverageATR)
+//			{
+//				usableProfitTarget = profitTargetLow;
+//			}
 			
 //			if (i_price_range.Fast[0] < (MAX(i_price_range.Slow, 40)[0] + MIN(i_price_range.Slow, 40)[0]) / 2) {
 //				if (shortStopEntry != null) {
@@ -393,13 +455,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 				ocoString = string.Format("unmanageexitdoco{0}", DateTime.Now.ToString("hhmmssffff"));
 				SubmitOrderUnmanaged(1, OrderAction.Sell, OrderType.Limit, quantity, price + adjustedProfitTarget, 0, ocoString, "longProfitTarget");
 				SubmitOrderUnmanaged(1, OrderAction.Sell, OrderType.StopMarket, quantity, 0, price - adjustedStopLoss, ocoString, "longStopLoss");
+                logEntry();
 			} else if (shortStopEntry != null && execution.Order == shortStopEntry) {
 				ocoString = string.Format("unmanageexitdoco{0}", DateTime.Now.ToString("hhmmssffff"));
 				SubmitOrderUnmanaged(1, OrderAction.BuyToCover, OrderType.Limit, quantity, price - adjustedProfitTarget, 0, ocoString, "shortProfitTarget");
 				SubmitOrderUnmanaged(1, OrderAction.BuyToCover, OrderType.StopMarket, quantity, 0, price + adjustedStopLoss, ocoString, "shortStopLoss");
-			} else if (execution.Name == "longProfitTarget" || execution.Name == "longStopLoss" || execution.Name == "shortProfitTarget" || execution.Name == "shortStopLoss") {
+                logEntry();
+			} else if (execution.Name == "Exit on session close" || execution.Name == "longProfitTarget" || execution.Name == "longStopLoss" || execution.Name == "shortProfitTarget" || execution.Name == "shortStopLoss") {
 				longStopEntry	= null;
 				shortStopEntry	= null;
+                logExit(execution.Name);
 			}
 		}
 
@@ -410,6 +475,44 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			if (order.Name == "shortStopEntry" && shortStopEntry != order)
 				shortStopEntry = order;
+		}
+		
+		private void logEntry()
+		{
+			tradeLog = prBelowLower + "|" + prBelowMid + "|" + prBelowUpper + "|" + prMiddle + "|" + prAboveUpper + "|" + prAboveMid + "|" + prAboveLower + "|" + belowAverageATR + "|" + aboveAverageATR + "|" + aboveVwapDown + "|" + belowVwapUp + "|" + aboveVwap + "|" + belowVwap;
+		}
+		
+		private void logExit(string orderName)
+		{
+            string orderType    = "";
+            string winLoss      = "";
+
+            if (orderName == "shortProfitTarget") {
+                orderType   = "Short";
+                winLoss     = "W";
+            }
+
+            if (orderName == "longProfitTarget" || orderName == "Exit on session close") {
+                orderType   = "Long";
+                winLoss     = "W";
+            }
+
+            if (orderName == "longStopLoss") {
+                orderType   = "Long";
+                winLoss     = "L";
+            }
+
+            if (orderName == "shortStopLoss") {
+                orderType   = "Short";
+                winLoss     = "L";
+            }
+
+            string log = tradeCount + "|" + orderType + "|" + winLoss + "|" + tradeLog;
+
+            Print(log);
+
+			tradeCount  = tradeCount + 1;
+            tradeLog    = "";
 		}
 
 		#region Properties
