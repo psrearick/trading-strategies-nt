@@ -139,6 +139,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				PRSmoothing									= 2;
 				PRLookback									= 9;
 				Control 									= 1;
+				Control2									= 1;
 				IsUnmanaged									= true;
 			}
 
@@ -246,251 +247,176 @@ namespace NinjaTrader.NinjaScript.Strategies
 			longPatternMatched = false;
 			shortPatternMatched = false;
 			
-//			longPatternMatched = false;
-//			shortPatternMatched = false;
-
+			double matchingPatternCount = 0;
 			
-						
-//			if ((biggerBars || smallerBars) && barsUp57) {
-//				shortPatternMatched = true;
-//			}
-			
-			
-//			if (Close[0] < i_ma_band.Fast[0] && smallerBars) {
-//				shortPatternMatched = true;
-//			}
-			
-			if (IsFalling(i_ma_band.Fast)) {
+			if (Close[0] > i_hourly_sma[0]) {
+				if (smallerBars) {
+					matchingPatternCount = matchingPatternCount + 1;
+				}
 				
-//				if (prBelowBand2Upper && prAboveBand2Lower && belowVwapUp && downBars && averageATR && priceBelowSma && allMaFalling) {
-//					shortPatternMatched = true;
-//				}
+				if (slowAboveSma) {
+					matchingPatternCount = matchingPatternCount + 1;
+				}
 				
-// 				if (
-// 					true
-// //					&& prBelowBand2Upper
-// //					&& prAboveBand2Lower
-// //					&& belowVwapUp
-// //					&& upBars
-// //					&& downBars
-// //					&& averageATR
-// //					&& priceBelowSma
-// //					&& allMaFalling
-// 					&& Close[0] < i_ma_band.Fast[0]
-// //					&& smallerBars
-// //					&& (aboveAverageATR || belowAverageATR)
-// //					&& priceAboveSma
-// //					&& slowAboveSma
-// 				) {
-// 					shortPatternMatched = true;
-// 				}
+				if (prMiddle) {
+					matchingPatternCount = matchingPatternCount + 1;
+				}
+				
+				if (prAboveMid) {
+					matchingPatternCount = matchingPatternCount + 1;
+				}
+				
+				shortPatternMatched = matchingPatternCount > Control;
+			} else {
+				if (belowVwap) {
+					matchingPatternCount = matchingPatternCount + 1;
+				}
+				
+				if (prBelowMid) {
+					matchingPatternCount = matchingPatternCount + 1;
+				}
+				
+				if (prMiddle) {
+					matchingPatternCount = matchingPatternCount + 1;
+				}
+				
+				if (averageATR) {
+					matchingPatternCount = matchingPatternCount + 1;
+				}
+				
+				if (slowBelowSma) {
+					matchingPatternCount = matchingPatternCount + 1;
+				}
+				
+				if (upBars) {
+					matchingPatternCount = matchingPatternCount + 1;
+				}
+				
+				shortPatternMatched = matchingPatternCount > Control2;
+			}
+			
+			
+			//////////////////////////////////////////
+			shortPatternMatched = false;
+			//////////////////////////////////////////
+			
+			
+			
+			
+			if (Close[0] > i_ma_band.Slow[0] || IsRising(i_ma_band.Slow)) {
+				shortPatternMatched = false;
+				
+				longPatternMatched = true
+//					 && aboveVwapDown // 0
+//					 && allMaFalling // 1
+//					 && averageATR // 2
+//					 && belowVwap // 3
+//					 && downBars // 4
+//					 && prAboveLower // 5
+//					 && prAboveMid // 6
+//					 && prBelowMid // 7
+//					 && prBelowUpper // 8
+//					 && prMiddle // 9
+//					 && slowAboveSma // 10
+//					 && slowBelowSma // 11
+//					 && smallerBars // 12
+//					 && upBars // 13
+				;		
+			
 
-				shortPatternMatched = true
-//					&& prMiddle
-					&& prBelowUpper
-//					&& allMaFalling
-//					&& prAboveMid
-//					&& prBelowMid
-//					&& aboveVwapDown
-					&& averageATR
-					&& slowBelowSma
-//					&& prAboveLower
-//					&& smallerBars
-//					&& downBars
-					&& upBars
-//					&& slowAboveSma
-				;
-
+				
 				if (Control == 0) {
-					shortPatternMatched = shortPatternMatched && (Close[0] < i_ma_band.Fast[0]);
+					longPatternMatched = longPatternMatched && (Close[0] < i_ma_band.Fast[0]);
 				}
 				if (Control == 1) {
-					shortPatternMatched = shortPatternMatched && prBelowLower;
+					longPatternMatched = longPatternMatched && prBelowLower;
 				}
 				if (Control == 2) {
-					shortPatternMatched = shortPatternMatched && prAboveBand2Upper;
+					longPatternMatched = longPatternMatched && prAboveBand2Upper;
 				}
 				if (Control == 3) {
-					shortPatternMatched = shortPatternMatched && prBelowBand2Upper;
+					longPatternMatched = longPatternMatched && prBelowBand2Upper;
 				}
 				if (Control == 4) {
-					shortPatternMatched = shortPatternMatched && prAboveBand2Lower;
+					longPatternMatched = longPatternMatched && prAboveBand2Lower;
 				}
 				if (Control == 5) {
-					shortPatternMatched = shortPatternMatched && prBelowBand2Lower;
+					longPatternMatched = longPatternMatched && prBelowBand2Lower;
 				}
 				if (Control == 6) {
-					shortPatternMatched = shortPatternMatched && prBelowMid;
+					longPatternMatched = longPatternMatched && prBelowMid;
 				}
 				if (Control == 7) {
-					shortPatternMatched = shortPatternMatched && prBelowUpper;
+					longPatternMatched = longPatternMatched && prBelowUpper;
 				}
 				if (Control == 8) {
-					shortPatternMatched = shortPatternMatched && prMiddle;
+					longPatternMatched = longPatternMatched && prMiddle;
 				}
 				if (Control == 9) {
-					shortPatternMatched = shortPatternMatched && prAboveUpper;
+					longPatternMatched = longPatternMatched && prAboveUpper;
 				}
 				if (Control == 10) {
-					shortPatternMatched = shortPatternMatched && prAboveMid;
+					longPatternMatched = longPatternMatched && prAboveMid;
 				}
 				if (Control == 11) {
-					shortPatternMatched = shortPatternMatched && prAboveLower;
+					longPatternMatched = longPatternMatched && prAboveLower;
 				}
 				if (Control == 12) {
-					shortPatternMatched = shortPatternMatched && belowAverageATR;
+					longPatternMatched = longPatternMatched && belowAverageATR;
 				}
 				if (Control == 13) {
-					shortPatternMatched = shortPatternMatched && aboveAverageATR;
+					longPatternMatched = longPatternMatched && aboveAverageATR;
 				}
 				if (Control == 14) {
-					shortPatternMatched = shortPatternMatched && aboveVwapDown;
+					longPatternMatched = longPatternMatched && aboveVwapDown;
 				}
 				if (Control == 15) {
-					shortPatternMatched = shortPatternMatched && belowVwapUp;
+					longPatternMatched = longPatternMatched && belowVwapUp;
 				}
 				if (Control == 16) {
-					shortPatternMatched = shortPatternMatched && aboveVwap;
+					longPatternMatched = longPatternMatched && aboveVwap;
 				}
 				if (Control == 17) {
-					shortPatternMatched = shortPatternMatched && belowVwap;
+					longPatternMatched = longPatternMatched && belowVwap;
 				}
 				if (Control == 18) {
-					shortPatternMatched = shortPatternMatched && averageATR;
+					longPatternMatched = longPatternMatched && averageATR;
 				}
 				if (Control == 19) {
-					shortPatternMatched = shortPatternMatched && smaRising;
+					longPatternMatched = longPatternMatched && smaRising;
 				}
 				if (Control == 20) {
-					shortPatternMatched = shortPatternMatched && priceAboveSma;
+					longPatternMatched = longPatternMatched && priceAboveSma;
 				}
 				if (Control == 21) {
-					shortPatternMatched = shortPatternMatched && slowAboveSma;
+					longPatternMatched = longPatternMatched && slowAboveSma;
 				}
 				if (Control == 22) {
-					shortPatternMatched = shortPatternMatched && biggerBars;
+					longPatternMatched = longPatternMatched && biggerBars;
 				}
 				if (Control == 23) {
-					shortPatternMatched = shortPatternMatched && smallerBars;
+					longPatternMatched = longPatternMatched && smallerBars;
 				}
 				if (Control == 24) {
-					shortPatternMatched = shortPatternMatched && downBars;
+					longPatternMatched = longPatternMatched && downBars;
 				}
 				if (Control == 25) {
-					shortPatternMatched = shortPatternMatched && upBars;
+					longPatternMatched = longPatternMatched && upBars;
 				}
 				if (Control == 26) {
-					shortPatternMatched = shortPatternMatched && priceBelowSma;
+					longPatternMatched = longPatternMatched && priceBelowSma;
 				}
 				if (Control == 27) {
-					shortPatternMatched = shortPatternMatched && slowBelowSma;
+					longPatternMatched = longPatternMatched && slowBelowSma;
 				}
 				if (Control == 28) {
-					shortPatternMatched = shortPatternMatched && allMaFalling;
+					longPatternMatched = longPatternMatched && allMaFalling;
 				}
 				if (Control == 29) {
-					shortPatternMatched = shortPatternMatched && maStackFalling;
+					longPatternMatched = longPatternMatched && maStackFalling;
 				}
-				
-//				if (Close[0] < i_ma_band.Fast[0] && smallerBars) {
-//					shortPatternMatched = true;
-//				}
 			}			
-			
-//			if (IsRising(i_ma_band.Fast)) {
-//				if (Close[0] > i_ma_band.Fast[0] && smallerBars) {
-//					longPatternMatched = true;
-//				}
-//			}
 
-			
-			
-//			if (IsRising(i_hourly_sma)) {
-//				if (prBelowLower && (
-//					averageATR
-//					|| aboveVwapDown
-//					|| smaRising
-//					|| priceAboveSma
-//					|| slowAboveSma
-//					|| barsUp57
-//					|| biggerBars
-//					|| upBars
-//				)) {
-//					longPatternMatched = true;
-//				}
-				
-//				if (aboveAverageATR && (
-//					prAboveMid
-//					|| smaRising
-//					|| priceAboveSma
-//					|| slowAboveSma
-//					|| barsUp57
-//					|| upBars
-//				)) {
-//					longPatternMatched = true;
-//				}
-//			} else {
-//				if (slowBelowSma && (barsUp79 || prAboveUpper || prBelowMid)) {
-//					longPatternMatched = true;
-//				}
-				
-//				if (prBelowMid && (smaRising || upBars)) {
-//					longPatternMatched = true;
-//				}
-				
-				
-//				if (barsUp79 && (averageATR || smaRising || priceAboveSma || prAboveUpper || prBelowMid || slowBelowSma)) {
-//					longPatternMatched = true;
-//				}
-				
-//				if (priceBelowSma) {
-//					longPatternMatched = false;
-//				}
-//			}
-
-//			if (IsRising(i_hourly_sma)) {
-//                if (aboveVwap && 
-//                    (smaRising
-//                    || slowAboveSma
-//                    || barsUp57
-//                    || allMaFalling
-//                    || aboveAverageATR)
-//                ) {
-//                    shortPatternMatched = true;
-//                }
-
-//                if (smaRising && (smallerBars || slowBelowSma)) {
-//                    shortPatternMatched = true;
-//                }
-
-//                 if (barsUp57 && (
-//                     prBelowMid
-//                     || prAboveLower
-//                     || averageATR
-//                     || smaRising
-//                     || priceAboveSma
-//                     || slowAboveSma
-//                     || biggerBars
-//                 )) {
-//                     shortPatternMatched = true;
-//                 }
-//            } else {
-//                if (aboveVwap && (
-//                    prAboveLower
-//                    || averageATR
-//                    || smaRising
-//                    || priceAboveSma
-//                    || downBars
-//                    || slowBelowSma
-//                )) {
-//                    shortPatternMatched = true;
-//                }
-
-//                if (slowBelowSma && smaRising) {
-//                    shortPatternMatched = true;
-//                }
-//            }
-			
 			if (allMaRising || maStackRising) {
 				shortPatternMatched = false;
 			}
@@ -498,6 +424,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (!allMaRising || !maStackRising) {
 				longPatternMatched = false;
 			}
+			
+			
 				
 			if (shortPatternMatched && patternHigh == 0 && patternLow == 0) {
 				longPatternMatched = false;
@@ -802,6 +730,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		[Range(0, int.MaxValue)]
 		[Display(Name="Control", Description="Control", Order=11, GroupName="Controller")]
 		public int Control
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Range(0, int.MaxValue)]
+		[Display(Name="Control2", Description="Control2", Order=12, GroupName="Controller")]
+		public int Control2
 		{ get; set; }
 		
 		#endregion
