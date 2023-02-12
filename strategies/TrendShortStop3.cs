@@ -33,6 +33,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Order entryOrder;
         private Order longStopEntry;
         private Order shortStopEntry;
+        private Order takeProfitOrder;
+        private Order stopLossOrder;
 		private int tradeDirection	    = 0;
         private string ocoString;
 
@@ -328,6 +330,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			}
 			
 			if (tradeDirection != 0) {
+                exitPositions();
+
 				return;
 			}
 			
@@ -376,7 +380,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 				if (orderState == OrderState.Cancelled) {
 					entryOrder = null;
 				}
-			}
+			} else if (order.Name == "Exit on session close" ||order.Name == "longProfitTarget" ||order.Name == "longStopLoss" ||order.Name == "shortProfitTarget" ||order.Name == "shortStopLoss") {
+				if (orderState == OrderState.Filled || orderState == OrderState.Cancelled || orderState == OrderState.Rejected) {
+                    takeProfitOrder = null;
+                    stopLossOrder   = null;
+                }
+            }
 		}
 
         protected override void OnExecutionUpdate(Cbi.Execution execution, string executionId, double price, int quantity,
@@ -397,18 +406,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double adjustedStopLoss		    = (executionAtr * StopLoss) * TickSize;
 			
 			if (longStopEntry != null && execution.Order == longStopEntry) {	
-				ocoString = string.Format("unmanageexitdoco{0}", DateTime.Now.ToString("hhmmssffff"));
-				SubmitOrderUnmanaged(1, OrderAction.Sell, OrderType.Limit, quantity, price + adjustedProfitTarget, 0, ocoString, "longProfitTarget");
-				SubmitOrderUnmanaged(1, OrderAction.Sell, OrderType.StopMarket, quantity, 0, price - adjustedStopLoss, ocoString, "longStopLoss");
+				ocoString       = string.Format("unmanageexitdoco{0}", DateTime.Now.ToString("hhmmssffff"));
+				// takeProfitOrder = SubmitOrderUnmanaged(1, OrderAction.Sell, OrderType.Limit, quantity, price + adjustedProfitTarget, 0, ocoString, "longProfitTarget");
+				stopLossOrder   = SubmitOrderUnmanaged(1, OrderAction.Sell, OrderType.StopMarket, quantity, 0, price - adjustedStopLoss, ocoString, "longStopLoss");
                 logEntry();
 			} else if (shortStopEntry != null && execution.Order == shortStopEntry) {
-				ocoString = string.Format("unmanageexitdoco{0}", DateTime.Now.ToString("hhmmssffff"));
-				SubmitOrderUnmanaged(1, OrderAction.BuyToCover, OrderType.Limit, quantity, price - adjustedProfitTarget, 0, ocoString, "shortProfitTarget");
-				SubmitOrderUnmanaged(1, OrderAction.BuyToCover, OrderType.StopMarket, quantity, 0, price + adjustedStopLoss, ocoString, "shortStopLoss");
+				ocoString       = string.Format("unmanageexitdoco{0}", DateTime.Now.ToString("hhmmssffff"));
+				// takeProfitOrder = SubmitOrderUnmanaged(1, OrderAction.BuyToCover, OrderType.Limit, quantity, price - adjustedProfitTarget, 0, ocoString, "shortProfitTarget");
+				stopLossOrder   = SubmitOrderUnmanaged(1, OrderAction.BuyToCover, OrderType.StopMarket, quantity, 0, price + adjustedStopLoss, ocoString, "shortStopLoss");
                 logEntry();
 			} else if (execution.Name == "Exit on session close" || execution.Name == "longProfitTarget" || execution.Name == "longStopLoss" || execution.Name == "shortProfitTarget" || execution.Name == "shortStopLoss") {
 				longStopEntry	= null;
 				shortStopEntry	= null;
+                takeProfitOrder = null;
+                stopLossOrder   = null;
                 logExit(execution.Name);
 			}
 		}
@@ -421,6 +432,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (order.Name == "shortStopEntry" && shortStopEntry != order)
 				shortStopEntry = order;
 		}
+
+        private void exitPositions() {
+			
+            if (tradeDirection == 1) {
+                if (i_price_range.Signal[0] > i_price_range.UpperBand1[0]) {
+                    SubmitOrderUnmanaged(1, OrderAction.Sell, OrderType.Market, quantity, 0, 0, ocoString, "longProfitTarget");
+                    CancelOrder(stopLossOrder);
+                }
+            } else {
+                if (i_price_range.Signal[0] < i_price_range.LowerBand1[0]) {
+                    SubmitOrderUnmanaged(1, OrderAction.BuyToCover, OrderType.Market, quantity, 0, 0, ocoString, "shortProfitTarget");
+                    CancelOrder(stopLossOrder);
+                }
+            }
+        }
 		
 		private void evaluateConditions()
 		{
@@ -429,24 +455,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			longPatternMatched = false;
 			shortPatternMatched = false;
 			
-//			bool hourlySlowMid  	= i_hourly_slow_sma[0] < i_hourly_mid_sma[0];
-//            bool hourlySlowFast  	= i_hourly_slow_sma[0] < i_hourly_sma[0];
-			
-//			if (hourlySlowMid != hourlySlowFast && IsRising(i_hourly_sma) != IsRising(i_hourly_mid_sma)) {
-//				return;
-//			}
-			
-//			isLong = IsRising(i_hourly_mid_sma) && i_hourly_mid_sma[0] > i_hourly_slow_sma[0];
-//			isLong = IsRising(i_hourly_mid_sma) && i_hourly_mid_sma[0] > i_hourly_slow_sma[0];
-			isLong = IsRising(i_ma_band.Fast);
-			
-//			bool slowAboveMid = i_ma_band.Slow[0] > i_ma_band.Mid[0];
-//			bool slowAboveFast = i_ma_band.Slow[0] > i_ma_band.Fast[0];
-			
-//			if (slowAboveFast != slowAboveMid) {
-//				return;
-//			}
-			
 			if (CrossAbove(i_price_range.Signal,i_price_range.UpperBand1, 1)) {
 				shortPatternMatched = true;
 			}
@@ -454,14 +462,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (CrossBelow(i_price_range.Signal,i_price_range.LowerBand1, 1)) {
 				longPatternMatched = true;
 			}
-			
-//			if (CrossBelow(i_price_range.Signal,i_price_range.UpperBand1, 1)) {
-//				shortPatternMatched = !isLong;
-//			}
-			
-//			if (CrossAbove(i_price_range.Signal,i_price_range.LowerBand1, 1)) {
-//				longPatternMatched = isLong;
-//			}
 		}
 
         private void evaluateConditions2()
