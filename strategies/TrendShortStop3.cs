@@ -180,7 +180,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				i_hourly_mid_sma	= SMA(BarsArray[2], MAHourlyMidPeriod);
 				
 				AddChartIndicator(i_price_range);
-//				AddChartIndicator(i_ma_band);
+				AddChartIndicator(i_ma_band);
 			}
 		}
 
@@ -267,11 +267,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 			// Conditions
 			//###########################################################################
             evaluateConditions();
+			
+			int patternLookback = 7;
 
 			if (shortPatternMatched && patternHigh == 0 && patternLow == 0) {
 				longPatternMatched = false;
-				patternLow = Math.Min(MIN(Close, 5)[0], MIN(Open, 5)[0]);
-				patternHigh	= Math.Max(MAX(Open, 5)[0], MAX(Close, 5)[0]);
+				patternLow = Math.Min(MIN(Close, patternLookback)[0], MIN(Open, patternLookback)[0]);
+				patternHigh	= Math.Max(MAX(Open, patternLookback)[0], MAX(Close, patternLookback)[0]);
 			}
 			
 			if (Close[0] > patternHigh && patternHigh > 0 && shortPatternMatched) {
@@ -290,8 +292,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			
 			if (longPatternMatched && patternHigh == 0 && patternLow == 0) {
 				shortPatternMatched = false;
-				patternHigh = MAX(Close, 5)[0];
-				patternLow	= Math.Min(MIN(Open, 5)[0], MIN(Close, 5)[0]);
+				patternHigh = MAX(Close, patternLookback)[0];
+				patternLow	= Math.Min(MIN(Open, patternLookback)[0], MIN(Close, patternLookback)[0]);
 			}
 			
 			if (Close[0] < patternLow && longPatternMatched) {
@@ -427,25 +429,39 @@ namespace NinjaTrader.NinjaScript.Strategies
 			longPatternMatched = false;
 			shortPatternMatched = false;
 			
-			isLong = allMaRising || maStackRising;
-//			isLong = allMaRising && maStackRising;
+//			bool hourlySlowMid  	= i_hourly_slow_sma[0] < i_hourly_mid_sma[0];
+//            bool hourlySlowFast  	= i_hourly_slow_sma[0] < i_hourly_sma[0];
 			
-//			if (CrossBelow(i_price_range.Signal,i_price_range.LowerBand1, 1)) {
-////				shortPatternMatched = !isLong;
-//				longPatternMatched = isLong;
-//			}		
+//			if (hourlySlowMid != hourlySlowFast && IsRising(i_hourly_sma) != IsRising(i_hourly_mid_sma)) {
+//				return;
+//			}
 			
-			if (CrossBelow(i_price_range.Signal,i_price_range.UpperBand1, 1)) {
-//				shortPatternMatched = !isLong;
-//				longPatternMatched = isLong;
+//			isLong = IsRising(i_hourly_mid_sma) && i_hourly_mid_sma[0] > i_hourly_slow_sma[0];
+//			isLong = IsRising(i_hourly_mid_sma) && i_hourly_mid_sma[0] > i_hourly_slow_sma[0];
+			isLong = IsRising(i_ma_band.Fast);
+			
+//			bool slowAboveMid = i_ma_band.Slow[0] > i_ma_band.Mid[0];
+//			bool slowAboveFast = i_ma_band.Slow[0] > i_ma_band.Fast[0];
+			
+//			if (slowAboveFast != slowAboveMid) {
+//				return;
+//			}
+			
+			if (CrossAbove(i_price_range.Signal,i_price_range.UpperBand1, 1)) {
+				shortPatternMatched = true;
+			}
+			
+			if (CrossBelow(i_price_range.Signal,i_price_range.LowerBand1, 1)) {
 				longPatternMatched = true;
 			}
 			
-			if (CrossAbove(i_price_range.Signal,i_price_range.LowerBand1, 1)) {
+//			if (CrossBelow(i_price_range.Signal,i_price_range.UpperBand1, 1)) {
 //				shortPatternMatched = !isLong;
-////				longPatternMatched = isLong;
-				shortPatternMatched = true;
-			}
+//			}
+			
+//			if (CrossAbove(i_price_range.Signal,i_price_range.LowerBand1, 1)) {
+//				longPatternMatched = isLong;
+//			}
 		}
 
         private void evaluateConditions2()
@@ -822,131 +838,5 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{ get; set; }
 		
 		#endregion
-		
-		
-//				longPatternMatched = true
-//					&& (Close[0] > i_ma_band.Fast[0]) // 0
-//					&& prBelowLower // 1
-//					&& prAboveBand2Upper // 2
-//					&& prBelowBand2Upper // 3
-//					&& prAboveBand2Lower // 4
-//					&& prBelowBand2Lower // 5
-//					&& prBelowMid // 6
-//					&& prBelowUpper // 7
-//					&& prMiddle // 8
-//					&& prAboveUpper // 9
-//					&& prAboveMid // 10
-//					&& prAboveLower // 11
-//					&& belowAverageATR // 12
-//					&& aboveAverageATR // 13
-//					&& aboveVwapDown // 14
-//					&& belowVwapUp // 15
-//					&& aboveVwap // 16
-//					&& belowVwap // 17
-//					&& averageATR // 18
-//					&& smaRising // 19
-//					&& priceAboveSma // 20
-//					&& slowAboveSma // 21
-//					&& biggerBars // 22
-//					&& smallerBars // 23
-//					&& downBars // 24
-//					&& upBars // 25
-//					&& priceBelowSma // 26
-//					&& slowBelowSma // 27
-//					&& allMaFalling // 28
-//					&& maStackFalling // 29
-//				;		
-
-				
-//				if (Control == 0) {
-//					longPatternMatched = longPatternMatched && (Close[0] > i_ma_band.Fast[0]);
-//				}
-//				if (Control == 1) {
-//					longPatternMatched = longPatternMatched && prBelowLower;
-//				}
-//				if (Control == 2) {
-//					longPatternMatched = longPatternMatched && prAboveBand2Upper;
-//				}
-//				if (Control == 3) {
-//					longPatternMatched = longPatternMatched && prBelowBand2Upper;
-//				}
-//				if (Control == 4) {
-//					longPatternMatched = longPatternMatched && prAboveBand2Lower;
-//				}
-//				if (Control == 5) {
-//					longPatternMatched = longPatternMatched && prBelowBand2Lower;
-//				}
-//				if (Control == 6) {
-//					longPatternMatched = longPatternMatched && prBelowMid;
-//				}
-//				if (Control == 7) {
-//					longPatternMatched = longPatternMatched && prBelowUpper;
-//				}
-//				if (Control == 8) {
-//					longPatternMatched = longPatternMatched && prMiddle;
-//				}
-//				if (Control == 9) {
-//					longPatternMatched = longPatternMatched && prAboveUpper;
-//				}
-//				if (Control == 10) {
-//					longPatternMatched = longPatternMatched && prAboveMid;
-//				}
-//				if (Control == 11) {
-//					longPatternMatched = longPatternMatched && prAboveLower;
-//				}
-//				if (Control == 12) {
-//					longPatternMatched = longPatternMatched && belowAverageATR;
-//				}
-//				if (Control == 13) {
-//					longPatternMatched = longPatternMatched && aboveAverageATR;
-//				}
-//				if (Control == 14) {
-//					longPatternMatched = longPatternMatched && aboveVwapDown;
-//				}
-//				if (Control == 15) {
-//					longPatternMatched = longPatternMatched && belowVwapUp;
-//				}
-//				if (Control == 16) {
-//					longPatternMatched = longPatternMatched && aboveVwap;
-//				}
-//				if (Control == 17) {
-//					longPatternMatched = longPatternMatched && belowVwap;
-//				}
-//				if (Control == 18) {
-//					longPatternMatched = longPatternMatched && averageATR;
-//				}
-//				if (Control == 19) {
-//					longPatternMatched = longPatternMatched && smaRising;
-//				}
-//				if (Control == 20) {
-//					longPatternMatched = longPatternMatched && priceAboveSma;
-//				}
-//				if (Control == 21) {
-//					longPatternMatched = longPatternMatched && slowAboveSma;
-//				}
-//				if (Control == 22) {
-//					longPatternMatched = longPatternMatched && biggerBars;
-//				}
-//				if (Control == 23) {
-//					longPatternMatched = longPatternMatched && smallerBars;
-//				}
-//				if (Control == 24) {
-//					longPatternMatched = longPatternMatched && downBars;
-//				}
-//				if (Control == 25) {
-//					longPatternMatched = longPatternMatched && upBars;
-//				}
-//				if (Control == 26) {
-//					longPatternMatched = longPatternMatched && priceBelowSma;
-//				}
-//				if (Control == 27) {
-//					longPatternMatched = longPatternMatched && slowBelowSma;
-//				}
-//				if (Control == 28) {
-//					longPatternMatched = longPatternMatched && allMaFalling;
-//				}
-//				if (Control == 29) {
-//					longPatternMatched = longPatternMatched && maStackFalling;
-//				}
 	}
 }
