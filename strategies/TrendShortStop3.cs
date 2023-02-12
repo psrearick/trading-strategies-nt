@@ -28,7 +28,7 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //This namespace holds strategies in this folder and is required. Do not change it.
 namespace NinjaTrader.NinjaScript.Strategies
 {
-	public class TrendShortStop : Strategy
+	public class TrendShort2 : Strategy
 	{
         private Order entryOrder;
         private Order longStopEntry;
@@ -38,7 +38,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private OrderFlowVWAP i_vwap;
         private ATR i_atr;
-		private PriceRange2 i_price_range;
+		private PriceRange3 i_price_range;
 		private PriceAction i_price_action;
 		private MABand i_ma_band;
 		private EMA i_atr_ma;
@@ -118,8 +118,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults) {
-				Description	                                = "Short Trend";
-                Name		                                = "Short Trend";
+				Description	                                = "Short Trend 2";
+                Name		                                = "Short Trend 2";
 				EntriesPerDirection							= 1;
 				EntryHandling								= EntryHandling.AllEntries;
 				IsExitOnSessionCloseStrategy				= true;
@@ -170,7 +170,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
                 i_vwap              = OrderFlowVWAP(VWAPResolution.Standard, TradingHours.String2TradingHours("CME US Index Futures RTH"), VWAPStandardDeviations.Three, 1, 2, 3);
                 i_atr               = ATR(4);
-				i_price_range		= PriceRange2(PRMA, PRSmoothing, PRLookback);
+				i_price_range		= PriceRange3(PRMA, PRSmoothing, PRLookback);
 				i_price_action		= PriceAction();
 				i_ma_band			= MABand(MAFastPeriod, MAMidPeriod, MASlowPeriod);
 				i_atr_ma			= EMA(i_atr, 9);
@@ -180,7 +180,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				i_hourly_mid_sma	= SMA(BarsArray[2], MAHourlyMidPeriod);
 				
 				AddChartIndicator(i_price_range);
-				AddChartIndicator(i_ma_band);
+//				AddChartIndicator(i_ma_band);
 			}
 		}
 
@@ -419,8 +419,36 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (order.Name == "shortStopEntry" && shortStopEntry != order)
 				shortStopEntry = order;
 		}
+		
+		private void evaluateConditions()
+		{
+			longCondition	= false;
+			shortCondition	= false;
+			longPatternMatched = false;
+			shortPatternMatched = false;
+			
+			isLong = allMaRising || maStackRising;
+//			isLong = allMaRising && maStackRising;
+			
+//			if (CrossBelow(i_price_range.Signal,i_price_range.LowerBand1, 1)) {
+////				shortPatternMatched = !isLong;
+//				longPatternMatched = isLong;
+//			}		
+			
+			if (CrossBelow(i_price_range.Signal,i_price_range.UpperBand1, 1)) {
+//				shortPatternMatched = !isLong;
+//				longPatternMatched = isLong;
+				longPatternMatched = true;
+			}
+			
+			if (CrossAbove(i_price_range.Signal,i_price_range.LowerBand1, 1)) {
+//				shortPatternMatched = !isLong;
+////				longPatternMatched = isLong;
+				shortPatternMatched = true;
+			}
+		}
 
-        private void evaluateConditions()
+        private void evaluateConditions2()
         {
 			longCondition	= false;
 			shortCondition	= false;
@@ -453,7 +481,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			// Short 1 Conditions
 			//###########################################################################
             if (smallerBars) {
-                conditionOneShortMatches = conditionOneShortMatches + 1;
+//                conditionOneShortMatches = conditionOneShortMatches + 1;
             }
             
             if (slowAboveSma) {
@@ -472,7 +500,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			// Short 2 Conditions
 			//###########################################################################
             if (belowVwap) {
-                conditionTwoShortMatches = conditionTwoShortMatches + 1;
+//                conditionTwoShortMatches = conditionTwoShortMatches + 1;
             }
             
             if (prBelowMid) {
@@ -492,30 +520,35 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             
             if (upBars) {
-                conditionTwoShortMatches = conditionTwoShortMatches + 0.5;
+//                conditionTwoShortMatches = conditionTwoShortMatches + 0.5;
             }
 
             //###########################################################################
 			// Long 1 Conditions
 			//###########################################################################
             if (closeAboveFast) {
-                conditionOneLongMatches = conditionOneLongMatches + 1;
+//                conditionOneLongMatches = conditionOneLongMatches + 1;
             }
             
             if (prBelowLower) {
                 conditionOneLongMatches = conditionOneLongMatches + 0.5;
             }
+			
             
-            if (prBelowUpper) {
+            if (prAboveUpper) {
                 conditionOneLongMatches = conditionOneLongMatches + 0.5;
             }
             
+//            if (prBelowUpper) {
+//                conditionOneLongMatches = conditionOneLongMatches + 0.5;
+//            }
+            
             if (belowVwapUp) {
-                conditionOneLongMatches = conditionOneLongMatches + 0.5;
+//                conditionOneLongMatches = conditionOneLongMatches + 0.5;
             }
             
             if (aboveVwap) {
-                conditionOneLongMatches = conditionOneLongMatches + 1;
+//                conditionOneLongMatches = conditionOneLongMatches + 1;
             }
             
             if (averageATR) {
@@ -542,11 +575,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             
             if (belowVwapUp) {
-                conditionTwoLongMatches = conditionTwoLongMatches + 0.5;
+//                conditionTwoLongMatches = conditionTwoLongMatches + 0.5;
             }
             
             if (averageATR) {
-                conditionTwoLongMatches = conditionTwoLongMatches + 1;
+//                conditionTwoLongMatches = conditionTwoLongMatches + 1;
             }
             
             if (priceAboveSma) {
@@ -554,20 +587,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             
             if (biggerBars) {
-                conditionTwoLongMatches = conditionTwoLongMatches + 1;
+//                conditionTwoLongMatches = conditionTwoLongMatches + 1;
             }
             
             if (upBars) {
-                conditionTwoLongMatches = conditionTwoLongMatches + 0.5;
+//                conditionTwoLongMatches = conditionTwoLongMatches + 0.5;
             }
             
             if (slowBelowSma) {
                 conditionTwoLongMatches = conditionTwoLongMatches + 0.5;
             }
 
-
-
-			
 			if (isLong) {
                 if (useFirstCondition) {
                     longPatternMatched = conditionOneLongMatches >= LongCondition1Threshold;
@@ -581,6 +611,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 					shortPatternMatched = conditionTwoShortMatches >= ShortCondition2Threshold;
 				}
             }
+			
+//			if (atr < ATRThreshold) {
+//				shortPatternMatched = false;
+//				longPatternMatched  = false;
+//			}
 
 			//////////////////////////////////////////
 			/// Disable Short Trades
