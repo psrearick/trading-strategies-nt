@@ -43,11 +43,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private PriceRange3 i_price_range;
 		private PriceAction i_price_action;
 		private MABand i_ma_band;
+		private MABand i_hourly_ma_band;
 		private EMA i_atr_ma;
 		private SMA i_long_sma;
-		private SMA i_hourly_sma;
-        private SMA i_hourly_mid_sma;
-        private SMA i_hourly_slow_sma;
+		private MIN i_open_min;
+		private MAX i_open_max;
+		private MIN i_close_min;
+		private MAX i_close_max;
 
         private bool maStackRising = false;
         private bool maStackFalling = false;
@@ -62,6 +64,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private bool slowRising = false;
         private bool closeAboveSlow = false;
         private bool closeAboveFast = false;
+		private bool closeAboveHourlyFast = false;
+        private bool closeAboveHourlyMid = false;
+        private bool closeAboveHourlySlow = false;
 		private bool hourlySlowAboveHourlyFast = false;
 		private bool hourlySlowAboveHourlyMid = false;
 		
@@ -177,9 +182,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 				i_ma_band			= MABand(MAFastPeriod, MAMidPeriod, MASlowPeriod);
 				i_atr_ma			= EMA(i_atr, 9);
 				i_long_sma			= SMA(200);
-				i_hourly_sma		= SMA(BarsArray[2], MAHourlyPeriod);
-                i_hourly_slow_sma   = SMA(BarsArray[2], MAHourlySlowPeriod);
-				i_hourly_mid_sma	= SMA(BarsArray[2], MAHourlyMidPeriod);
+				i_hourly_ma_band	= MABand(MAHourlyPeriod, MAHourlyMidPeriod, MAHourlySlowPeriod);
+				i_open_min			= MIN(Opens[0], 7);
+				i_open_max			= MAX(Opens[0], 7);
+				i_close_min			= MIN(Closes[0], 7);
+				i_close_max			= MAX(Closes[0], 7);
 				
 				AddChartIndicator(i_price_range);
 				AddChartIndicator(i_ma_band);
@@ -196,8 +203,62 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return;		
             }
 
-            //###########################################################################
-			// Indicators
+			setIndicatorStatuses();
+			
+            evaluateConditions();
+			
+			setTargetEntries();
+			
+			executeTrades();
+			
+		}
+
+        protected override void OnOrderUpdate(Cbi.Order order, double limitPrice, double stopPrice,
+			int quantity, int filled, double averageFillPrice,
+			Cbi.OrderState orderState, DateTime time, Cbi.ErrorCode error, string comment)
+		{
+			AssignOrderToVariable(ref order);
+		}
+
+        protected override void OnExecutionUpdate(Cbi.Execution execution, string executionId, double price, int quantity,
+			Cbi.MarketPosition marketPosition, string orderId, DateTime time)
+		{
+			double baseProfitTarget			= ProfitTarget;
+			double profitTargetLow			= baseProfitTarget * 0.2;
+			double profitTargetHalf			= (baseProfitTarget + profitTargetLow) / 2;
+			double usableProfitTarget		= baseProfitTarget;
+			double profitTargetDouble		= baseProfitTarget * 2;
+			
+			if (execution.Order == shortStopEntry) {
+				usableProfitTarget = ShortProfitTarget;
+			}
+			
+			executionAtr					= ATR(14)[0];
+			double adjustedProfitTarget     = (executionAtr * usableProfitTarget) * TickSize;
+			double adjustedStopLoss		    = (executionAtr * StopLoss) * TickSize;
+			
+			if (longStopEntry != null && execution.Order == longStopEntry) {	
+				tradeDirection = 1;
+				ocoString       = string.Format("unmanageexitdoco{0}", DateTime.Now.ToString("hhmmssffff"));
+				stopLossOrder   = SubmitOrderUnmanaged(1, OrderAction.Sell, OrderType.StopMarket, quantity, 0, price - adjustedStopLoss, ocoString, "longStopLoss");
+                logEntry();
+			} else if (shortStopEntry != null && execution.Order == shortStopEntry) {
+				tradeDirection = -1;
+				ocoString       = string.Format("unmanageexitdoco{0}", DateTime.Now.ToString("hhmmssffff"));
+				stopLossOrder   = SubmitOrderUnmanaged(1, OrderAction.BuyToCover, OrderType.StopMarket, quantity, 0, price + adjustedStopLoss, ocoString, "shortStopLoss");
+                logEntry();
+			} else if (execution.Name == "Exit on session close" || execution.Name == "longProfitTarget" || execution.Name == "longStopLoss" || execution.Name == "shortProfitTarget" || execution.Name == "shortStopLoss") {
+				longStopEntry	= null;
+				shortStopEntry	= null;
+                takeProfitOrder = null;
+                stopLossOrder   = null;
+                logExit(execution.Name);
+				tradeDirection = 0;
+			}
+		}
+		
+		private void setIndicatorStatuses()
+		{
 			//###########################################################################
 			// MOVING AVERAGES
 			//#####################
@@ -213,10 +274,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 			slowBelowSma		= i_ma_band.Slow[0] < i_long_sma[0];
             closeAboveSlow      = Close[0] > i_ma_band.Slow[0];
             closeAboveFast      = Close[0] > i_ma_band.Fast[0];
-
-            closeAboveHourlyMA  		= Close[0] > i_hourly_sma[0];
-            hourlySlowAboveHourlyMid  	=   i_hourly_slow_sma[0] > i_hourly_mid_sma[0];
-            hourlySlowAboveHourlyFast  	=   i_hourly_slow_sma[0] > i_hourly_sma[0];
+			
+            closeAboveHourlyFast  		= Close[0] > i_hourly_ma_band.Fast[0];
+            closeAboveHourlyMid 		= Close[0] > i_hourly_ma_band.Mid[0];
+            closeAboveHourlySlow  		= Close[0] > i_hourly_ma_band.Slow[0];
+            hourlySlowAboveHourlyMid  	=   i_hourly_ma_band.Slow[0] > i_hourly_ma_band.Mid[0];
+            hourlySlowAboveHourlyFast  	=   i_hourly_ma_band.Slow[0] > i_hourly_ma_band.Fast[0];
 
 			//#####################
 			// VWAP
@@ -264,27 +327,31 @@ namespace NinjaTrader.NinjaScript.Strategies
 			biggerBars 			= i_price_action.BarIsBigger(0) && i_price_action.LeastBiggerBars(1, 2, 1);
 			barsUp79 			= i_price_action.LeastBarsUp(7, 9);
 			barsUp57			= i_price_action.LeastBarsUp(5, 7);
-
-            //###########################################################################
-			// Conditions
-			//###########################################################################
-            evaluateConditions();
-			
-			int patternLookback = 7;
-
-			if (shortPatternMatched && patternHigh == 0 && patternLow == 0) {
-				longPatternMatched = false;
-				patternLow = Math.Min(MIN(Close, patternLookback)[0], MIN(Open, patternLookback)[0]);
-				patternHigh	= Math.Max(MAX(Open, patternLookback)[0], MAX(Close, patternLookback)[0]);
+		}
+		
+		private void setTargetEntries()
+		{
+			if (patternHigh == 0.0 && patternLow == 0.0 && (shortPatternMatched || longPatternMatched)) {
+				patternLow = Math.Min(i_close_min[0], i_open_min[0]);
+				patternHigh	= Math.Max(i_close_max[0], i_open_max[0]);
 			}
 			
-			if (Close[0] > patternHigh && patternHigh > 0 && shortPatternMatched) {
+			if (ToTime(Time[0]) < ToTime(OpenTime) || ToTime(Time[0]) > ToTime(CloseTime)) {
+				patternHigh = 0.0;
+				patternLow = 0.0;
+            }
+
+			if (shortPatternMatched && patternHigh == 0.0 && patternLow == 0.0) {
+				longPatternMatched = false;
+			}
+			
+			if (Closes[0][0] > patternHigh && patternHigh > 0 && shortPatternMatched) {
 				shortPatternMatched = false;
 				patternHigh = 0.0;
 				patternLow = 0.0;
 			}
 			
-			if (Close[0] < patternLow && shortPatternMatched) {
+			if (Closes[0][0] < patternLow && shortPatternMatched) {
 				shortPatternMatched = false;
 				patternHigh = 0.0;
 				patternLow = 0.0;
@@ -292,56 +359,32 @@ namespace NinjaTrader.NinjaScript.Strategies
 				shortCondition = true;
 			}
 			
-			if (longPatternMatched && patternHigh == 0 && patternLow == 0) {
+			if (longPatternMatched && patternHigh == 0.0 && patternLow == 0.0) {
 				shortPatternMatched = false;
-				patternHigh = MAX(Close, patternLookback)[0];
-				patternLow	= Math.Min(MIN(Open, patternLookback)[0], MIN(Close, patternLookback)[0]);
 			}
 			
-			if (Close[0] < patternLow && longPatternMatched) {
+			if (Closes[0][0] < patternLow && longPatternMatched) {
 				longPatternMatched = false;
 				patternHigh = 0.0;
 				patternLow = 0.0;
 			}
 			
-			if (Close[0] > patternHigh && patternHigh > 0 && longPatternMatched) {
+			if (Closes[0][0] > patternHigh && patternHigh > 0 && longPatternMatched) {
 				longPatternMatched = false;
 				patternHigh = 0.0;
 				patternLow = 0.0;
 				
 				longCondition = true;
 			}
-
-			//###########################################################################
-			// Execute Trades
-			//###########################################################################
-			tradeDirection = 0;
-			
-			if (Position.MarketPosition != MarketPosition.Flat) {
-				tradeDirection = Position.MarketPosition == MarketPosition.Long ? 1 : -1;
-			}
-			
-			if (entryOrder != null) {
-				if (entryOrder.OrderState == OrderState.Accepted) {
-					CancelOrder(entryOrder);
-				} else {
-					return;
-				}
-			}
-			
+		}
+		
+		private void executeTrades()
+		{
 			if (tradeDirection != 0) {
                 exitPositions();
 
 				return;
 			}
-			
-			if (ToTime(Time[0]) < ToTime(OpenTime)) {
-				return;
-            }
-			
-			if (ToTime(Time[0]) > ToTime(CloseTime)) {
-				return;
-            }
 			
 			if (longCondition) {
 				ocoString		= string.Format("unmanagedlongentryoco{0}", DateTime.Now.ToString("hhmmssffff"));
@@ -351,76 +394,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (shortCondition) {
 				ocoString		= string.Format("unmanagedshortentryoco{0}", DateTime.Now.ToString("hhmmssffff"));
 				shortStopEntry	= SubmitOrderUnmanaged(1, OrderAction.SellShort, OrderType.Market, quantity, 0, 0, ocoString, "shortStopEntry");
-			}
-		}
-
-        protected override void OnOrderUpdate(Cbi.Order order, double limitPrice, double stopPrice,
-			int quantity, int filled, double averageFillPrice,
-			Cbi.OrderState orderState, DateTime time, Cbi.ErrorCode error, string comment)
-		{
-			AssignOrderToVariable(ref order);
-			if ((longStopEntry != null && longStopEntry.OrderState == OrderState.Cancelled && shortStopEntry != null && shortStopEntry.OrderState == OrderState.Cancelled) || (order.Name == "Exit on session close" && order.OrderState == OrderState.Filled))
-			{
-				longStopEntry	= null;
-				shortStopEntry	= null;
-				tradeDirection	= 0;
-			}
-			
-			bool isOrderEntry = order.Name == "LongStopEntry" || order.Name == "ShortStopEntry";
-			
-			if (isOrderEntry) {
-				tradeDirection 	= 0;
-				entryOrder 		= order;
-				
-				if (orderState == OrderState.Filled) {
-					tradeDirection	= order.Name == "LongStopEntry" ? 1 : -1;
-					entryOrder 		= null;
-				}
-				
-				if (orderState == OrderState.Cancelled) {
-					entryOrder = null;
-				}
-			} else if (order.Name == "Exit on session close" ||order.Name == "longProfitTarget" ||order.Name == "longStopLoss" ||order.Name == "shortProfitTarget" ||order.Name == "shortStopLoss") {
-				if (orderState == OrderState.Filled || orderState == OrderState.Cancelled || orderState == OrderState.Rejected) {
-                    takeProfitOrder = null;
-                    stopLossOrder   = null;
-                }
-            }
-		}
-
-        protected override void OnExecutionUpdate(Cbi.Execution execution, string executionId, double price, int quantity,
-			Cbi.MarketPosition marketPosition, string orderId, DateTime time)
-		{
-			double baseProfitTarget			= ProfitTarget;
-			double profitTargetLow			= baseProfitTarget * 0.2;
-			double profitTargetHalf			= (baseProfitTarget + profitTargetLow) / 2;
-			double usableProfitTarget		= baseProfitTarget;
-			double profitTargetDouble		= baseProfitTarget * 2;
-			
-			if (execution.Order == shortStopEntry) {
-				usableProfitTarget = ShortProfitTarget;
-			}
-			
-			executionAtr					= ATR(14)[0];
-			double adjustedProfitTarget     = (executionAtr * usableProfitTarget) * TickSize;
-			double adjustedStopLoss		    = (executionAtr * StopLoss) * TickSize;
-			
-			if (longStopEntry != null && execution.Order == longStopEntry) {	
-				ocoString       = string.Format("unmanageexitdoco{0}", DateTime.Now.ToString("hhmmssffff"));
-				// takeProfitOrder = SubmitOrderUnmanaged(1, OrderAction.Sell, OrderType.Limit, quantity, price + adjustedProfitTarget, 0, ocoString, "longProfitTarget");
-				stopLossOrder   = SubmitOrderUnmanaged(1, OrderAction.Sell, OrderType.StopMarket, quantity, 0, price - adjustedStopLoss, ocoString, "longStopLoss");
-                logEntry();
-			} else if (shortStopEntry != null && execution.Order == shortStopEntry) {
-				ocoString       = string.Format("unmanageexitdoco{0}", DateTime.Now.ToString("hhmmssffff"));
-				// takeProfitOrder = SubmitOrderUnmanaged(1, OrderAction.BuyToCover, OrderType.Limit, quantity, price - adjustedProfitTarget, 0, ocoString, "shortProfitTarget");
-				stopLossOrder   = SubmitOrderUnmanaged(1, OrderAction.BuyToCover, OrderType.StopMarket, quantity, 0, price + adjustedStopLoss, ocoString, "shortStopLoss");
-                logEntry();
-			} else if (execution.Name == "Exit on session close" || execution.Name == "longProfitTarget" || execution.Name == "longStopLoss" || execution.Name == "shortProfitTarget" || execution.Name == "shortStopLoss") {
-				longStopEntry	= null;
-				shortStopEntry	= null;
-                takeProfitOrder = null;
-                stopLossOrder   = null;
-                logExit(execution.Name);
 			}
 		}
 
@@ -434,224 +407,78 @@ namespace NinjaTrader.NinjaScript.Strategies
 		}
 
         private void exitPositions() {
+			if (tradeDirection == 0) {
+				return;
+			}
+			
+			if (i_price_range.Signal[0] < i_price_range.UpperBand1[0] && i_price_range.Signal[0] > i_price_range.LowerBand1[0]) {
+				return;
+			}
 			
             if (tradeDirection == 1) {
-                if (i_price_range.Signal[0] > i_price_range.UpperBand1[0]) {
-                    SubmitOrderUnmanaged(1, OrderAction.Sell, OrderType.Market, quantity, 0, 0, ocoString, "longProfitTarget");
-                    CancelOrder(stopLossOrder);
-                }
+                SubmitOrderUnmanaged(1, OrderAction.Sell, OrderType.Market, quantity, 0, 0, ocoString, "longProfitTarget");
             } else {
-                if (i_price_range.Signal[0] < i_price_range.LowerBand1[0]) {
-                    SubmitOrderUnmanaged(1, OrderAction.BuyToCover, OrderType.Market, quantity, 0, 0, ocoString, "shortProfitTarget");
-                    CancelOrder(stopLossOrder);
-                }
+                SubmitOrderUnmanaged(1, OrderAction.BuyToCover, OrderType.Market, quantity, 0, 0, ocoString, "shortProfitTarget"); 
             }
+			
+			CancelOrder(stopLossOrder);
         }
 		
 		private void evaluateConditions()
 		{
-			longCondition	= false;
-			shortCondition	= false;
-			longPatternMatched = false;
-			shortPatternMatched = false;
+			longCondition		= false;
+			shortCondition		= false;
 			
-			if (CrossAbove(i_price_range.Signal,i_price_range.UpperBand1, 1)) {
-				shortPatternMatched = true;
-			}
-			
-			if (CrossBelow(i_price_range.Signal,i_price_range.LowerBand1, 1)) {
-				longPatternMatched = true;
-			}
+			longPatternMatched 	= evaluateLongConditions();
+			shortPatternMatched = longPatternMatched ? false : evaluateShortConditions();		
 		}
-
-        private void evaluateConditions2()
-        {
-			longCondition	= false;
-			shortCondition	= false;
-			longPatternMatched = false;
-			shortPatternMatched = false;
-			
-//            useFirstCondition = hourlySlowAboveHourlyFast && hourlySlowAboveHourlyMid;
-            useFirstCondition = hourlySlowAboveHourlyFast;
-//            useFirstCondition = hourlySlowAboveHourlyMid;
-//			useFirstCondition = slowBelowSma && slowRising;
-			
-//			useFirstCondition = slowAboveSma || slowRising;
-//			useFirstCondition = closeAboveHourlyMA;
-			
-//			bool allowShort = !allMaRising && !maStackRising;
-			bool allowShort = true;
-			
-//			isLong = allMaRising || maStackRising;
-//			isLong = allMaRising && maStackRising;
-//            isLong = closeAboveSlow || slowRising;
-//            isLong = closeAboveSlow && slowRising;
-			isLong = Close[0] > i_ma_band.Fast[0];
-
-            double conditionOneShortMatches = 0.0;
-            double conditionTwoShortMatches = 0.0;
-            double conditionOneLongMatches = 0.0;
-            double conditionTwoLongMatches = 0.0;
-
-            //###########################################################################
-			// Short 1 Conditions
-			//###########################################################################
-            if (smallerBars) {
-//                conditionOneShortMatches = conditionOneShortMatches + 1;
-            }
-            
-            if (slowAboveSma) {
-                conditionOneShortMatches = conditionOneShortMatches + 1;
-            }
-            
-            if (prMiddle) {
-                conditionOneShortMatches = conditionOneShortMatches + 1;
-            }
-            
-            if (prAboveMid) {
-                conditionOneShortMatches = conditionOneShortMatches + 1;
-            }
-
-            //###########################################################################
-			// Short 2 Conditions
-			//###########################################################################
-            if (belowVwap) {
-//                conditionTwoShortMatches = conditionTwoShortMatches + 1;
-            }
-            
-            if (prBelowMid) {
-                conditionTwoShortMatches = conditionTwoShortMatches + 1;
-            }
-            
-            if (prMiddle) {
-                conditionTwoShortMatches = conditionTwoShortMatches + 0.5;
-            }
-            
-            if (averageATR) {
-                conditionTwoShortMatches = conditionTwoShortMatches + 0.5;
-            }
-            
-            if (slowBelowSma) {
-                conditionTwoShortMatches = conditionTwoShortMatches + 1;
-            }
-            
-            if (upBars) {
-//                conditionTwoShortMatches = conditionTwoShortMatches + 0.5;
-            }
-
-            //###########################################################################
-			// Long 1 Conditions
-			//###########################################################################
-            if (closeAboveFast) {
-//                conditionOneLongMatches = conditionOneLongMatches + 1;
-            }
-            
-            if (prBelowLower) {
-                conditionOneLongMatches = conditionOneLongMatches + 0.5;
-            }
-			
-            
-            if (prAboveUpper) {
-                conditionOneLongMatches = conditionOneLongMatches + 0.5;
-            }
-            
-//            if (prBelowUpper) {
-//                conditionOneLongMatches = conditionOneLongMatches + 0.5;
-//            }
-            
-            if (belowVwapUp) {
-//                conditionOneLongMatches = conditionOneLongMatches + 0.5;
-            }
-            
-            if (aboveVwap) {
-//                conditionOneLongMatches = conditionOneLongMatches + 1;
-            }
-            
-            if (averageATR) {
-                conditionOneLongMatches = conditionOneLongMatches + 1;
-            }
-            
-            if (slowAboveSma) {
-                conditionOneLongMatches = conditionOneLongMatches + 1;
-            }
-
-            //###########################################################################
-			// Long 2 Conditions
-			//###########################################################################
-            if (prBelowLower) {
-                conditionTwoLongMatches = conditionTwoLongMatches + 1;
-            }
-            
-            if (prBelowMid) {
-                conditionTwoLongMatches = conditionTwoLongMatches + 0.5;
-            }
-            
-            if (belowAverageATR) {
-                conditionTwoLongMatches = conditionTwoLongMatches + 0.5;
-            }
-            
-            if (belowVwapUp) {
-//                conditionTwoLongMatches = conditionTwoLongMatches + 0.5;
-            }
-            
-            if (averageATR) {
-//                conditionTwoLongMatches = conditionTwoLongMatches + 1;
-            }
-            
-            if (priceAboveSma) {
-                conditionTwoLongMatches = conditionTwoLongMatches + 0.5;
-            }
-            
-            if (biggerBars) {
-//                conditionTwoLongMatches = conditionTwoLongMatches + 1;
-            }
-            
-            if (upBars) {
-//                conditionTwoLongMatches = conditionTwoLongMatches + 0.5;
-            }
-            
-            if (slowBelowSma) {
-                conditionTwoLongMatches = conditionTwoLongMatches + 0.5;
-            }
-
-			if (isLong) {
-                if (useFirstCondition) {
-                    longPatternMatched = conditionOneLongMatches >= LongCondition1Threshold;
-                } else {
-                    longPatternMatched = conditionTwoLongMatches >= LongCondition2Threshold;
-                }
-			} else {
-				if (useFirstCondition) {
-					shortPatternMatched = conditionOneShortMatches >= ShortCondition1Threshold;
-				} else {
-					shortPatternMatched = conditionTwoShortMatches >= ShortCondition2Threshold;
-				}
-            }
-			
-//			if (atr < ATRThreshold) {
-//				shortPatternMatched = false;
-//				longPatternMatched  = false;
+		
+		private bool evaluateLongConditions()
+		{
+//			if (allMaFalling && maStackFalling) {
+//				return false;
 //			}
-
-			//////////////////////////////////////////
-			/// Disable Short Trades
-			shortPatternMatched = AllowLongTrades ? shortPatternMatched : false;
-			//////////////////////////////////////////
-
-			//////////////////////////////////////////
-			/// Disable Long Trades
-			longPatternMatched = AllowLongTrades ? longPatternMatched : false;
-			//////////////////////////////////////////
-        }
+			
+//			if (!closeAboveHourlyMid) {
+//				return false;
+//			}
+			
+//			if (!!closeAboveHourlySlow) {
+//				return false;
+//			}
+				
+			return CrossBelow(i_price_range.Signal,i_price_range.LowerBand1, 1);
+		}
+		
+		private bool evaluateShortConditions()
+		{
+//			if (!prAboveUpper) {
+//				return false;
+//			}
+			
+//			if (aboveAverageATR) {
+//				return false;
+//			}
+			
+//			if (closeAboveHourlyFast) {
+//				return false;
+//			}
+			
+//			if (closeAboveHourlyMid) {
+//				return false;
+//			}
+			
+//			if (closeAboveHourlySlow) {
+//				return false;
+//			}
+			
+			return CrossAbove(i_price_range.Signal,i_price_range.UpperBand1, 1);
+		}
 		
 		private void logEntry()
 		{	
 			tradeLog =
 				prBelowLower +
-				"|" + prAboveBand2Upper +
-				"|" + prBelowBand2Upper +
-				"|" + prAboveBand2Lower +
-				"|" + prBelowBand2Lower +
 				"|" + prBelowMid +
 				"|" + prBelowUpper +
 				"|" + prMiddle +
@@ -660,48 +487,35 @@ namespace NinjaTrader.NinjaScript.Strategies
 				"|" + prAboveLower +
 				"|" + belowAverageATR +
 				"|" + aboveAverageATR +
-				"|" + aboveVwapDown +
-				"|" + belowVwapUp +
-				"|" + aboveVwap +
-				"|" + belowVwap +
+//				"|" + aboveVwapDown +
+//				"|" + belowVwapUp +
+//				"|" + aboveVwap +
+//				"|" + belowVwap +
 				"|" + averageATR +
-				"|" + smaRising +
-				"|" + priceAboveSma +
-				"|" + slowAboveSma +
-				"|" + biggerBars +
-				"|" + smallerBars +
-				"|" + downBars +
-				"|" + upBars +
-				"|" + priceBelowSma +
-				"|" + slowBelowSma +
+//				"|" + smaRising +
+//				"|" + priceAboveSma +
+//				"|" + slowAboveSma +
+//				"|" + biggerBars +
+//				"|" + smallerBars +
+//				"|" + downBars +
+//				"|" + upBars +
+//				"|" + priceBelowSma +
+//				"|" + slowBelowSma +
 				"|" + allMaFalling +
-				"|" + maStackFalling;
+				"|" + maStackFalling +
+				"|" + closeAboveHourlyFast +
+				"|" + closeAboveHourlyMid +
+				"|" + closeAboveHourlySlow +
+				"|" + hourlySlowAboveHourlyMid +
+				"|" + hourlySlowAboveHourlyFast
+			
+			;
 		}
 		
 		private void logExit(string orderName)
 		{
-            string orderType    = "";
-            string winLoss      = "";
-
-            if (orderName == "shortProfitTarget") {
-                orderType   = "Short";
-                winLoss     = "W";
-            }
-
-            if (orderName == "longProfitTarget" || orderName == "Exit on session close") {
-                orderType   = "Long";
-                winLoss     = "W";
-            }
-
-            if (orderName == "longStopLoss") {
-                orderType   = "Long";
-                winLoss     = "L";
-            }
-
-            if (orderName == "shortStopLoss") {
-                orderType   = "Short";
-                winLoss     = "L";
-            }
+            string orderType    = tradeDirection == 1 ? "Long" : "Short";
+            string winLoss      = (orderName == "longStopLoss" || orderName == "shortStopLoss") ? "L" : "W";
 
             string log = tradeCount + "|" + orderType + "|" + winLoss + "|" + tradeLog;
 
