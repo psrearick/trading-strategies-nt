@@ -153,7 +153,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				MAHourlyMidPeriod							= 50;
 				MAHourlyPeriod								= 30;
 				ATRThreshold								= 25;
-				PRLength									= 2;
+				PRLength									= 5;
+				PRFast										= 10;
+				PRSlow										= 20;
 				IsUnmanaged									= true;
 			}
 
@@ -167,9 +169,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
                 i_vwap              = OrderFlowVWAP(VWAPResolution.Standard, TradingHours.String2TradingHours("CME US Index Futures RTH"), VWAPStandardDeviations.Three, 1, 2, 3);
                 i_atr               = ATR(4);
-				i_price_range		= PriceRange5(PRLength, false);
+				i_price_range		= PriceRange5(PRLength, PRFast, PRSlow);
 				i_price_action		= PriceAction();
-				i_price_range_short	= PriceRange5(PRLength, false, 1, 10);
+				i_price_range_short	= PriceRange5(Convert.ToInt32(Math.Round(Convert.ToDouble(PRLength / 2), 0)), PRFast, PRSlow);
 				i_ma_band			= MABand(MAFastPeriod, MAMidPeriod, MASlowPeriod);
 				i_atr_ma			= EMA(i_atr, 9);
 				i_long_sma			= SMA(200);
@@ -428,8 +430,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 			
 			PriceRange5 priceRange = getPR();
 			
-			bool crossAbove = CrossAbove(priceRange.Price, priceRange.Range, 1);
-			bool crossBelow = CrossBelow(priceRange.Price, priceRange.Range, 1);
+//			bool crossAbove = CrossAbove(priceRange.Signal, 20, 1);
+//			bool crossBelow = CrossBelow(priceRange.Signal, 80, 1);
+			
+			bool crossAbove = CrossAbove(priceRange.Fast, priceRange.Slow, 1);
+			bool crossBelow = CrossBelow(priceRange.Fast, priceRange.Slow, 1);
 			
 			if (crossAbove || crossBelow) {
 				string exitOcoString = string.Format("unmanageexitcross{0}", DateTime.Now.ToString("hhmmssffff"));
@@ -446,8 +451,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		
 		private PriceRange5 getPR()
 		{
-			bool conditions = false
-//				true
+			bool conditions = true
+				&& false
 //				&& allMaFalling && maStackFalling
 //				&& allMaRising && maStackRising
 //				&& hourlySlowAboveHourlyMid
@@ -480,29 +485,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 			PriceRange5 priceRange = getPR();
 			
-			if (priceRange.Price[0] < 50) {
-				return false;
-			}
-			
-			if (priceRange.Range[0] < 50) {
-				return false;
-			}
-			
-			return CrossAbove(priceRange.Price, priceRange.Range, 1);
-//			return CrossAbove(priceRange.Signal, priceRange.LowerBand1, 1);
+			return CrossAbove(priceRange.Fast, priceRange.Slow, 1);
+//			return CrossAbove(priceRange.Signal, 30, 1);
 		}
 		
 		private bool evaluateShortConditions()
 		{
 			PriceRange5 priceRange = getPR();
 			
-						
-			if (priceRange.Price[0] > 30) {
-				return false;
-			}
-			
-			return CrossBelow(priceRange.Price, priceRange.Range, 1);
-//			return CrossBelow(priceRange.Signal, priceRange.UpperBand1, 1);
+			return CrossBelow(priceRange.Fast, priceRange.Slow, 1);
+//			return CrossBelow(priceRange.Signal, 70, 1);
 		}
 		
 		private void logEntry()
@@ -569,20 +561,32 @@ namespace NinjaTrader.NinjaScript.Strategies
 		
 		[NinjaScriptProperty]
 		[Range(0.25, double.MaxValue)]
-		[Display(Name="Stop Loss", Description="Stop Loss", Order=5, GroupName="Parameters")]
+		[Display(Name="Stop Loss", Description="Stop Loss", Order=3, GroupName="Parameters")]
 		public double StopLoss
 		{ get; set; }
 		
 		[NinjaScriptProperty]
 		[Range(1, double.MaxValue)]
-		[Display(Name="ATR Threshold", Description="ATR Threshold", Order=6, GroupName="Parameters")]
+		[Display(Name="ATR Threshold", Description="ATR Threshold", Order=4, GroupName="Parameters")]
 		public double ATRThreshold
 		{ get; set; }
 		
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
-		[Display(Name="Price Range Length", Description="Price Range Length", Order=7, GroupName="Parameters")]
+		[Display(Name="Price Range Length", Description="Price Range Length", Order=5, GroupName="Parameters")]
 		public int PRLength
+		{ get; set; }
+		
+		[NinjaScriptProperty]
+		[Range(1, int.MaxValue)]
+		[Display(Name="Price Range Fast Length", Description="Price Range Fast Length", Order=6, GroupName="Parameters")]
+		public int PRFast
+		{ get; set; }
+		
+		[NinjaScriptProperty]
+		[Range(1, int.MaxValue)]
+		[Display(Name="Price Range Slow Length", Description="Price Range Slow Length", Order=7, GroupName="Parameters")]
+		public int PRSlow
 		{ get; set; }
 		
 		[NinjaScriptProperty]
