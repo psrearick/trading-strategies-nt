@@ -39,8 +39,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private OrderFlowVWAP i_vwap;
         private ATR i_atr;
-		private PriceRange4 i_price_range;
-		private PriceRange4 i_price_range_short;
+		private PriceRange5 i_price_range;
+		private PriceRange5 i_price_range_short;
 		private PriceAction i_price_action;
 		private MABand i_ma_band;
 		private MABand i_hourly_ma_band;
@@ -167,9 +167,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				
                 i_vwap              = OrderFlowVWAP(VWAPResolution.Standard, TradingHours.String2TradingHours("CME US Index Futures RTH"), VWAPStandardDeviations.Three, 1, 2, 3);
                 i_atr               = ATR(4);
-				i_price_range		= PriceRange4(PRLength, false);
+				i_price_range		= PriceRange5(PRLength, false);
 				i_price_action		= PriceAction();
-				i_price_range_short	= PriceRange4(PRLength, false, 1, 10);
+				i_price_range_short	= PriceRange5(PRLength, false, 1, 10);
 				i_ma_band			= MABand(MAFastPeriod, MAMidPeriod, MASlowPeriod);
 				i_atr_ma			= EMA(i_atr, 9);
 				i_long_sma			= SMA(200);
@@ -291,18 +291,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 			//#####################
 			// Price Range
             //#####################
-			prReference			= i_price_range.Signal[0];
-			prBelowUpper		= prReference < i_price_range.UpperBand1[0];
-			prBelowMid 	    	= prReference < i_price_range.MovingAverage[0];
-			prBelowLower		= prReference < i_price_range.LowerBand1[0];
-			prAboveUpper 		= prReference > i_price_range.UpperBand1[0];
-			prAboveMid			= prReference > i_price_range.MovingAverage[0];
-			prAboveLower		= prReference > i_price_range.LowerBand1[0];
-			prMiddle 			= prAboveLower && prBelowUpper;
-			prAboveBand2Upper	= prReference > i_price_range.UpperBand2[0];
-			prBelowBand2Upper	= prReference < i_price_range.UpperBand2[0];
-			prAboveBand2Lower	= prReference > i_price_range.LowerBand2[0];
-			prBelowBand2Lower	= prReference < i_price_range.LowerBand2[0];
+//			prReference			= i_price_range.Signal[0];
+//			prBelowUpper		= prReference < i_price_range.UpperBand1[0];
+//			prBelowMid 	    	= prReference < i_price_range.MovingAverage[0];
+//			prBelowLower		= prReference < i_price_range.LowerBand1[0];
+//			prAboveUpper 		= prReference > i_price_range.UpperBand1[0];
+//			prAboveMid			= prReference > i_price_range.MovingAverage[0];
+//			prAboveLower		= prReference > i_price_range.LowerBand1[0];
+//			prMiddle 			= prAboveLower && prBelowUpper;
+//			prAboveBand2Upper	= prReference > i_price_range.UpperBand2[0];
+//			prBelowBand2Upper	= prReference < i_price_range.UpperBand2[0];
+//			prAboveBand2Lower	= prReference > i_price_range.LowerBand2[0];
+//			prBelowBand2Lower	= prReference < i_price_range.LowerBand2[0];
 			
 			//#####################
 			// Price Action
@@ -426,21 +426,25 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return;
 			}
 			
-			PriceRange4 priceRange = getPR();
+			PriceRange5 priceRange = getPR();
 			
+			bool crossAbove = CrossAbove(priceRange.Price, priceRange.Range, 1);
+			bool crossBelow = CrossBelow(priceRange.Price, priceRange.Range, 1);
 			
-			if (CrossAbove(priceRange.Signal, priceRange.UpperBand1, 1) || CrossBelow(priceRange.Signal, priceRange.LowerBand1, 1)) {
+			if (crossAbove || crossBelow) {
+				string exitOcoString = string.Format("unmanageexitcross{0}", DateTime.Now.ToString("hhmmssffff"));
+//			if (CrossAbove(priceRange.Signal, priceRange.UpperBand1, 1) || CrossBelow(priceRange.Signal, priceRange.LowerBand1, 1)) {
 				if (tradeDirection == 1) {
-					SubmitOrderUnmanaged(1, OrderAction.Sell, OrderType.Market, quantity, 0, 0, ocoString, "longProfitTarget");
+					SubmitOrderUnmanaged(1, OrderAction.Sell, OrderType.Market, quantity, 0, 0, exitOcoString, "longProfitTarget");
 				} else {
-					SubmitOrderUnmanaged(1, OrderAction.BuyToCover, OrderType.Market, quantity, 0, 0, ocoString, "shortProfitTarget");
+					SubmitOrderUnmanaged(1, OrderAction.BuyToCover, OrderType.Market, quantity, 0, 0, exitOcoString, "shortProfitTarget");
 				}
 				
 				CancelOrder(stopLossOrder);
 			}
         }
 		
-		private PriceRange4 getPR()
+		private PriceRange5 getPR()
 		{
 			bool conditions = false
 //				true
@@ -474,29 +478,44 @@ namespace NinjaTrader.NinjaScript.Strategies
 		
 		private bool evaluateLongConditions()
 		{
-			PriceRange4 priceRange = getPR();
+			PriceRange5 priceRange = getPR();
 			
-			return CrossAbove(priceRange.Signal, priceRange.LowerBand1, 1);
+			if (priceRange.Price[0] < 50) {
+				return false;
+			}
+			
+			if (priceRange.Range[0] < 50) {
+				return false;
+			}
+			
+			return CrossAbove(priceRange.Price, priceRange.Range, 1);
+//			return CrossAbove(priceRange.Signal, priceRange.LowerBand1, 1);
 		}
 		
 		private bool evaluateShortConditions()
 		{
-			PriceRange4 priceRange = getPR();
+			PriceRange5 priceRange = getPR();
 			
-			return CrossBelow(priceRange.Signal, priceRange.UpperBand1, 1);
+						
+			if (priceRange.Price[0] > 30) {
+				return false;
+			}
+			
+			return CrossBelow(priceRange.Price, priceRange.Range, 1);
+//			return CrossBelow(priceRange.Signal, priceRange.UpperBand1, 1);
 		}
 		
 		private void logEntry()
 		{	
 			tradeLog =
-				prBelowLower +
-				"|" + prBelowMid +
-				"|" + prBelowUpper +
-				"|" + prMiddle +
-				"|" + prAboveUpper +
-				"|" + prAboveMid +
-				"|" + prAboveLower +
-				"|" + belowAverageATR +
+//				prBelowLower +
+//				"|" + prBelowMid +
+//				"|" + prBelowUpper +
+//				"|" + prMiddle +
+//				"|" + prAboveUpper +
+//				"|" + prAboveMid +
+//				"|" + prAboveLower +
+				belowAverageATR +
 				"|" + aboveAverageATR +
 				"|" + aboveVwapDown +
 				"|" + belowVwapUp +
@@ -530,6 +549,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             string log = orderType + "|" + winLoss + "|" + tradeLog;
 
 //             Print(log);
+			
             tradeLog    = "";
 		}
 
