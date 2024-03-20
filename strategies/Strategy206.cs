@@ -89,6 +89,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				CloseTime										= DateTime.Parse("15:30", System.Globalization.CultureInfo.InvariantCulture);
 				LastTradeTime									= DateTime.Parse("15:00", System.Globalization.CultureInfo.InvariantCulture);
 				TradesExporterActivated							= false;
+				InvertChoppiness								= false;
 			}
 			else if (State == State.Configure)
 			{
@@ -167,6 +168,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 			bool lowChop			= chop[0] < ChoppinessThresholdLow;
 			bool highChop			= chop[0] > ChoppinessThresholdHigh;
 			bool validChoppiness 	= lowChop || highChop;
+
+			if (InvertChoppiness) {
+				validChoppiness 	= !lowChop && !highChop;
+			}
+
 
 			bool rising1			= Close[0] > Close[1];
 			bool rising2			= Close[1] > Close[2];
@@ -314,14 +320,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
 		[NinjaScriptProperty]
+		[Display(Name="Invert Choppiness Filter", Description="Invert Choppiness Filter", Order=8, GroupName="Parameters")]
+		public bool InvertChoppiness
+		{ get; set; }
+
+
+		[NinjaScriptProperty]
 		[Range(double.MinValue, double.MaxValue)]
-		[Display(Name="Time Shift (Hours)", Description="Time Shift", Order=8, GroupName="Parameters")]
+		[Display(Name="Time Shift (Hours)", Description="Time Shift", Order=9, GroupName="Parameters")]
 		public double TimeShift
 		{ get; set; }
 
 
 		[NinjaScriptProperty]
-		[Display(Name="Export Trades", Description="Export Trades", Order=9, GroupName="Parameters")]
+		[Display(Name="Export Trades", Description="Export Trades", Order=10, GroupName="Parameters")]
 		public bool TradesExporterActivated
 		{ get; set; }
 
