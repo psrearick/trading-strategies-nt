@@ -31,6 +31,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public Series<double> SwingStart;
 		private TrendDirection swingDirection = TrendDirection.Flat;
 		private TrendDirection legDirection = TrendDirection.Flat;
+		private ATR barRange;
+		private double minScalpSize;
+		private double minSwingSize;
 		#endregion
 
 		#region OnStateChange()
@@ -58,6 +61,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			else if (State == State.Configure)
 			{
 				legIdentifier = Legs();
+				barRange = ATR(10);
 			}
 			#endregion
 
@@ -77,61 +81,138 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
+			minScalpSize = 0.7 * barRange[0];
+			minSwingSize = minScalpSize * 3.75;
+
 			int lookback = Math.Min(CurrentBar, 81);
-			int trendMin = (int) Math.Floor((double) lookback / 3);
 
-			int legBarsUp = 0;
-			int legBarsDown = 0;
+//			int legBarsUp = 0;
+//			int legBarsDown = 0;
 
-			for (int i = 0; i < 25; i++) {
-				if (legIdentifier[i] == 1) {
-					legBarsUp++;
+
+			int loopback 		= lookback + (int) legIdentifier.BarsAgoStarts[lookback];
+			int legStart 		= CurrentBar - loopback;
+			int legDirection	= legIdentifier.ValFromStart(lookback);
+			double legLow 		= Low[loopback];
+			double legHigh 		= High[lookback];
+
+			int legStart1		= 0;
+			int legDirection1	= 0;
+			double legLow1		= 0;
+			double legHigh1		= 0;
+
+			int legStart2		= 0;
+			int legDirection2	= 0;
+			double legLow2		= 0;
+			double legHigh2		= 0;
+
+			double swingLow			= legLow;
+			double swingHigh		= legHigh;
+			double swingStart		= legStart;
+			double swingDirection	= legDirection;
+
+			int barCountInSwing		= 1;
+
+			for (int i = loopback; i >= 0; i--) {
+				barCountInSwing++;
+				if (legIdentifier.Starts[i] == legStart) {
+					legLow = Math.Min(legLow, Low[i]);
+					legHigh = Math.Max(legHigh, High[i]);
+					continue;
 				}
 
-				if (legIdentifier[i] == -1) {
-					legBarsDown++;
+				legStart2		= legStart1;
+				legStart1 		= legStart;
+				legStart 		= (int) legIdentifier.Starts[i];
+
+				legDirection2	= legDirection1;
+				legDirection1 	= legDirection;
+				legDirection 	= legIdentifier.ValFromStart(i);
+
+				legLow2			= legLow1;
+				legLow1 		= legLow;
+				legLow			= Low[i];
+
+				legHigh2		= legHigh1;
+				legHigh1 		= legHigh;
+				legHigh			= High[i];
+
+				if (legLow2 == 0 || legHigh2 == 0) {
+					continue;
 				}
+
+				swingLow 				= Math.Min(swingLow, legLow2);
+				swingHigh 				= Math.Max(swingHigh, legHigh2);
+				double swingDistance	= swingHigh - swingLow;
+				int swingCount			= barCountInSwing;
+
+				if ((legDirection2 == 1 && legLow1 < legLow2) || (legDirection2 == -1 && legHigh1 > legHigh2)) {
+
+					for (int swingI = 0; swingI < barCountInSwing; swingI++) {
+						Value[swingI] = swingDistance < minSwingSize ? 0 : swingDirection;
+					}
+
+					swingLow		= legLow;
+					swingHigh		= legHigh;
+					swingStart		= legStart;
+					swingDirection	= legDirection;
+					barCountInSwing = 1;
+				}
+
 			}
 
-			TrendDirection previousDirection = swingDirection;
-			swingDirection = legBarsUp > legBarsDown ? TrendDirection.Bullish : legBarsUp < legBarsDown ? TrendDirection.Bearish : TrendDirection.Flat;
 
-			SwingStart[0] = SwingStart[1];
-			if (swingDirection != previousDirection) {
-				if (swingDirection == TrendDirection.Flat) {
-					SwingStart[0] = (previousDirection == TrendDirection.Bullish) ? Low[0] : High[0];
-				} else {
-					SwingStart[0] = (swingDirection == TrendDirection.Bullish) ? Low[0] : High[0];
-				}
-			}
 
-			legDirection = legIdentifier[0] == 1 ? TrendDirection.Bullish : legIdentifier[0] == -1 ? TrendDirection.Bearish : TrendDirection.Flat;
 
-			Value[0] = 0;
+//			for (int i = 0; i < 25; i++) {
+//				if (legIdentifier.ValFromStart(i) == 1) {
+//					legBarsUp++;
+//				}
 
-			if (swingDirection == TrendDirection.Bullish) {
-				Value[0] = 2;
+//				if (legIdentifier.ValFromStart(i) == -1) {
+//					legBarsDown++;
+//				}
+//			}
 
-				if (legDirection == TrendDirection.Bullish) {
-					Value[0] = 3;
-				}
+//			TrendDirection previousDirection = swingDirection;
+//			swingDirection = legBarsUp > legBarsDown ? TrendDirection.Bullish : legBarsUp < legBarsDown ? TrendDirection.Bearish : TrendDirection.Flat;
 
-				if (legDirection == TrendDirection.Bearish) {
-					Value[0] = 1;
-				}
-			}
+//			SwingStart[0] = SwingStart[1];
+//			if (swingDirection != previousDirection) {
+//				if (swingDirection == TrendDirection.Flat) {
+//					SwingStart[0] = (previousDirection == TrendDirection.Bullish) ? Low[0] : High[0];
+//				} else {
+//					SwingStart[0] = (swingDirection == TrendDirection.Bullish) ? Low[0] : High[0];
+//				}
+//			}
 
-			if (swingDirection == TrendDirection.Bearish) {
-				Value[0] = -2;
+//			legDirection = legIdentifier.ValFromStart(0) == 1 ? TrendDirection.Bullish : legIdentifier.ValFromStart(0) == -1 ? TrendDirection.Bearish : TrendDirection.Flat;
 
-				if (legDirection == TrendDirection.Bearish) {
-					Value[0] = -3;
-				}
+//			Value[0] = 0;
 
-				if (legDirection == TrendDirection.Bullish) {
-					Value[0] = -1;
-				}
-			}
+//			if (swingDirection == TrendDirection.Bullish) {
+//				Value[0] = 2;
+
+//				if (legDirection == TrendDirection.Bullish) {
+//					Value[0] = 3;
+//				}
+
+//				if (legDirection == TrendDirection.Bearish) {
+//					Value[0] = 1;
+//				}
+//			}
+
+//			if (swingDirection == TrendDirection.Bearish) {
+//				Value[0] = -2;
+
+//				if (legDirection == TrendDirection.Bearish) {
+//					Value[0] = -3;
+//				}
+
+//				if (legDirection == TrendDirection.Bullish) {
+//					Value[0] = -1;
+//				}
+//			}
 		}
 	}
 }
