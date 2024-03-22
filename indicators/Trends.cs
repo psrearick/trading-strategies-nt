@@ -37,11 +37,19 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private int BarsInTrend = 0;
 		private double BreakoutExtreme = 0;
 
+		public Series<double> TrendValues;
+		public Series<double> TrendStarts;
+		public Series<double> LegValues;
+		public Series<double> LegStarts;
+		public Series<double> SwingValues;
+		public Series<double> SwingStarts;
+
 		#endregion
 
 		#region OnStageChange()
 		protected override void OnStateChange()
 		{
+			#region State.SetDefaults
 			if (State == State.SetDefaults)
 			{
 				Description									= @"Enter the description for your new custom Indicator here.";
@@ -57,10 +65,26 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				IsSuspendedWhileInactive					= true;
 				AddPlot(Brushes.DarkCyan, "Trend Direction");
 			}
+			#endregion
+
+			#region State.Configure
 			else if (State == State.Configure)
 			{
 				SwingIdentifier = Swings();
 			}
+			#endregion
+
+			#region State.DataLoaded
+			else if (State == State.DataLoaded)
+			{
+				TrendValues 	= new Series<double>(this, MaximumBarsLookBack.Infinite);
+				TrendStarts 	= new Series<double>(this, MaximumBarsLookBack.Infinite);
+				LegValues 		= new Series<double>(this, MaximumBarsLookBack.Infinite);
+				LegStarts 		= new Series<double>(this, MaximumBarsLookBack.Infinite);
+				SwingValues 	= new Series<double>(this, MaximumBarsLookBack.Infinite);
+				SwingStarts 	= new Series<double>(this, MaximumBarsLookBack.Infinite);
+			}
+			#endregion
 		}
 		#endregion
 
@@ -68,6 +92,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		protected override void OnBarUpdate()
 		{
 			if (CurrentBar < 35) {
+				TrendValues[0] 	= 0;
+				TrendStarts[0] 	= 0;
+				LegValues[0] 	= 0;
+				LegStarts[0] 	= 0;
+				SwingValues[0]	= 0;
+				SwingStarts[0] 	= 0;
 				return;
 			}
 
@@ -88,10 +118,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				BarsInTrend++;
 			}
 
+			setHistoricalValues();
+
 			Value[0] = getTrendValue();
 		}
 		#endregion
-
 
 		#region GetBarsInTrend()
 		public int GetBarsInTrend()
@@ -108,6 +139,19 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int legValue = (SwingIdentifier[0] == 3 || SwingIdentifier[0] == -1) ? 1 : (SwingIdentifier[0] == -3 || SwingIdentifier[0] == 1) ? -1 : 0;
 
 			return trendValue + swingValue + legValue;
+		}
+		#endregion
+
+		#region setHistoricalValues()
+		private void setHistoricalValues()
+		{
+			TrendValues[0] 	= Trend == TrendDirection.Bullish ? 1 : Trend == TrendDirection.Bearish ? -1 : 0;
+			SwingValues[0] 	= SwingIdentifier[0] > 0 ? 1 : SwingIdentifier[0] < 0 ? -1 : 0;
+			LegValues[0] 	= (SwingIdentifier[0] == 3 || SwingIdentifier[0] == -1) ? 1 : (SwingIdentifier[0] == -3 || SwingIdentifier[0] == 1) ? -1 : 0;
+
+			TrendStarts[0] 	= TrendValues[0]	== TrendValues[1]	? TrendStarts[1]	: CurrentBar;
+			SwingStarts[0] 	= SwingValues[0] 	== SwingValues[1] 	? SwingStarts[1] 	: CurrentBar;
+			LegStarts[0] 	= LegValues[0] 		== LegValues[1] 	? LegStarts[1] 		: CurrentBar;
 		}
 		#endregion
 

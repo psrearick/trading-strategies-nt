@@ -28,26 +28,29 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public class Strategy301 : Strategy
 	{
+		#region Variables
 		private PriceActionUtils PA;
 		private EMA Ema;
 		private MarketCycle MC;
 		private Legs LegIdentifier;
 		private Swings SwingIdentifier;
+		private Trends TrendIdentifier;
 		private TrendDirection tradeDirection = TrendDirection.Flat;
 
 		private double entryHigh = 0;
 		private double entryLow = 0;
-
-//		private int CycleThreshold = 5;
-//		private int CycleExitThreshold = 3;
+		private double stopLoss = 0;
 
 		private DateTime LastDataDay	= new DateTime(2023, 03, 17);
 		private DateTime OpenTime		= DateTime.Parse("10:00", System.Globalization.CultureInfo.InvariantCulture);
 		private DateTime CloseTime		= DateTime.Parse("15:30", System.Globalization.CultureInfo.InvariantCulture);
 		private DateTime LastTradeTime	= DateTime.Parse("15:00", System.Globalization.CultureInfo.InvariantCulture);
+		#endregion
 
+		#region OnStateChange()
 		protected override void OnStateChange()
 		{
+			#region State.SetDefaults
 			if (State == State.SetDefaults)
 			{
 				Description									= @"Enter the description for your new custom Strategy here.";
@@ -74,39 +77,62 @@ namespace NinjaTrader.NinjaScript.Strategies
 				CycleThreshold								= 5;
 				CycleExitThreshold							= 3;
 			}
+			#endregion
+
+			#region State.Configure
 			else if (State == State.Configure)
 			{
-				AddDataSeries(Data.BarsPeriodType.Second, 1);
+//				AddDataSeries(Data.BarsPeriodType.Second, 60);
 			}
+			#endregion
 
+			#region State.DataLoaded
 			if (State == State.DataLoaded) {
 				PA = PriceActionUtils();
 				Ema = EMA(21);
 				MC = MarketCycle();
 				LegIdentifier = Legs();
 				SwingIdentifier = Swings();
+				TrendIdentifier = Trends();
 			}
+			#endregion
 		}
+		#endregion
 
+		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1 || CurrentBars[1] < 1) {
+			if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1) {// || CurrentBars[1] < 1) {
 				return;
             }
 
-			if (BarsInProgress != 0) {
-				return;
-			}
+//			if (BarsInProgress != 0) {
+//				return;
+//			}
 
 			exitPositions();
 
 			setEntries();
 		}
+		#endregion
 
+		#region shouldExit()
 		private bool shouldExit() {
+			int swingStartBarsAgo = Math.Max(CurrentBar - (int) TrendIdentifier.SwingStarts[0], 1);
+
 			if (Position.MarketPosition == MarketPosition.Long) {
 				if (MC[0] < CycleExitThreshold) {
 					return true;
+				}
+
+				if (TrendIdentifier.GetLegsInSwing() > 2) {
+					return true;
+				}
+
+				double swingLow = MIN(Low, swingStartBarsAgo)[0];
+				if (swingLow != stopLoss && SwingIdentifier[0] > 0) {
+					stopLoss = swingLow;
+					SetStopLoss(CalculationMode.Price, stopLoss - 1);
 				}
 
 //				if (SwingIdentifier[0] < 1) {
@@ -121,19 +147,27 @@ namespace NinjaTrader.NinjaScript.Strategies
 					return true;
 				}
 
+				if (TrendIdentifier.GetLegsInSwing() > 2) {
+					return true;
+				}
+
+				double swingHigh = MAX(High, swingStartBarsAgo)[0];
+				if (swingHigh != stopLoss && SwingIdentifier[0] < 0) {
+					stopLoss = swingHigh;
+					SetStopLoss(CalculationMode.Price, stopLoss + 1);
+				}
+
 //				if (SwingIdentifier[0] > -1) {
 //					return true;
 //				}
 //				SetStopLoss(CalculationMode.Price, PA.trendHigh);
 			}
 
-//			if (PA.DoesInsideOutsideMatch("ioi", 0) || PA.DoesInsideOutsideMatch("ii", 0)) {
-//				return true;
-//			}
-
 			return false;
 		}
+		#endregion
 
+		#region exitPositions()
 		private void exitPositions() {
 			if (isValidTradeTime() && !shouldExit()) {
 				return;
@@ -147,7 +181,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				ExitShort();
 			}
         }
+		#endregion
 
+		#region isValidEntryTime()
 		private bool isValidEntryTime()
 		{
 			int now = ToTime(Time[0]);
@@ -164,7 +200,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			return true;
 		}
+		#endregion
 
+		#region isValidTradeTime()
 		private bool isValidTradeTime()
 		{
 			int now = ToTime(Time[0]);
@@ -181,7 +219,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			return true;
 		}
+		#endregion
 
+		#region setEntries()
 		private void setEntries()
 		{
 			if (!isValidEntryTime()) {
@@ -192,23 +232,40 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return;
 			}
 
-			if (longPatternMatched()) {
-				if (SwingIdentifier.SwingStart[0] < Low[0]) {
-					double stoploss = 4 * (Close[0] - SwingIdentifier.SwingStart[0]);
-					SetStopLoss(CalculationMode.Ticks, stoploss + 1);
+			bool longMatch 	= longPatternMatched();
+			bool shortMatch	= shortPatternMatched();
+
+			if (!longMatch && !shortMatch);
+
+			int swingStartBarsAgo = Math.Max(CurrentBar - (int) TrendIdentifier.SwingStarts[0], 1);
+			double swingHigh = MAX(High, swingStartBarsAgo)[0];
+			double swingLow = MIN(Low, swingStartBarsAgo)[0];
+
+			if (TrendIdentifier.GetLegsInSwing() > 2) {
+				return;
+			}
+
+			if (longMatch) {
+				if (swingLow < Low[0]) {
+					stopLoss = swingLow;
+					double stopLossDistance = 4 * (Close[0] - stopLoss) + 4;
+					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
 					EnterLong(1, "longEntry");
 				}
 			}
 
-			if (shortPatternMatched()) {
-				if (SwingIdentifier.SwingStart[0] > High[0]) {
-					double stoploss = 4 * (SwingIdentifier.SwingStart[0] - Close[0]);
-					SetStopLoss(CalculationMode.Ticks, stoploss + 1);
+			if (shortMatch) {
+				if (swingHigh > High[0]) {
+					stopLoss = swingHigh;
+					double stopLossDistance = 4 * (stopLoss - Close[0]) + 4;
+					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
 					EnterShort(1, "shortEntry");
 				}
 			}
 		}
+		#endregion
 
+		#region longPatternMatched()
 		private bool longPatternMatched()
 		{
 
@@ -243,7 +300,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			return true;
 		}
+		#endregion
 
+		#region shortPatternMatched()
 		private bool shortPatternMatched() {
 			if (PA.isTradingRangeBar(0)) {
 				return false;
@@ -276,6 +335,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			return true;
 		}
+		#endregion
 
 		#region Properties
 
