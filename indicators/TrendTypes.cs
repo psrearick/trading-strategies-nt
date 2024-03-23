@@ -309,16 +309,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region InitializeTrend()
 		private void InitializeTrend()
 		{
-//			if (TrendLow > 0 && TrendHigh > 0) {
-//				return;
-//			}
-
-//			TrendLow 			= Low[0];
-//			TrendHigh 			= High[0];
 			Trend				= TrendDirection.Flat;
 			TrendBarCount		= 0;
-//			BarsSinceNewHigh	= 0;
-//			BarsSinceNewLow		= 0;
 		}
 		#endregion
 
