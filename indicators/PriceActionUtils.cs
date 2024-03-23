@@ -541,6 +541,51 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region AverageBarsInTrendPullback()
+		public int AverageBarsInTrendPullback(int barsAgo, int period, ISeries <double> series, Func <int, int, bool> callback)
+		{
+			int barsInPullback = 0;
+			int pullbacks = 0;
+			double pullbackStart = 0;
+
+			int rangeMax = Math.Min((period + barsAgo), Close.Count);
+
+			for (int i = barsAgo; i < rangeMax; i++) {
+				if (pullbackStart == 0) {
+					if (callback(i, 1)) {
+						pullbackStart = series[1];
+						pullbacks++;
+						barsInPullback++;
+					}
+				} else {
+					barsInPullback++;
+
+					if (Low[0] < pullbackStart) {
+						pullbackStart = 0;
+					}
+				}
+			}
+
+			if (pullbacks == 0) {
+				return 0;
+			}
+
+			return (int) Math.Floor((double)(barsInPullback / pullbacks));
+		}
+		#endregion
+
+		#region AverageBarsInBearTrendPullback()
+		public int AverageBarsInBearTrendPullback(int barsAgo, int period) {
+			return AverageBarsInTrendPullback(barsAgo, period, High, isHigherHigh);
+		}
+		#endregion
+
+		#region AverageBarsInBullTrendPullback()
+		public int AverageBarsInBullTrendPullback(int barsAgo, int period) {
+			return AverageBarsInTrendPullback(barsAgo, period, Low, isLowerLow);
+		}
+		#endregion
+
 		#region NumberOfBullPullbacks()
 		public int NumberOfBullPullbacks(int barsAgo, int period)
 		{
@@ -629,6 +674,20 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			return barsBigger >= count;
+		}
+		#endregion
+
+		#region isRisingBar()
+		public bool isRisingBar(int barsAgo = 0)
+		{
+			return isHigherHigh(barsAgo) && !isLowerLow(barsAgo);
+		}
+		#endregion
+
+		#region isFallingBar()
+		public bool isFallingBar(int barsAgo = 0)
+		{
+			return !isHigherHigh(barsAgo) && isLowerLow(barsAgo);
 		}
 		#endregion
 
@@ -770,7 +829,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region TrendDirection()
+		#region getTrendDirection()
 		// get the trend direction over the last `length` bars, starting `barsAgo` bars before the current bar
 		public TrendDirection getTrendDirection(int barsAgo = 0, int length = 10)
 		{
@@ -781,11 +840,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			for (int i = barsAgo; i < barsAgo + length; i++) {
 
-				if (isBullishBar(i)) {
+				if (isBullishBar(i) && isRising(i)) {
 					bullishBars++;
 				}
 
-				if (isBearishBar(i)) {
+				if (isBearishBar(i) && isFalling(i)) {
 					bearishBars++;
 				}
 			}
@@ -1335,6 +1394,119 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			double bearValue = getSellingPressure(barsAgo, period) * 50;
 
 			return 50 + bullValue - bearValue;
+		}
+		#endregion
+
+		#region NumberOfPullbacksInTrend()
+		public int NumberOfPullbacksInTrend(int barsAgo, int period)
+		{
+			if (getTrendDirection(barsAgo, period) == TrendDirection.Bullish) {
+				return NumberOfBullPullbacks(barsAgo, period);
+			}
+
+			if (getTrendDirection(barsAgo, period) == TrendDirection.Bearish) {
+				return NumberOfBearPullbacks(barsAgo, period);
+			}
+
+			return 0;
+		}
+		#endregion
+
+		#region AveragePullbackLength()
+		public double AveragePullbackLength(int barsAgo, int period)
+		{
+			if (getTrendDirection(barsAgo, period) == TrendDirection.Bullish) {
+				return AverageBarsInBullTrendPullback(barsAgo, period);
+			}
+
+			if (getTrendDirection(barsAgo, period) == TrendDirection.Bearish) {
+				return AverageBarsInBearTrendPullback(barsAgo, period);
+			}
+
+			return 0;
+		}
+		#endregion
+
+		#region isBreakoutTrend()
+		public bool isBreakoutTrend(int barsAgo, int period)
+		{
+			return NumberOfPullbacksInTrend(barsAgo, period) <= 1 && AveragePullbackLength(barsAgo, period) <= 2 && period >= 4;
+		}
+		#endregion
+
+		#region largestPullbackInTrend()
+		public double largestPullbackInBullTrend(int barsAgo, int period)
+		{
+			double low = Low[barsAgo + period];
+			double high = High[barsAgo + period];;
+
+			for (int i = barsAgo + period; i > barsAgo; i--) {
+				if (isHigherHigh(i, 1)) {
+					high = High[i];
+					low = Low[i];
+				}
+
+				if (isLowerLow(i, 1)) {
+					high = Math.Max(high, High[i]);
+					low = Math.Min(low, Low[i]);
+				}
+			}
+
+			return high - low;
+		}
+
+		public double largestPullbackInBearTrend(int barsAgo, int period)
+		{
+			double low = Low[barsAgo + period];
+			double high = High[barsAgo + period];
+
+			for (int i = barsAgo + period; i > barsAgo; i--) {
+				if (isLowerLow(i, 1)) {
+					high = High[i];
+					low = Low[i];
+				}
+
+				if (isHigherHigh(i, 1)) {
+					high = Math.Max(high, High[i]);
+					low = Math.Min(low, Low[i]);
+				}
+			}
+
+			return high - low;
+		}
+
+		public double largestPullbackInTrend(int barsAgo, int period, TrendDirection direction) {
+			if (period == 0) {
+				return 0;
+			}
+
+			double totalRange = MAX(High, period)[barsAgo] - MIN(Low, period)[barsAgo];
+
+			if (direction == TrendDirection.Bullish) {
+				return largestPullbackInBullTrend(barsAgo, period) / totalRange;
+			}
+
+			if (direction == TrendDirection.Bearish) {
+				return largestPullbackInBearTrend(barsAgo, period) / totalRange;
+			}
+
+			return 0;
+		}
+
+		public double largestPullbackInTrend(int barsAgo, int period) {
+			if (period == 0) {
+				return 0;
+			}
+
+			if (isRising(barsAgo, period)) {
+				return largestPullbackInTrend(barsAgo, period, TrendDirection.Bullish);
+			}
+
+			if (isFalling(barsAgo, period)) {
+				return largestPullbackInTrend(barsAgo, period, TrendDirection.Bearish);
+			}
+
+			return 0;
 		}
 		#endregion
 	}
