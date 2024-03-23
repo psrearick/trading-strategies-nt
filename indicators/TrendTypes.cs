@@ -35,6 +35,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public Series<double> TrendValues;
 		public Series<double> MovementValues;
 		public Series<double> BreakoutValues;
+		public int LegStarted;
+		public int SwingStarted;
+		public int TrendStarted;
+		public int BreakoutStarted;
 		private double MinScalpSize;
 		private double MinSwingSize;
 
@@ -99,7 +103,32 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			if (CurrentBar < 12) {
+//			if (CurrentBar < 25) {
+//				LegValues[0] 		= 0;
+//				SwingValues[0]		= 0;
+//				TrendValues[0] 		= 0;
+//				MovementValues[0]	= 0;
+//				BreakoutValues[0]	= 0;
+
+//				SetPlotValues(0, 1);
+//				return;
+//			}
+
+//			SetSwingSize();
+
+//			MovementValues[0] = Movements.ValFromStart(0);
+
+//			EvaluateLeg();
+//			EvaluateBreakout();
+//			EvaluateSwing();
+//			EvaluateTrend();
+		}
+		#endregion
+
+		#region
+		public void Evaluate()
+		{
+			if (CurrentBar < 25) {
 				LegValues[0] 		= 0;
 				SwingValues[0]		= 0;
 				TrendValues[0] 		= 0;
@@ -134,6 +163,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			bool deepPullback = pullback > 0.5;
 
+			LegStarted = deepPullback ? 0 : (int) Movements.BarsAgoStarts[0];
+
 			for (int i = 0; i <= Movements.BarsAgoStarts[0]; i++) {
 				LegValues[i] = deepPullback ? 0 : Movements.ValFromStart(0);
 			}
@@ -145,6 +176,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region EvaluateBreakout()
 		private void EvaluateBreakout()
 		{
+			BreakoutStarted = 0;
+
 			TrendDirection direction = LegValues[0] > 0
 				? TrendDirection.Bullish
 				: LegValues[0] < 0
@@ -157,7 +190,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			double number = PA.NumberOfPullbacksInTrend(0, (int) Movements.BarsAgoStarts[0], direction);
 
 			if (LegValues[0] != 0 && length <= 2 && number <= 1 && Movements.BarsAgoStarts[0] >= 5) {
-				for (int i = 0; i <= Movements.BarsAgoStarts[0]; i++) {
+				BreakoutStarted = (int) Movements.BarsAgoStarts[0];
+				for (int i = 0; i <= BreakoutStarted; i++) {
 					BreakoutValues[i] = LegValues[0];
 				}
 			}
@@ -169,6 +203,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region EvaluateSwing()
 		private void EvaluateSwing()
 		{
+			SwingStarted = 0;
 			if (LegValues[0] == 0) {
 				if (Swing != TrendDirection.Flat) {
 					DirectionBeforeTradingRange = Swing;
@@ -224,6 +259,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
+			SwingStarted = SwingBarCount;
 			for (int i = 0; i <= SwingBarCount; i++) {
 				SwingValues[i] = Movements.ValFromStart(0);
 			}
@@ -235,6 +271,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region EvaluateTrend()
 		private void EvaluateTrend()
 		{
+			TrendStarted = 0;
 			if (LegValues[0] == 0) {
 				if (Trend != TrendDirection.Flat) {
 					DirectionBeforeTradingRange = Trend;
@@ -290,6 +327,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
+			TrendStarted = TrendBarCount;
 			for (int i = 0; i <= TrendBarCount; i++) {
 				TrendValues[i] = Movements.ValFromStart(0);
 			}
