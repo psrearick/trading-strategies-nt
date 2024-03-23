@@ -29,19 +29,26 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region Variables
 		private Legs Movements;
 		private ATR BarRange;
-		public Series<int> LegValues;
-		public Series<int> SwingValues;
-		public Series<int> TrendValues;
-		public Series<int> MovementValues;
+		private PriceActionUtils PA;
+		public Series<double> LegValues;
+		public Series<double> SwingValues;
+		public Series<double> TrendValues;
+		public Series<double> MovementValues;
+		public Series<double> BreakoutValues;
 		private double MinScalpSize;
 		private double MinSwingSize;
 
-		private int TrendDirection;
-		private double TrendLow;
-		private double TrendHigh;
+		private TrendDirection Swing;
+		private int SwingBarCount;
+		private int BarsBeforeTradingRange;
+		private TrendDirection DirectionBeforeTradingRange;
+		private int TradingRangeCount;
+
+		private TrendDirection Trend;
 		private int TrendBarCount;
-		private int BarsSinceNewHigh;
-		private int BarsSinceNewLow;
+		private int BarsBeforeTrendTradingRange;
+		private TrendDirection DirectionBeforeTrendTradingRange;
+		private int TrendTradingRangeCount;
 		#endregion
 
 		#region OnStateChange()
@@ -56,33 +63,34 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				IsOverlay									= false;
 				DisplayInDataBox							= true;
 				DrawOnPricePanel							= true;
-				DrawHorizontalGridLines						= true;
-				DrawVerticalGridLines						= true;
-				PaintPriceMarkers							= true;
+				PaintPriceMarkers							= false;
 				ScaleJustification							= NinjaTrader.Gui.Chart.ScaleJustification.Right;
-				//Disable this property if your indicator requires custom values that cumulate with each new market data event.
-				//See Help Guide for additional information.
 				IsSuspendedWhileInactive					= true;
-				AddPlot(Brushes.DarkCyan, "Legs");
-				AddPlot(Brushes.Green, "Swings");
-				AddPlot(Brushes.Red, "Trends");
+
+				AddPlot(new Stroke(Brushes.Blue, 2), PlotStyle.Line, "Legs");
+				AddPlot(new Stroke(Brushes.Green, 3), PlotStyle.Line, "Swings");
+				AddPlot(new Stroke(Brushes.Orange, 4), PlotStyle.Line, "Trends");
+				AddPlot(new Stroke(Brushes.Red, 2), PlotStyle.Line, "Breakouts");
 			}
 			#endregion
+
 			#region State.Configure
 			else if (State == State.Configure)
 			{
 				BarRange	= ATR(10);
 				Movements	= Legs();
+				PA			= PriceActionUtils();
 			}
 			#endregion
 
 			#region State.DataLoaded
 			else if (State == State.DataLoaded)
 			{
-				LegValues 		= new Series<int>(this);
-				SwingValues 	= new Series<int>(this);
-				TrendValues		= new Series<int>(this);
-				MovementValues	= new Series<int>(this);
+				LegValues 		= new Series<double>(this);
+				SwingValues 	= new Series<double>(this);
+				TrendValues		= new Series<double>(this);
+				MovementValues	= new Series<double>(this);
+				BreakoutValues	= new Series<double>(this);
 			}
 			#endregion
 		}
@@ -91,67 +99,226 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			if (CurrentBar < 15) {
+			if (CurrentBar < 12) {
 				LegValues[0] 		= 0;
 				SwingValues[0]		= 0;
 				TrendValues[0] 		= 0;
 				MovementValues[0]	= 0;
+				BreakoutValues[0]	= 0;
 
-				SetPlotValues();
+				SetPlotValues(0, 1);
 				return;
 			}
 
 			SetSwingSize();
 
-			EvaluateTrend();
+			MovementValues[0] = Movements.ValFromStart(0);
 
-			SetPlotValues();
+			EvaluateLeg();
+			EvaluateBreakout();
+			EvaluateSwing();
+			EvaluateTrend();
+		}
+		#endregion
+
+		#region EvaluateLeg()
+		private void EvaluateLeg()
+		{
+			TrendDirection direction = Movements.ValFromStart(0) > 0
+				? TrendDirection.Bullish
+				: Movements.ValFromStart(0) < 0
+					? TrendDirection.Bearish
+					: TrendDirection.Flat;
+
+			double pullback = PA.largestPullbackInTrend(0, (int) Movements.BarsAgoStarts[0], direction);
+
+			bool deepPullback = pullback > 0.5;
+
+			for (int i = 0; i <= Movements.BarsAgoStarts[0]; i++) {
+				LegValues[i] = deepPullback ? 0 : Movements.ValFromStart(0);
+			}
+
+			SetPlotValues(0, Movements.BarsAgoStarts[0]);
+		}
+		#endregion
+
+		#region EvaluateBreakout()
+		private void EvaluateBreakout()
+		{
+			TrendDirection direction = LegValues[0] > 0
+				? TrendDirection.Bullish
+				: LegValues[0] < 0
+					? TrendDirection.Bearish
+					: TrendDirection.Flat;
+
+			BreakoutValues[0] = 0;
+
+			double length = PA.AveragePullbackLength(0, (int) Movements.BarsAgoStarts[0], direction);
+			double number = PA.NumberOfPullbacksInTrend(0, (int) Movements.BarsAgoStarts[0], direction);
+
+			if (LegValues[0] != 0 && length <= 2 && number <= 1 && Movements.BarsAgoStarts[0] >= 5) {
+				for (int i = 0; i <= Movements.BarsAgoStarts[0]; i++) {
+					BreakoutValues[i] = LegValues[0];
+				}
+			}
+
+			SetPlotValues(0, Movements.BarsAgoStarts[0]);
+		}
+		#endregion
+
+		#region EvaluateSwing()
+		private void EvaluateSwing()
+		{
+			if (LegValues[0] == 0) {
+				if (Swing != TrendDirection.Flat) {
+					DirectionBeforeTradingRange = Swing;
+					BarsBeforeTradingRange = SwingBarCount;
+					InitializeSwing();
+				}
+
+				TradingRangeCount++;
+
+				for (int i = 0; i < TradingRangeCount; i++) {
+					SwingValues[i] = 0;
+				}
+
+				return;
+			}
+
+			if (LegValues[0] != SwingValues[1]) {
+				SwingBarCount = 0;
+			}
+
+			TrendDirection direction = LegValues[0] > 0 ? TrendDirection.Bullish : LegValues[0] < 0 ? TrendDirection.Bearish : TrendDirection.Flat;
+
+			if (SwingBarCount == 0) {
+				SwingBarCount = (int) Movements.BarsAgoStarts[0];
+				if (Swing == TrendDirection.Flat && DirectionBeforeTradingRange == direction && TradingRangeCount < 20) {
+					SwingBarCount = SwingBarCount + BarsBeforeTradingRange + TradingRangeCount;
+				}
+			}
+
+			Swing 						= direction;
+			DirectionBeforeTradingRange	= TrendDirection.Flat;
+
+			TradingRangeCount = 0;
+			SwingBarCount++;
+
+			if (SwingBarCount > 25) {
+				SwingBarCount = (int) Movements.BarsAgoStarts[0];
+			}
+
+			double high = MAX(High, SwingBarCount)[0];
+			double low = MIN(Low, SwingBarCount)[0];
+			double range = high - low;
+
+			double pullback = PA.largestPullbackInTrend(0, (int) SwingBarCount, direction);
+
+			bool deepPullback = pullback >= 1;
+
+			if (range < MinSwingSize || deepPullback) {
+				for (int i = 0; i < SwingBarCount; i++) {
+					SwingValues[i] = 0;
+				}
+
+				return;
+			}
+
+			for (int i = 0; i <= SwingBarCount; i++) {
+				SwingValues[i] = Movements.ValFromStart(0);
+			}
+
+			SetPlotValues(0, SwingBarCount);
 		}
 		#endregion
 
 		#region EvaluateTrend()
 		private void EvaluateTrend()
 		{
-			InitializeTrend();
+			if (LegValues[0] == 0) {
+				if (Trend != TrendDirection.Flat) {
+					DirectionBeforeTradingRange = Trend;
+					BarsBeforeTradingRange = TrendBarCount;
+					InitializeTrend();
+				}
 
-			MovementValues[0] = Movements.ValFromStart(0);
+				TrendTradingRangeCount++;
 
-//			if (Movements.Starts[0] == Movements.Starts[1]) {
-//				UpdateValuesInSameMovement();
-//			}
+				for (int i = 0; i < TrendTradingRangeCount; i++) {
+					TrendValues[i] = 0;
+				}
 
-			if (High[0] > TrendHigh) {
-				BarsSinceNewHigh = 0;
-				TrendHigh = High[0];
+				return;
 			}
 
-			if (Low[0] < TrendLow) {
-				BarsSinceNewLow = 0;
-				TrendLow = Low[0];
+			if (LegValues[0] != TrendValues[1]) {
+				TrendBarCount = 0;
 			}
+
+			TrendDirection direction = LegValues[0] > 0 ? TrendDirection.Bullish : LegValues[0] < 0 ? TrendDirection.Bearish : TrendDirection.Flat;
+
+			if (TrendBarCount == 0) {
+				TrendBarCount = (int) Movements.BarsAgoStarts[0];
+				if (Trend == TrendDirection.Flat && DirectionBeforeTrendTradingRange == direction && TrendTradingRangeCount < 20) {
+					TrendBarCount = TrendBarCount + BarsBeforeTrendTradingRange + TrendTradingRangeCount;
+				}
+			}
+
+			Trend 								= direction;
+			DirectionBeforeTrendTradingRange	= TrendDirection.Flat;
+
+			TrendTradingRangeCount = 0;
+			TrendBarCount++;
+
+			double high = MAX(High, TrendBarCount)[0];
+			double low = MIN(Low, TrendBarCount)[0];
+			double range = high - low;
+
+			if (range < MinSwingSize) {
+				for (int i = 0; i < TrendBarCount; i++) {
+					TrendValues[i] = 0;
+				}
+
+				return;
+			}
+
+			if (TrendBarCount < 20) {
+				for (int i = 0; i < TrendBarCount; i++) {
+					TrendValues[i] = TrendValues[TrendBarCount + 1];
+				}
+
+				return;
+			}
+
+			for (int i = 0; i <= TrendBarCount; i++) {
+				TrendValues[i] = Movements.ValFromStart(0);
+			}
+
+			SetPlotValues(0, TrendBarCount);
 		}
 		#endregion
 
-//		#region UpdateValuesInSameMovement()
-//		private void UpdateValuesInSameMovement()
-//		{
-
-//		}
-//		#endregion
+		#region InitializeSwing()
+		private void InitializeSwing()
+		{
+			Swing				= TrendDirection.Flat;
+			SwingBarCount		= 0;
+		}
+		#endregion
 
 		#region InitializeTrend()
 		private void InitializeTrend()
 		{
-			if (TrendLow > 0 && TrendHigh > 0) {
-				return;
-			}
+//			if (TrendLow > 0 && TrendHigh > 0) {
+//				return;
+//			}
 
-			TrendLow 			= Low[0];
-			TrendHigh 			= High[0];
-			TrendDirection		= 0;
-			TrendBarCount		= 1;
-			BarsSinceNewHigh	= 0;
-			BarsSinceNewLow		= 0;
+//			TrendLow 			= Low[0];
+//			TrendHigh 			= High[0];
+			Trend				= TrendDirection.Flat;
+			TrendBarCount		= 0;
+//			BarsSinceNewHigh	= 0;
+//			BarsSinceNewLow		= 0;
 		}
 		#endregion
 
@@ -164,11 +331,19 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region SetPlotValues()
-		private void SetPlotValues()
+		private void SetPlotValues(int barsAgo = 0, int period = 1)
 		{
-			Values[0][0] 	= (double) LegValues[0];
-			Values[1][0] 	= (double) SwingValues[0];
-			Values[2][0] 	= (double) TrendValues[0];
+			for (int i = barsAgo; i < period; i++) {
+				Values[0][i] 	= LegValues[i] * 2;
+				Values[1][i] 	= SwingValues[i] * 3;
+				Values[2][i] 	= TrendValues[i] * 4;
+				Values[3][i] 	= BreakoutValues[i];
+			}
+		}
+
+		private void SetPlotValues(int barsAgo = 0, double period = 1)
+		{
+			SetPlotValues(barsAgo, (int) period);
 		}
 		#endregion
 	}
