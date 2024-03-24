@@ -105,19 +105,21 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			bool previousHigherLow	= PA.isHigherLow(1, 1);
 
 			Lows[0] 	= lowerLow ? Low[0] : Lows[1];
-			Highs[0]	= higherHigh ? High[0] : Highs[0];
+			Highs[0]	= higherHigh ? High[0] : Highs[1];
 
-			if (High[0] > SwingHighs[1] || BullContinuationAttempts[0] == 6) {
+			if (High[0] > SwingHighs[1] || (BullContinuationAttempts[1] == 7 && higherHigh && previousLowerHigh)) {
 				SwingHighs[0] 				= High[0];
 				BullContinuationAttempts[0]	= 0;
 			} else {
+				SwingHighs[0] 				= SwingHighs[1];
 				BullContinuationAttempts[0]	= higherHigh && previousLowerHigh ? BullContinuationAttempts[1] + 1 : BullContinuationAttempts[1];
 			}
 
-			if (Low[0] < SwingLows[0] || BearContinuationAttempts[0] == 6) {
+			if (Low[0] < SwingLows[1] || (BearContinuationAttempts[1] == 7 && lowerLow && previousHigherLow)) {
 				SwingLows[0]				= Low[0];
 				BearContinuationAttempts[0]	= 0;
 			} else {
+				SwingLows[0]				= SwingLows[1];
 				BearContinuationAttempts[0]	= lowerLow && previousHigherLow ? BearContinuationAttempts[1] + 1 : BearContinuationAttempts[1];
 			}
 		}

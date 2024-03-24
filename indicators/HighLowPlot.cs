@@ -39,7 +39,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				Description									= @"";
 				Name										= "High Low Plot";
 				Calculate									= Calculate.OnBarClose;
-				IsOverlay									= false;
+				IsOverlay									= true;
 				DisplayInDataBox							= true;
 				DrawOnPricePanel							= true;
 				DrawHorizontalGridLines						= true;
@@ -50,8 +50,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 				AddPlot(new Stroke(Brushes.Green, 3), PlotStyle.Line, "High");
 				AddPlot(new Stroke(Brushes.Red, 3), PlotStyle.Line, "Low");
-				AddPlot(new Stroke(Brushes.DarkGreen, 3), PlotStyle.Line, "Swing High");
-				AddPlot(new Stroke(Brushes.DarkRed, 3), PlotStyle.Line, "Swing Low");
+				AddPlot(new Stroke(Brushes.DarkGreen, 2), PlotStyle.Line, "Swing High");
+				AddPlot(new Stroke(Brushes.DarkRed, 2), PlotStyle.Line, "Swing Low");
 			}
 			#endregion
 

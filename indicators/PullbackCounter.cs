@@ -28,6 +28,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	{
 		#region Parameters
 		private HighsAndLowsCounter HLCount;
+		private Gui.Tools.SimpleFont textFont;
 		#endregion
 
 		#region OnStageChange()
@@ -37,7 +38,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			if (State == State.SetDefaults)
 			{
 				Description									= @"Counts Bullish and Bearish Pullbacks";
-				Name										= "PullbackCounter";
+				Name										= "Pullback Counter";
 				Calculate									= Calculate.OnBarClose;
 				IsOverlay									= false;
 				DisplayInDataBox							= true;
@@ -73,7 +74,19 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			//
+			Values[0][0] = HLCount.BullContinuationAttempts[0];
+			Values[1][0] = HLCount.BearContinuationAttempts[1];
+
+			double yBull = (High[0] + (TickSize * 12));
+			double yBear = (Low[0] - (TickSize * 12));
+
+			if ( HLCount.BullContinuationAttempts[0] != HLCount.BullContinuationAttempts[1] ) {
+				Draw.Text(this,"bullTag" + CurrentBar, true, HLCount.BullContinuationAttempts[0].ToString(), 0, yBull, 0, Brushes.Black, textFont, TextAlignment.Center, Brushes.Transparent, Brushes.Transparent, 0);
+			}
+
+			if ( HLCount.BearContinuationAttempts[0] != HLCount.BearContinuationAttempts[1] ) {
+				Draw.Text(this,"bearTag" + CurrentBar, true, HLCount.BearContinuationAttempts[0].ToString(), 0, yBear, 0, Brushes.Black, textFont, TextAlignment.Center, Brushes.Transparent, Brushes.Transparent, 0);
+			}
 		}
 		#endregion
 	}
