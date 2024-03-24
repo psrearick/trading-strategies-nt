@@ -721,14 +721,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			return source[barsAgo] < source[barsAgo + length];
 		}
 
-		public bool isFalling( int barsAgo = 0, int length = 1)
+		public bool isFalling(int barsAgo = 0, int length = 1)
 		{
-			return isRising(Close, barsAgo, length);
+			return isFalling(Close, barsAgo, length);
 		}
 
-		public bool isFalling( int barsAgo = 0)
+		public bool isFalling(int barsAgo = 0)
 		{
-			return isRising(Close, barsAgo, 1);
+			return isFalling(Close, barsAgo, 1);
 		}
 		#endregion
 
@@ -848,6 +848,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					bearishBars++;
 				}
 			}
+
+			Print(bullishBars);
+			Print(bearishBars);
+			Print("======");
 
 			if (bullishBars > bearishBars) {
 				return TrendDirection.Bullish;
@@ -1398,6 +1402,19 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region NumberOfPullbacksInTrend()
+		public int NumberOfPullbacksInTrend(int barsAgo, int period, TrendDirection direction)
+		{
+			if (direction == TrendDirection.Bullish) {
+				return NumberOfBullPullbacks(barsAgo, period);
+			}
+
+			if (direction == TrendDirection.Bearish) {
+				return NumberOfBearPullbacks(barsAgo, period);
+			}
+
+			return 0;
+		}
+
 		public int NumberOfPullbacksInTrend(int barsAgo, int period)
 		{
 			if (getTrendDirection(barsAgo, period) == TrendDirection.Bullish) {
@@ -1413,6 +1430,19 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region AveragePullbackLength()
+		public double AveragePullbackLength(int barsAgo, int period, TrendDirection direction)
+		{
+			if (direction == TrendDirection.Bullish) {
+				return AverageBarsInBullTrendPullback(barsAgo, period);
+			}
+
+			if (direction == TrendDirection.Bearish) {
+				return AverageBarsInBearTrendPullback(barsAgo, period);
+			}
+
+			return 0;
+		}
+
 		public double AveragePullbackLength(int barsAgo, int period)
 		{
 			if (getTrendDirection(barsAgo, period) == TrendDirection.Bullish) {
@@ -1424,6 +1454,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			return 0;
+		}
+		#endregion
+
+		#region isBreakoutTrend()
+		public bool isBreakoutTrend(int barsAgo, int period, TrendDirection direction)
+		{
+			return NumberOfPullbacksInTrend(barsAgo, period, direction) <= 1 && AveragePullbackLength(barsAgo, period, direction) <= 2 && period >= 4;
 		}
 		#endregion
 
