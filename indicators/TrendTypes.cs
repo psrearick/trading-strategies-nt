@@ -33,6 +33,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public Series<double> LegValues;
 		public Series<double> SwingValues;
 		public Series<double> TrendValues;
+		public Series<double> TrendStarts;
 		public Series<double> MovementValues;
 		public Series<double> BreakoutValues;
 		public int LegStarted;
@@ -52,7 +53,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private int TrendBarCount;
 		private int BarsBeforeTrendTradingRange;
 		private TrendDirection DirectionBeforeTrendTradingRange;
-		private int TrendTradingRangeCount;
+		public int TrendTradingRangeCount;
 		#endregion
 
 		#region OnStateChange()
@@ -93,6 +94,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				LegValues 		= new Series<double>(this);
 				SwingValues 	= new Series<double>(this);
 				TrendValues		= new Series<double>(this);
+				TrendStarts		= new Series<double>(this);
 				MovementValues	= new Series<double>(this);
 				BreakoutValues	= new Series<double>(this);
 			}
@@ -103,35 +105,18 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-//			if (CurrentBar < 25) {
-//				LegValues[0] 		= 0;
-//				SwingValues[0]		= 0;
-//				TrendValues[0] 		= 0;
-//				MovementValues[0]	= 0;
-//				BreakoutValues[0]	= 0;
-
-//				SetPlotValues(0, 1);
-//				return;
-//			}
-
-//			SetSwingSize();
-
-//			MovementValues[0] = Movements.ValFromStart(0);
-
-//			EvaluateLeg();
-//			EvaluateBreakout();
-//			EvaluateSwing();
-//			EvaluateTrend();
+			Evaluate();
 		}
 		#endregion
 
-		#region
+		#region Evaluate()
 		public void Evaluate()
 		{
 			if (CurrentBar < 25) {
 				LegValues[0] 		= 0;
 				SwingValues[0]		= 0;
 				TrendValues[0] 		= 0;
+				TrendStarts[0]		= 0;
 				MovementValues[0]	= 0;
 				BreakoutValues[0]	= 0;
 
@@ -176,8 +161,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region EvaluateBreakout()
 		private void EvaluateBreakout()
 		{
-			BreakoutStarted = 0;
-
 			TrendDirection direction = LegValues[0] > 0
 				? TrendDirection.Bullish
 				: LegValues[0] < 0
@@ -274,8 +257,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			TrendStarted = 0;
 			if (LegValues[0] == 0) {
 				if (Trend != TrendDirection.Flat) {
-					DirectionBeforeTradingRange = Trend;
-					BarsBeforeTradingRange = TrendBarCount;
+					DirectionBeforeTrendTradingRange = Trend;
+					BarsBeforeTrendTradingRange = TrendBarCount;
 					InitializeTrend();
 				}
 
@@ -296,16 +279,20 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			if (TrendBarCount == 0) {
 				TrendBarCount = (int) Movements.BarsAgoStarts[0];
-				if (Trend == TrendDirection.Flat && DirectionBeforeTrendTradingRange == direction && TrendTradingRangeCount < 20) {
-					TrendBarCount = TrendBarCount + BarsBeforeTrendTradingRange + TrendTradingRangeCount;
+				int trCount = BarsBeforeTrendTradingRange + TrendTradingRangeCount;
+				if (Trend == TrendDirection.Flat
+					&& DirectionBeforeTrendTradingRange == direction
+					&& TrendTradingRangeCount < 20
+					&& trCount > 0) {
+					TrendBarCount = trCount;
 				}
+			} else {
+				TrendBarCount++;
 			}
 
 			Trend 								= direction;
 			DirectionBeforeTrendTradingRange	= TrendDirection.Flat;
-
-			TrendTradingRangeCount = 0;
-			TrendBarCount++;
+			TrendTradingRangeCount 				= 0;
 
 			double high = MAX(High, TrendBarCount)[0];
 			double low = MIN(Low, TrendBarCount)[0];
