@@ -27,34 +27,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	public class PriceActionUtils : Indicator
 	{
 		#region Variables
-		public bool firstBarUp = false;
-		public bool firstBarDown = false;
-		public Series<double> BuySell;
-		public Series<double> BuySellEMA;
-		public bool isInBullTrend = false;
-		public bool isInBearTrend = false;
-		public bool inBullPullback = false;
-		public bool inBearPullback = false;
-		public double trendHigh = 0;
-		public double trendLow = 0;
-
-        private bool twoSmallerBars = false;
-        private bool twoBiggerBars = false;
-        private bool threeSmallerBars = false;
-        private bool threeBiggerBars = false;
-        private bool smallerBars = false;
-        private bool biggerBars = false;
-		private double buyingPressure = 0.5;
-		private double sellingPressure = 0.5;
-		private double pullbackSwingHigh = 0;
-		private double pullbackSwingLow = 0;
-		private bool hasBuyingPressure = false;
-		private bool hasSellingPressure = false;
-		private bool increasingBuyingPressure = false;
-		private bool increasingSellingPressure = false;
-		private bool brokeFiftyPercentPullback = false;
-
-		private int openGaps = 0;
+		public ATR Atr;
 		#endregion
 
 		#region OnStateChange()
@@ -84,13 +57,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			#region State.Configure
 			else if (State == State.Configure)
 			{
+				Atr = ATR(14);
 			}
 			#endregion
 			#region State.DataLoaded
 			else if (State == State.DataLoaded)
 			{
-				BuySell 	= new Series<double>(this);
-				BuySellEMA	= new Series<double>(this);
 			}
 			#endregion
 		}
@@ -99,84 +71,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			if (CurrentBar < 40) {
-				BuySell[0] 			= 50;
-				BuySellEMA[0] 		= 50;
-				trendHigh 			= High[0];
-				trendLow 			= Low[0];
-				pullbackSwingHigh 	= High[0];
-				pullbackSwingLow 	= Low[0];
-				return;
-			}
-
-			firstBarUp 					= BarIsUp(0);
-			firstBarDown				= BarIsDown(0);
-
-			double pressure 			= getBuySellPressure(0, 20);
-
-			BuySell[0] 					= pressure;
-			BuySellEMA[0] 				= EMA(BuySell, 9)[0];
-
-			increasingBuyingPressure 	= BuySell[0] > BuySell[1];
-			increasingSellingPressure 	= BuySell[1] >= BuySell[0];
-
-			double previousTrendLow		= trendLow;
-			double previousTrendHigh	= trendHigh;
-
-			bool previousInBullTrend	= BuySellEMA[1] > 50;
-			bool previousInBearTrend	= BuySellEMA[1] < 50;
-			isInBullTrend 				= BuySellEMA[0] > 50;
-			isInBearTrend 				= BuySellEMA[0] < 50;
-
-			if (isInBullTrend && previousInBearTrend) {
-				trendHigh 					= High[0];
-				pullbackSwingHigh			= High[0];
-				brokeFiftyPercentPullback	= false;
-			}
-
-			if (isInBearTrend && previousInBullTrend) {
-				trendLow 					= Low[0];
-				pullbackSwingLow			= Low[0];
-				brokeFiftyPercentPullback	= false;
-			}
-
-			if (isInBullTrend) {
-				trendHigh = Math.Max(trendHigh, High[0]);
-			}
-
-			if (isInBearTrend) {
-				trendLow = Math.Min(trendLow, Low[0]);
-			}
-
-			double fiftyPercentPullback = (trendHigh + trendLow) / 2;
-
-			if (isInBearTrend && High[0] > fiftyPercentPullback) {
-				brokeFiftyPercentPullback	= true;
-				pullbackSwingHigh			= High[0];
-			}
-
-			if (isInBullTrend && Low[0] < fiftyPercentPullback) {
-				brokeFiftyPercentPullback 	= true;
-				pullbackSwingLow			= Low[0];
-			}
-
-			if (isInBearTrend && brokeFiftyPercentPullback && Low[0] < previousTrendLow) {
-				trendHigh = pullbackSwingHigh;
-				brokeFiftyPercentPullback = false;
-			}
-
-			if (isInBullTrend && brokeFiftyPercentPullback && High[0] > previousTrendHigh) {
-				trendLow = pullbackSwingLow;
-				brokeFiftyPercentPullback = false;
-			}
-
-//			if (trendHigh > 0) {
-//				Values[0][0] = trendHigh;
-//			}
-
-//			if (trendLow > 0) {
-//				Values[1][0] = trendLow;
-//			}
 		}
 		#endregion
 
@@ -251,6 +145,20 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public bool BarIsUp(int index)
 		{
 			return Close[index] > Close[index + 1];
+		}
+		#endregion
+
+		#region isLargerThanAverage()
+		public bool isLargerThanAverage(int barsAgo)
+		{
+			return BarRealBodySize(barsAgo) > Atr[barsAgo];
+		}
+		#endregion
+
+		#region isSmallerThanAverage()
+		public bool isSmallerThanAverage(int barsAgo)
+		{
+			return BarRealBodySize(barsAgo) < Atr[barsAgo];
 		}
 		#endregion
 
@@ -848,10 +756,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					bearishBars++;
 				}
 			}
-
-			Print(bullishBars);
-			Print(bearishBars);
-			Print("======");
 
 			if (bullishBars > bearishBars) {
 				return TrendDirection.Bullish;

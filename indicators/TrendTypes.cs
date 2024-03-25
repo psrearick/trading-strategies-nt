@@ -36,6 +36,18 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public Series<double> TrendStarts;
 		public Series<double> MovementValues;
 		public Series<double> BreakoutValues;
+
+		private Series<double> SwingEvaluations;
+		private Series<double> TrendEvaluations;
+		private Series<bool> SwingAccuracy;
+		private Series<bool> TrendAccuracy;
+		private int CorrectSwingValues;
+		private int CheckedSwingValues;
+		private int CorrectTrendValues;
+		private int CheckedTrendValues;
+		private int lastSwingChecked;
+		private int lastTrendChecked;
+
 		public int LegStarted;
 		public int SwingStarted;
 		public int TrendStarted;
@@ -47,7 +59,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private int SwingBarCount;
 		private int BarsBeforeTradingRange;
 		private TrendDirection DirectionBeforeTradingRange;
-		private int TradingRangeCount;
+		public int TradingRangeCount;
 
 		private TrendDirection Trend;
 		private int TrendBarCount;
@@ -97,6 +109,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				TrendStarts		= new Series<double>(this);
 				MovementValues	= new Series<double>(this);
 				BreakoutValues	= new Series<double>(this);
+
+				SwingEvaluations	= new Series<double>(this, MaximumBarsLookBack.Infinite);
+				TrendEvaluations	= new Series<double>(this, MaximumBarsLookBack.Infinite);
+				SwingAccuracy		= new Series<bool>(this, MaximumBarsLookBack.Infinite);
+				TrendAccuracy		= new Series<bool>(this, MaximumBarsLookBack.Infinite);
 			}
 			#endregion
 		}
@@ -119,6 +136,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				TrendStarts[0]		= 0;
 				MovementValues[0]	= 0;
 				BreakoutValues[0]	= 0;
+				SwingEvaluations[0]	= 0;
+				TrendEvaluations[0]	= 0;
 
 				SetPlotValues(0, 1);
 				return;
@@ -132,6 +151,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			EvaluateBreakout();
 			EvaluateSwing();
 			EvaluateTrend();
+
+			SwingEvaluations[0] = SwingValues[0];
+			TrendEvaluations[0] = TrendValues[0];
+
+			CheckSwingAccuracy();
+			CheckTrendAccuracy();
 		}
 		#endregion
 
@@ -172,7 +197,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			double length = PA.AveragePullbackLength(0, (int) Movements.BarsAgoStarts[0], direction);
 			double number = PA.NumberOfPullbacksInTrend(0, (int) Movements.BarsAgoStarts[0], direction);
 
-			if (LegValues[0] != 0 && length <= 2 && number <= 1 && Movements.BarsAgoStarts[0] >= 5) {
+			if (LegValues[0] != 0 && length <= 1 && number <= 1 && Movements.BarsAgoStarts[0] >= 5) {
 				BreakoutStarted = (int) Movements.BarsAgoStarts[0];
 				for (int i = 0; i <= BreakoutStarted; i++) {
 					BreakoutValues[i] = LegValues[0];
@@ -336,6 +361,83 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		{
 			Trend				= TrendDirection.Flat;
 			TrendBarCount		= 0;
+		}
+		#endregion
+
+		#region CheckSwingAccuracy()
+		private void CheckSwingAccuracy()
+		{
+			int lastAvailableValue = CurrentBar - SwingStarted - 1;
+
+			if (lastAvailableValue == lastSwingChecked) {
+				return;
+			}
+
+			if (lastAvailableValue > lastSwingChecked) {
+				for (int i = lastSwingChecked; i < lastAvailableValue - 1; i++) {
+					int index = i;
+
+					SwingAccuracy[index] = (SwingValues[index] == SwingEvaluations[index]);
+				}
+			}
+
+			if (lastSwingChecked > lastAvailableValue) {
+				for (int i = lastAvailableValue; i < lastSwingChecked; i++) {
+					int index = i;
+
+					SwingAccuracy[index] = false;
+				}
+			}
+		}
+		#endregion
+
+		#region CheckTrendAccuracy()
+		private void CheckTrendAccuracy()
+		{
+			int lastAvailableValue = CurrentBar - TrendStarted - 1;
+
+			if (lastAvailableValue == lastTrendChecked) {
+				return;
+			}
+
+			if (lastAvailableValue > lastTrendChecked) {
+				for (int i = lastTrendChecked; i < lastAvailableValue - 1; i++) {
+					int index = i;
+
+					TrendAccuracy[index] = (TrendValues[index] == TrendEvaluations[index]);
+				}
+			}
+
+			if (lastTrendChecked > lastAvailableValue) {
+				for (int i = lastAvailableValue; i < lastTrendChecked; i++) {
+					int index = i;
+
+					TrendAccuracy[index] = false;
+				}
+			}
+		}
+		#endregion
+
+		#region ComputeAccuracy()
+		public double ComputeAccuracy(int period)
+		{
+			int length = Math.Min(period, SwingAccuracy.Count);
+
+			int swingCorrect = 0;
+			int trendCorrect = 0;
+
+			for (int i = 0; i < length; i++) {
+				int swingIndex = CurrentBar - lastSwingChecked;
+				swingCorrect += (SwingAccuracy[swingIndex] ? 1 : 0);
+
+				int trendIndex = CurrentBar - lastTrendChecked;
+				trendCorrect += (TrendAccuracy[trendIndex] ? 1 : 0);
+			}
+
+			double swingPercent = swingCorrect / length;
+			double trendPercent = trendCorrect / length;
+
+			return (swingPercent + trendPercent) / 2;
 		}
 		#endregion
 
