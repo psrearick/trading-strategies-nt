@@ -30,7 +30,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private PriceActionUtils PA;
 		public Series<double> Highs;
 		public Series<double> Lows;
-		public Series<double> Reversal;
 		public Series<double> SwingHighs;
 		public Series<double> SwingLows;
 		public Series<double> BullContinuationAttempts;
@@ -57,6 +56,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				//Disable this property if your indicator requires custom values that cumulate with each new market data event.
 				//See Help Guide for additional information.
 				IsSuspendedWhileInactive					= true;
+
+				AttemptsUntilReversal						= 7;
 			}
 			#endregion
 
@@ -72,7 +73,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			{
 				Highs		= new Series<double>(this);
 				Lows 		= new Series<double>(this);
-				Reversal 	= new Series<double>(this);
 				SwingHighs	= new Series<double>(this);
 				SwingLows 	= new Series<double>(this);
 
@@ -96,72 +96,82 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			bool higherLow	= PA.isHigherLow(0, 1);
-			bool lowerLow 	= PA.isLowerLow(0, 1);
-			bool higherHigh = PA.isHigherHigh(0, 1);
-			bool lowerhigh 	= PA.isLowerHigh(0, 1);
+			ProcessBar(0);
+		}
+		#endregion
 
-			bool previousLowerHigh	= PA.isLowerHigh(1, 1);
-			bool previousHigherLow	= PA.isHigherLow(1, 1);
+		#region ProcessBar()
+		private void ProcessBar(int barsAgo = 0)
+		{
+			bool higherLow	= PA.IsHigherLow(barsAgo, 1);
+			bool lowerLow 	= PA.IsLowerLow(barsAgo, 1);
+			bool higherHigh = PA.IsHigherHigh(barsAgo, 1);
+			bool lowerhigh 	= PA.IsLowerHigh(barsAgo, 1);
 
-			Lows[0] 	= lowerLow ? Low[0] : Lows[1];
-			Highs[0]	= higherHigh ? High[0] : Highs[1];
+			bool previousLowerHigh	= PA.IsLowerHigh(barsAgo + 1, 1);
+			bool previousHigherLow	= PA.IsHigherLow(barsAgo + 1, 1);
 
-			if (High[0] > SwingHighs[1] || (BullContinuationAttempts[1] == 7 && higherHigh && previousLowerHigh)) {
-				SwingHighs[0] 				= High[0];
-				BullContinuationAttempts[0]	= 0;
+			Lows[barsAgo] 	= lowerLow ? Low[barsAgo] : Lows[barsAgo + 1];
+			Highs[barsAgo]	= higherHigh ? High[barsAgo] : Highs[barsAgo + 1];
+
+			if (High[barsAgo] > SwingHighs[barsAgo + 1] || (BullContinuationAttempts[barsAgo + 1] == AttemptsUntilReversal && higherHigh && previousLowerHigh)) {
+				SwingHighs[barsAgo] 				= High[barsAgo];
+				BullContinuationAttempts[barsAgo]	= 0;
 			} else {
-				SwingHighs[0] 				= SwingHighs[1];
-				BullContinuationAttempts[0]	= higherHigh && previousLowerHigh ? BullContinuationAttempts[1] + 1 : BullContinuationAttempts[1];
+				SwingHighs[barsAgo] 				= SwingHighs[barsAgo + 1];
+				BullContinuationAttempts[barsAgo]	= higherHigh && previousLowerHigh ? BullContinuationAttempts[barsAgo + 1] + 1 : BullContinuationAttempts[barsAgo + 1];
 			}
 
-			if (Low[0] < SwingLows[1] || (BearContinuationAttempts[1] == 7 && lowerLow && previousHigherLow)) {
-				SwingLows[0]				= Low[0];
-				BearContinuationAttempts[0]	= 0;
+			if (Low[barsAgo] < SwingLows[barsAgo + 1] || (BearContinuationAttempts[barsAgo + 1] == AttemptsUntilReversal && lowerLow && previousHigherLow)) {
+				SwingLows[barsAgo]				= Low[barsAgo];
+				BearContinuationAttempts[barsAgo]	= 0;
 			} else {
-				SwingLows[0]				= SwingLows[1];
-				BearContinuationAttempts[0]	= lowerLow && previousHigherLow ? BearContinuationAttempts[1] + 1 : BearContinuationAttempts[1];
+				SwingLows[barsAgo]				= SwingLows[barsAgo + 1];
+				BearContinuationAttempts[barsAgo]	= lowerLow && previousHigherLow ? BearContinuationAttempts[barsAgo + 1] + 1 : BearContinuationAttempts[barsAgo + 1];
 			}
 		}
 		#endregion
+
+		#region ResetToBar()
+		public void ResetToBar(int barsAgo)
+		{
+			if (CurrentBar == 0) {
+				return;
+			}
+
+			int firstBar = Math.Min(barsAgo, CurrentBar - 1);
+			int primerBar = Math.Min(barsAgo + 1, CurrentBar);
+
+			Highs[primerBar] 					= High[primerBar];
+			SwingHighs[primerBar] 				= High[primerBar];
+			Lows[primerBar]						= Low[primerBar];
+			SwingLows[primerBar]				= Low[primerBar];
+			BullContinuationAttempts[primerBar]	= 0;
+			BearContinuationAttempts[primerBar]	= 0;
+
+			for (int i = firstBar; i >= 0; i--) {
+				ProcessBar(i);
+			}
+		}
+		#endregion
+
+		#region Properties
+		[NinjaScriptProperty]
+		[Range(-1, int.MaxValue)]
+		[Display(Name="Attempts Until Reversal", Description="Attempts Until Reversal", Order=0, GroupName="Parameters")]
+		public int AttemptsUntilReversal
+		{ get; set; }
+		#endregion
 	}
 }
-
-#region NinjaScript generated code. Neither change nor remove.
-
+#region NinjaScript Legacy/Convenience Constructors
 namespace NinjaTrader.NinjaScript.Indicators
 {
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
-		private PR.HighsAndLowsCounter[] cacheHighsAndLowsCounter;
 		public PR.HighsAndLowsCounter HighsAndLowsCounter()
 		{
-			return HighsAndLowsCounter(Input);
-		}
-
-		public PR.HighsAndLowsCounter HighsAndLowsCounter(ISeries<double> input)
-		{
-			if (cacheHighsAndLowsCounter != null)
-				for (int idx = 0; idx < cacheHighsAndLowsCounter.Length; idx++)
-					if (cacheHighsAndLowsCounter[idx] != null &&  cacheHighsAndLowsCounter[idx].EqualsInput(input))
-						return cacheHighsAndLowsCounter[idx];
-			return CacheIndicator<PR.HighsAndLowsCounter>(new PR.HighsAndLowsCounter(), input, ref cacheHighsAndLowsCounter);
-		}
-	}
-}
-
-namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
-{
-	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
-	{
-		public Indicators.PR.HighsAndLowsCounter HighsAndLowsCounter()
-		{
-			return indicator.HighsAndLowsCounter(Input);
-		}
-
-		public Indicators.PR.HighsAndLowsCounter HighsAndLowsCounter(ISeries<double> input )
-		{
-			return indicator.HighsAndLowsCounter(input);
+			return HighsAndLowsCounter(Input, 7);
 		}
 	}
 }
@@ -172,12 +182,63 @@ namespace NinjaTrader.NinjaScript.Strategies
 	{
 		public Indicators.PR.HighsAndLowsCounter HighsAndLowsCounter()
 		{
-			return indicator.HighsAndLowsCounter(Input);
+			return indicator.HighsAndLowsCounter(Input, 7);
+		}
+	}
+}
+#endregion
+
+#region NinjaScript generated code. Neither change nor remove.
+
+namespace NinjaTrader.NinjaScript.Indicators
+{
+	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
+	{
+		private PR.HighsAndLowsCounter[] cacheHighsAndLowsCounter;
+		public PR.HighsAndLowsCounter HighsAndLowsCounter(int attemptsUntilReversal)
+		{
+			return HighsAndLowsCounter(Input, attemptsUntilReversal);
 		}
 
-		public Indicators.PR.HighsAndLowsCounter HighsAndLowsCounter(ISeries<double> input )
+		public PR.HighsAndLowsCounter HighsAndLowsCounter(ISeries<double> input, int attemptsUntilReversal)
 		{
-			return indicator.HighsAndLowsCounter(input);
+			if (cacheHighsAndLowsCounter != null)
+				for (int idx = 0; idx < cacheHighsAndLowsCounter.Length; idx++)
+					if (cacheHighsAndLowsCounter[idx] != null && cacheHighsAndLowsCounter[idx].AttemptsUntilReversal == attemptsUntilReversal && cacheHighsAndLowsCounter[idx].EqualsInput(input))
+						return cacheHighsAndLowsCounter[idx];
+			return CacheIndicator<PR.HighsAndLowsCounter>(new PR.HighsAndLowsCounter(){ AttemptsUntilReversal = attemptsUntilReversal }, input, ref cacheHighsAndLowsCounter);
+		}
+	}
+}
+
+namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
+{
+	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
+	{
+		public Indicators.PR.HighsAndLowsCounter HighsAndLowsCounter(int attemptsUntilReversal)
+		{
+			return indicator.HighsAndLowsCounter(Input, attemptsUntilReversal);
+		}
+
+		public Indicators.PR.HighsAndLowsCounter HighsAndLowsCounter(ISeries<double> input , int attemptsUntilReversal)
+		{
+			return indicator.HighsAndLowsCounter(input, attemptsUntilReversal);
+		}
+	}
+}
+
+namespace NinjaTrader.NinjaScript.Strategies
+{
+	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
+	{
+		public Indicators.PR.HighsAndLowsCounter HighsAndLowsCounter(int attemptsUntilReversal)
+		{
+			return indicator.HighsAndLowsCounter(Input, attemptsUntilReversal);
+		}
+
+		public Indicators.PR.HighsAndLowsCounter HighsAndLowsCounter(ISeries<double> input , int attemptsUntilReversal)
+		{
+			return indicator.HighsAndLowsCounter(input, attemptsUntilReversal);
 		}
 	}
 }

@@ -74,50 +74,50 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region BarRealBody()
-		public double BarRealBody(int index)
+		#region BodySize()
+		public double BodySize(int index)
 		{
 			return Close[index] - Open[index];
 		}
 		#endregion
 
-		#region BarRealBodySize()
-		public double BarRealBodySize(int index)
+		#region RealBodySize()
+		public double RealBodySize(int index)
 		{
-			return Math.Abs(BarRealBody(index));
+			return Math.Abs(BodySize(index));
 		}
 		#endregion
 
-		#region BarIsBig()
-		public bool BarIsBig(int index)
+		#region IsBig()
+		public bool IsBig(int index)
 		{
-			return (BarRealBodySize(index) / (High[index] - Low[index])) > 0.75;
+			return (RealBodySize(index) / (High[index] - Low[index])) > 0.75;
 		}
 		#endregion
 
-		#region BarIsSmall()
-		public bool BarIsSmall(int index)
+		#region IsSmall()
+		public bool IsSmall(int index)
 		{
-			return (BarRealBodySize(index) / (High[index] - Low[index])) < 0.25;
+			return (RealBodySize(index) / (High[index] - Low[index])) < 0.25;
 		}
 		#endregion
 
-		#region BarIsStrong()
-		public bool BarIsStrong(int index)
+		#region IsStrong()
+		public bool IsStrong(int index)
 		{
-			return BarIsBig(index) && BarNearExtreme(index) && BarIsBigger(index);
+			return IsBig(index) && ClosedNearExtreme(index) && IsBigger(index);
 		}
 		#endregion
 
-		#region BarIsBigger()
-		public bool BarIsBigger(int index)
+		#region IsBigger()
+		public bool IsBigger(int index)
 		{
-			return BarRealBodySize(index) > BarRealBodySize(index + 1);
+			return RealBodySize(index) > RealBodySize(index + 1);
 		}
 		#endregion
 
-		#region BarNearExtreme()
-		public bool BarNearExtreme(int index)
+		#region ClosedNearExtreme()
+		public bool ClosedNearExtreme(int index)
 		{
 			if (Close[index] > Open[index]) {
 				return ((Close[index] - Low[index]) / (High[index] - Low[index])) > 0.75;
@@ -127,38 +127,38 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region BarIsSmaller()
-		public bool BarIsSmaller(int index)
+		#region IsSmaller()
+		public bool IsSmaller(int index)
 		{
-			return BarRealBodySize(index) < BarRealBodySize(index + 1);
+			return RealBodySize(index) < RealBodySize(index + 1);
 		}
 		#endregion
 
-		#region BarIsDown()
-		public bool BarIsDown(int index)
+		#region IsDown()
+		public bool IsDown(int index)
 		{
 			return Close[index] < Close[index + 1];
 		}
 		#endregion
 
-		#region BarIsUp()
-		public bool BarIsUp(int index)
+		#region IsUp()
+		public bool IsUp(int index)
 		{
 			return Close[index] > Close[index + 1];
 		}
 		#endregion
 
-		#region isLargerThanAverage()
-		public bool isLargerThanAverage(int barsAgo)
+		#region IsLargerThanAverage()
+		public bool IsLargerThanAverage(int barsAgo)
 		{
-			return BarRealBodySize(barsAgo) > Atr[barsAgo];
+			return RealBodySize(barsAgo) > Atr[barsAgo];
 		}
 		#endregion
 
-		#region isSmallerThanAverage()
-		public bool isSmallerThanAverage(int barsAgo)
+		#region IsSmallerThanAverage()
+		public bool IsSmallerThanAverage(int barsAgo)
 		{
-			return BarRealBodySize(barsAgo) < Atr[barsAgo];
+			return RealBodySize(barsAgo) < Atr[barsAgo];
 		}
 		#endregion
 
@@ -168,7 +168,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			bool biggerBars = true;
 
 			for (int i = 0; i < period; i++) {
-				if (!BarIsBigger(i + index)) {
+				if (!IsBigger(i + index)) {
 					biggerBars = false;
 
 					break;
@@ -185,7 +185,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			bool smallerBars = true;
 
 			for (int i = 0; i < period; i++) {
-				if (!BarIsSmaller(i + index)) {
+				if (!IsSmaller(i + index)) {
 					smallerBars = false;
 
 					break;
@@ -202,7 +202,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			bool barsUp = true;
 
 			for (int i = 0; i < period; i++) {
-				if (!BarIsUp(i + index)) {
+				if (!IsUp(i + index)) {
 					barsUp = false;
 
 					break;
@@ -219,7 +219,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			bool barsDown = true;
 
 			for (int i = 0; i < period; i++) {
-				if (!BarIsDown(i + index)) {
+				if (!IsDown(i + index)) {
 					barsDown = false;
 
 					break;
@@ -236,7 +236,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int barsDown = 0;
 
 			for (int i = 0; i < period; i++) {
-				if (BarIsDown(i + index)) {
+				if (IsDown(i + index)) {
 					barsDown = barsDown + 1;
 				}
 			}
@@ -253,9 +253,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int rangeMax = Math.Min((period + barsAgo), Close.Count);
 
 			for (int i = barsAgo; i < rangeMax; i++) {
-				if (isBearishBar(i)) {
+				if (IsBearishBar(i)) {
 					bearBarCount++;
-					bearBarSize = bearBarSize + BarRealBodySize(i);
+					bearBarSize = bearBarSize + RealBodySize(i);
 				}
 			}
 
@@ -275,9 +275,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int rangeMax = Math.Min((period + barsAgo), Close.Count);
 
 			for (int i = barsAgo; i < rangeMax; i++) {
-				if (isBullishBar(i)) {
+				if (IsBullishBar(i)) {
 					bullBarCount++;
-					bullBarSize = bullBarSize + BarRealBodySize(i);
+					bullBarSize = bullBarSize + RealBodySize(i);
 				}
 			}
 
@@ -296,7 +296,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int rangeMax = Math.Min((period + barsAgo), Close.Count);
 
 			for (int i = barsAgo; i < rangeMax; i++) {
-				if (isBearishBar(i) && isBearishBar(i + 1)) {
+				if (IsBearishBar(i) && IsBearishBar(i + 1)) {
 					bearBars++;
 				}
 			}
@@ -312,7 +312,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int rangeMax = Math.Min((period + barsAgo), Close.Count);
 
 			for (int i = barsAgo; i < rangeMax; i++) {
-				if (isBullishBar(i) && isBullishBar(i + 1)) {
+				if (IsBullishBar(i) && IsBullishBar(i + 1)) {
 					bullBars++;
 				}
 			}
@@ -328,7 +328,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int rangeMax = Math.Min((period + barsAgo), Close.Count);
 
 			for (int i = barsAgo; i < rangeMax; i++) {
-				if (isBearishBar(i)) {
+				if (IsBearishBar(i)) {
 					bearBars++;
 				}
 			}
@@ -344,7 +344,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int rangeMax = Math.Min((period + barsAgo), Close.Count);
 
 			for (int i = barsAgo; i < rangeMax; i++) {
-				if (isBullishBar(i)) {
+				if (IsBullishBar(i)) {
 					bullBars++;
 				}
 			}
@@ -360,14 +360,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int rangeMax = Math.Min((period + barsAgo), Close.Count);
 
 			for (int i = barsAgo; i < rangeMax; i++) {
-				if (isBullishBar(barsAgo)) {
-					if (inPortionOfBarRange(Open, i, 33, 66)) {
+				if (IsBullishBar(barsAgo)) {
+					if (InPortionOfBarRange(Open, i, 33, 66)) {
 						lowerTail++;
 					}
 				}
 
-				if (isBearishBar(barsAgo)) {
-					if (inPortionOfBarRange(Close, i, 33, 66)) {
+				if (IsBearishBar(barsAgo)) {
+					if (InPortionOfBarRange(Close, i, 33, 66)) {
 						lowerTail++;
 					}
 				}
@@ -384,14 +384,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int rangeMax = Math.Min((period + barsAgo), Close.Count);
 
 			for (int i = barsAgo; i < rangeMax; i++) {
-				if (isBullishBar(barsAgo)) {
-					if (inPortionOfBarRange(Close, i, 33, 66)) {
+				if (IsBullishBar(barsAgo)) {
+					if (InPortionOfBarRange(Close, i, 33, 66)) {
 						upperTail++;
 					}
 				}
 
-				if (isBearishBar(barsAgo)) {
-					if (inPortionOfBarRange(Open, i, 33, 66)) {
+				if (IsBearishBar(barsAgo)) {
+					if (InPortionOfBarRange(Open, i, 33, 66)) {
 						upperTail++;
 					}
 				}
@@ -408,7 +408,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int rangeMax = Math.Min((period + barsAgo), Close.Count);
 
 			for (int i = barsAgo; i < rangeMax; i++) {
-				if (inPortionOfBarRange(i, 50, 100)) {
+				if (InPortionOfBarRange(i, 50, 100)) {
 					bullBars++;
 				}
 			}
@@ -424,7 +424,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int rangeMax = Math.Min((period + barsAgo), Close.Count);
 
 			for (int i = barsAgo; i < rangeMax; i++) {
-				if (inPortionOfBarRange(i, 0, 50)) {
+				if (InPortionOfBarRange(i, 0, 50)) {
 					bearBars++;
 				}
 			}
@@ -440,7 +440,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int rangeMax = Math.Min((period + barsAgo), Close.Count);
 
 			for (int i = barsAgo; i < rangeMax; i++) {
-				if (isHigherHigh(i, 1)) {
+				if (IsHigherHigh(i, 1)) {
 					bullBars++;
 				}
 			}
@@ -484,13 +484,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		#region AverageBarsInBearTrendPullback()
 		public int AverageBarsInBearTrendPullback(int barsAgo, int period) {
-			return AverageBarsInTrendPullback(barsAgo, period, High, isHigherHigh);
+			return AverageBarsInTrendPullback(barsAgo, period, High, IsHigherHigh);
 		}
 		#endregion
 
 		#region AverageBarsInBullTrendPullback()
 		public int AverageBarsInBullTrendPullback(int barsAgo, int period) {
-			return AverageBarsInTrendPullback(barsAgo, period, Low, isLowerLow);
+			return AverageBarsInTrendPullback(barsAgo, period, Low, IsLowerLow);
 		}
 		#endregion
 
@@ -501,7 +501,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int rangeMax = Math.Min((period + barsAgo), Close.Count);
 
 			for (int i = barsAgo; i < rangeMax; i++) {
-				if (isLowerLow(i, 1)) {
+				if (IsLowerLow(i, 1)) {
 					bearBars++;
 				}
 			}
@@ -516,7 +516,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int barsUp = 0;
 
 			for (int i = 0; i < period; i++) {
-				if (BarIsUp(i + index)) {
+				if (IsUp(i + index)) {
 					barsUp = barsUp + 1;
 				}
 			}
@@ -531,7 +531,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int barsSmall = 0;
 
 			for (int i = 0; i < period; i++) {
-				if (BarIsSmall(i + index)) {
+				if (IsSmall(i + index)) {
 					barsSmall = barsSmall + 1;
 				}
 			}
@@ -546,7 +546,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int barsBig = 0;
 
 			for (int i = 0; i < period; i++) {
-				if (BarIsBig(i + index)) {
+				if (IsBig(i + index)) {
 					barsBig = barsBig + 1;
 				}
 			}
@@ -561,7 +561,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int barsSmaller = 0;
 
 			for (int i = 0; i < period; i++) {
-				if (BarIsSmaller(i + index)) {
+				if (IsSmaller(i + index)) {
 					barsSmaller = barsSmaller + 1;
 				}
 			}
@@ -576,7 +576,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int barsBigger = 0;
 
 			for (int i = 0; i < period; i++) {
-				if (BarIsBigger(i + index)) {
+				if (IsBigger(i + index)) {
 					barsBigger = barsBigger + 1;
 				}
 			}
@@ -585,42 +585,42 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region isRisingBar()
-		public bool isRisingBar(int barsAgo = 0)
+		#region IsRisingBar()
+		public bool IsRisingBar(int barsAgo = 0)
 		{
-			return isHigherHigh(barsAgo) && !isLowerLow(barsAgo);
+			return IsHigherHigh(barsAgo) && !IsLowerLow(barsAgo);
 		}
 		#endregion
 
-		#region isFallingBar()
-		public bool isFallingBar(int barsAgo = 0)
+		#region IsFallingBar()
+		public bool IsFallingBar(int barsAgo = 0)
 		{
-			return !isHigherHigh(barsAgo) && isLowerLow(barsAgo);
+			return !IsHigherHigh(barsAgo) && IsLowerLow(barsAgo);
 		}
 		#endregion
 
-		#region isBullishBar()
+		#region IsBullishBar()
 		// determine if the bar at `barsAgo` is a bull bar
-		public bool isBullishBar(int barsAgo = 0)
+		public bool IsBullishBar(int barsAgo = 0)
 		{
 			return Close[barsAgo] > Open[barsAgo];
 		}
 		#endregion
 
-		#region isBearishBar()
+		#region IsBearishBar()
 		// determine if the bar at `barsAgo` is a bear bar
-		public bool isBearishBar(int barsAgo = 0)
+		public bool IsBearishBar(int barsAgo = 0)
 		{
 			return Close[barsAgo] < Open[barsAgo];
 		}
 		#endregion
 
-		#region isFalling()
+		#region IsFalling()
 		// is source at `barsAgo` is less than `length` bars earlier
 		// source = Series to check
 		// barsAgo = the latest bar
 		// length = the number of bars before `barsAgo` to evaluate
-		public bool isFalling(ISeries<double> source, int barsAgo = 0, int length = 1)
+		public bool IsFalling(ISeries<double> source, int barsAgo = 0, int length = 1)
 		{
 			if (source == null) {
 				source = Close;
@@ -629,23 +629,23 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			return source[barsAgo] < source[barsAgo + length];
 		}
 
-		public bool isFalling(int barsAgo = 0, int length = 1)
+		public bool IsFalling(int barsAgo = 0, int length = 1)
 		{
-			return isFalling(Close, barsAgo, length);
+			return IsFalling(Close, barsAgo, length);
 		}
 
-		public bool isFalling(int barsAgo = 0)
+		public bool IsFalling(int barsAgo = 0)
 		{
-			return isFalling(Close, barsAgo, 1);
+			return IsFalling(Close, barsAgo, 1);
 		}
 		#endregion
 
-		#region isRising()
+		#region IsRising()
 		// is source at `barsAgo` is greater than `length` bars earlier
 		// source = Series to check
 		// barsAgo = the latest bar
 		// length = the number of bars before `barsAgo` to evaluate
-		public bool isRising(ISeries<double> source, int barsAgo = 0, int length = 1)
+		public bool IsRising(ISeries<double> source, int barsAgo = 0, int length = 1)
 		{
 			if (source == null) {
 				source = Close;
@@ -654,52 +654,52 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			return source[barsAgo] > source[barsAgo + length];
 		}
 
-		public bool isRising( int barsAgo = 0, int length = 1)
+		public bool IsRising( int barsAgo = 0, int length = 1)
 		{
-			return isRising(Close, barsAgo, length);
+			return IsRising(Close, barsAgo, length);
 		}
 
-		public bool isRising( int barsAgo = 0)
+		public bool IsRising( int barsAgo = 0)
 		{
-			return isRising(Close, barsAgo, 1);
+			return IsRising(Close, barsAgo, 1);
 		}
 		#endregion
 
-		#region isHigherHigh()
+		#region IsHigherHigh()
 		// Is High at `barsAgo` greater than `length` bars earlier
-		public bool isHigherHigh(int barsAgo = 0, int length = 1)
+		public bool IsHigherHigh(int barsAgo = 0, int length = 1)
 		{
-			return isRising(High, barsAgo, length);
+			return IsRising(High, barsAgo, length);
 		}
 		#endregion
 
-		#region isLowerLow()
+		#region IsLowerLow()
 		// Is Low at `barsAgo` less than `length` bars earlier
-		public bool isLowerLow(int barsAgo = 0, int length = 1)
+		public bool IsLowerLow(int barsAgo = 0, int length = 1)
 		{
-			return isFalling(Low, barsAgo, length);
+			return IsFalling(Low, barsAgo, length);
 		}
 		#endregion
 
-		#region isLowerHigh()
+		#region IsLowerHigh()
 		// Is High at `barsAgo` less than `length` bars earlier
-		public bool isLowerHigh(int barsAgo = 0, int length = 1)
+		public bool IsLowerHigh(int barsAgo = 0, int length = 1)
 		{
-			return isFalling(High, barsAgo, length);
+			return IsFalling(High, barsAgo, length);
 		}
 		#endregion
 
-		#region isHigherLow()
+		#region IsHigherLow()
 		// Is Low at `barsAgo` greater than `length` bars earlier
-		public bool isHigherLow(int barsAgo = 0, int length = 1)
+		public bool IsHigherLow(int barsAgo = 0, int length = 1)
 		{
-			return isRising(Low, barsAgo, length);
+			return IsRising(Low, barsAgo, length);
 		}
 		#endregion
 
-		#region inRangeOfBars()
+		#region InRangeOfBars()
 		// the number of bars that have `val` within the bars open and close, starting at `barsAgo`, looking `length` bars back
-		public int inRangeOfBars(int barsAgo, double val, int length)
+		public int InRangeOfBars(int barsAgo, double val, int length)
 		{
 			int bars = 0;
 			double barLow = 0;
@@ -718,9 +718,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region inPortionOfBarRange()
+		#region InPortionOfBarRange()
 		// determine how far a value is between the Low and High of a bar at `barsAgo`. The range is 0 - 100 with 0 being the Low and 100 being the High.
-		public bool inPortionOfBarRange(ISeries<double> source, int barsAgo, double lowestValue, double highestValue)
+		public bool InPortionOfBarRange(ISeries<double> source, int barsAgo, double lowestValue, double highestValue)
 		{
 			double reference = source[barsAgo] - Low[barsAgo];
 			double range = High[barsAgo] - Low[barsAgo];
@@ -730,16 +730,16 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region inPortionOfBarRange()
-		public bool inPortionOfBarRange(int barsAgo, double lowestValue, double highestValue)
+		#region InPortionOfBarRange()
+		public bool InPortionOfBarRange(int barsAgo, double lowestValue, double highestValue)
 		{
-			return inPortionOfBarRange(Close, barsAgo, lowestValue, highestValue);
+			return InPortionOfBarRange(Close, barsAgo, lowestValue, highestValue);
 		}
 		#endregion
 
-		#region getTrendDirection()
+		#region GetTrendDirection()
 		// get the trend direction over the last `length` bars, starting `barsAgo` bars before the current bar
-		public TrendDirection getTrendDirection(int barsAgo = 0, int length = 10)
+		public TrendDirection GetTrendDirection(int barsAgo = 0, int length = 10)
 		{
 			if (Close.Count < length + barsAgo) return TrendDirection.Flat;
 
@@ -748,11 +748,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			for (int i = barsAgo; i < barsAgo + length; i++) {
 
-				if (isBullishBar(i) && isRising(i)) {
+				if (IsBullishBar(i) && IsRising(i)) {
 					bullishBars++;
 				}
 
-				if (isBearishBar(i) && isFalling(i)) {
+				if (IsBearishBar(i) && IsFalling(i)) {
 					bearishBars++;
 				}
 			}
@@ -770,8 +770,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region isTrendBar()
-		public bool isTrendBar(int barsAgo)
+		#region IsTrendBar()
+		public bool IsTrendBar(int barsAgo)
 		{
 			double thresholdPercentage = 0.5;
 			double openCloseDifference = Math.Abs(Open[barsAgo] - Close[barsAgo]);
@@ -785,8 +785,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region isTradingRangeBar()
-		public bool isTradingRangeBar(int barsAgo)
+		#region IsTradingRangeBar()
+		public bool IsTradingRangeBar(int barsAgo)
 		{
 			double thresholdPercentage = 0.5;
 			double openCloseDifference = Math.Abs(Open[barsAgo] - Close[barsAgo]);
@@ -800,17 +800,17 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region isWeakSignalBar()
-		public bool isWeakSignalBar(int barsAgo, TrendDirection direction = TrendDirection.Flat)
+		#region IsWeakSignalBar()
+		public bool IsWeakSignalBar(int barsAgo, TrendDirection direction = TrendDirection.Flat)
 		{
-			if (barsAgo > 0 && !isWeakFollowThroughBar(barsAgo - 1)) {
+			if (barsAgo > 0 && !IsWeakFollowThroughBar(barsAgo - 1)) {
 				return false;
 			}
 
 			double change = Close[barsAgo] - Open[barsAgo + 3];
 
 			if (direction == TrendDirection.Flat) {
-				direction = getTrendDirection(1, 3);
+				direction = GetTrendDirection(1, 3);
 			}
 
 			if (direction == TrendDirection.Bullish && change < 0) {
@@ -825,14 +825,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region isStrongSellSignalBar()
-		public bool isStrongSellSignalBar(int barsAgo, TrendDirection direction = TrendDirection.Flat)
+		#region IsStrongSellSignalBar()
+		public bool IsStrongSellSignalBar(int barsAgo, TrendDirection direction = TrendDirection.Flat)
 		{
-			if (isWeakSignalBar(barsAgo, direction)) {
+			if (IsWeakSignalBar(barsAgo, direction)) {
 				return false;
 			}
 
-			if (!isBearishSellReversalBar(barsAgo)) {
+			if (!IsBearishSellReversalBar(barsAgo)) {
 				return false;
 			}
 
@@ -844,7 +844,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return false;
 			}
 
-			if (inRangeOfBars(0, Close[0], 5) > 2) {
+			if (InRangeOfBars(0, Close[0], 5) > 2) {
 				return false;
 			}
 
@@ -852,11 +852,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return false;
 			}
 
-			if (inPortionOfBarRange(0, 20, 100)) {
+			if (InPortionOfBarRange(0, 20, 100)) {
 				return false;
 			}
 
-			if (!inPortionOfBarRange(Open, 0, 50, 67)) {
+			if (!InPortionOfBarRange(Open, 0, 50, 67)) {
 				return false;
 			}
 
@@ -864,17 +864,17 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region buySignalBarStrength()
-		public double buySignalBarStrength(int barsAgo, TrendDirection direction = TrendDirection.Flat)
+		#region BuySignalBarStrength()
+		public double BuySignalBarStrength(int barsAgo, TrendDirection direction = TrendDirection.Flat)
 		{
 			double countStrength = 0;
 			double strengthIndicators = 8;
 
-			if (!isWeakSignalBar(barsAgo, direction)) {
+			if (!IsWeakSignalBar(barsAgo, direction)) {
 				countStrength++;
 			}
 
-			if (isBullishBuyReversalBar(barsAgo)) {
+			if (IsBullishBuyReversalBar(barsAgo)) {
 				countStrength++;
 			}
 
@@ -886,7 +886,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				countStrength++;
 			}
 
-			if (inRangeOfBars(0, Close[0], 5) <= 2) {
+			if (InRangeOfBars(0, Close[0], 5) <= 2) {
 				countStrength++;
 			}
 
@@ -894,11 +894,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				countStrength++;
 			}
 
-			if (inPortionOfBarRange(0, 80, 100)) {
+			if (InPortionOfBarRange(0, 80, 100)) {
 				countStrength++;
 			}
 
-			if (inPortionOfBarRange(Open, 0, 33, 50)) {
+			if (InPortionOfBarRange(Open, 0, 33, 50)) {
 				countStrength++;
 			}
 
@@ -906,17 +906,17 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region sellSignalBarStrength()
-		public double sellSignalBarStrength(int barsAgo, TrendDirection direction = TrendDirection.Flat)
+		#region SellSignalBarStrength()
+		public double SellSignalBarStrength(int barsAgo, TrendDirection direction = TrendDirection.Flat)
 		{
 			double countStrength = 0;
 			double strengthIndicators = 8;
 
-			if (!isWeakSignalBar(barsAgo, direction)) {
+			if (!IsWeakSignalBar(barsAgo, direction)) {
 				countStrength++;
 			}
 
-			if (isBearishSellReversalBar(barsAgo)) {
+			if (IsBearishSellReversalBar(barsAgo)) {
 				countStrength++;
 			}
 
@@ -928,7 +928,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				countStrength++;
 			}
 
-			if (inRangeOfBars(0, Close[0], 5) <= 2) {
+			if (InRangeOfBars(0, Close[0], 5) <= 2) {
 				countStrength++;
 			}
 
@@ -936,11 +936,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				countStrength++;
 			}
 
-			if (!inPortionOfBarRange(0, 20, 100)) {
+			if (!InPortionOfBarRange(0, 20, 100)) {
 				countStrength++;
 			}
 
-			if (inPortionOfBarRange(Open, 0, 50, 67)) {
+			if (InPortionOfBarRange(Open, 0, 50, 67)) {
 				countStrength++;
 			}
 
@@ -948,14 +948,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region isStrongBuySignalBar()
-		public bool isStrongBuySignalBar(int barsAgo, TrendDirection direction = TrendDirection.Flat)
+		#region IsStrongBuySignalBar()
+		public bool IsStrongBuySignalBar(int barsAgo, TrendDirection direction = TrendDirection.Flat)
 		{
-			if (isWeakSignalBar(barsAgo, direction)) {
+			if (IsWeakSignalBar(barsAgo, direction)) {
 				return false;
 			}
 
-			if (!isBullishBuyReversalBar(barsAgo)) {
+			if (!IsBullishBuyReversalBar(barsAgo)) {
 				return false;
 			}
 
@@ -967,7 +967,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return false;
 			}
 
-			if (inRangeOfBars(0, Close[0], 5) > 2) {
+			if (InRangeOfBars(0, Close[0], 5) > 2) {
 				return false;
 			}
 
@@ -975,11 +975,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return false;
 			}
 
-			if (inPortionOfBarRange(0, 0, 80)) {
+			if (InPortionOfBarRange(0, 0, 80)) {
 				return false;
 			}
 
-			if (!inPortionOfBarRange(Open, 0, 33, 50)) {
+			if (!InPortionOfBarRange(Open, 0, 33, 50)) {
 				return false;
 			}
 
@@ -987,23 +987,23 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region isWeakFollowThroughBar()
-		public bool isWeakFollowThroughBar(int barsAgo)
+		#region IsWeakFollowThroughBar()
+		public bool IsWeakFollowThroughBar(int barsAgo)
 		{
 			bool isReversalBar = Close[barsAgo + 1] > Open[barsAgo + 1]
-				? isBuyReversalBar(barsAgo)
-				: isSellReversalBar(barsAgo);
+				? IsBuyReversalBar(barsAgo)
+				: IsSellReversalBar(barsAgo);
 
-			return isDoji(barsAgo)
-				|| isInsideBar(barsAgo)
+			return IsDoji(barsAgo)
+				|| IsInsideBar(barsAgo)
 				|| isReversalBar;
 		}
 		#endregion
 
-		#region isStrongFollowThroughBar()
-		public bool isStrongFollowThroughBar(int barsAgo)
+		#region IsStrongFollowThroughBar()
+		public bool IsStrongFollowThroughBar(int barsAgo)
 		{
-			if (isWeakFollowThroughBar(barsAgo)) {
+			if (IsWeakFollowThroughBar(barsAgo)) {
 				return false;
 			}
 
@@ -1019,12 +1019,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return false;
 			}
 
-			return isTrendBar(barsAgo);
+			return IsTrendBar(barsAgo);
 		}
 		#endregion
 
-		#region isDoji()
-		public bool isDoji(int barsAgo)
+		#region IsDoji()
+		public bool IsDoji(int barsAgo)
 		{
 			double thresholdPercentage = 0.1;
 			double openCloseDifference = Math.Abs(Open[barsAgo] - Close[barsAgo]);
@@ -1038,17 +1038,17 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region isInsideBar()
-		public bool isInsideBar(int barsAgo)
+		#region IsInsideBar()
+		public bool IsInsideBar(int barsAgo)
 		{
-			return !isHigherHigh(barsAgo, 1) && !isLowerLow(barsAgo, 1);
+			return !IsHigherHigh(barsAgo, 1) && !IsLowerLow(barsAgo, 1);
 		}
 		#endregion
 
-		#region isOutsideBar()
-		public bool isOutsideBar(int barsAgo)
+		#region IsOutsideBar()
+		public bool IsOutsideBar(int barsAgo)
 		{
-			return isHigherHigh(barsAgo, 1) && isLowerLow(barsAgo, 1);
+			return IsHigherHigh(barsAgo, 1) && IsLowerLow(barsAgo, 1);
 		}
 		#endregion
 
@@ -1064,12 +1064,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					return false;
 				}
 
-				if (barType == 'i' && !isInsideBar(i + barsAgo))
+				if (barType == 'i' && !IsInsideBar(i + barsAgo))
 				{
 					return false;
 				}
 
-				if (barType == 'o' && !isOutsideBar(i + barsAgo))
+				if (barType == 'o' && !IsOutsideBar(i + barsAgo))
 				{
 					return false;
 				}
@@ -1079,8 +1079,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region isBuyReversalBar()
-		public bool isBuyReversalBar(int barsAgo)
+		#region IsBuyReversalBar()
+		public bool IsBuyReversalBar(int barsAgo)
 		{
 			double midpoint = (High[barsAgo] + Low[barsAgo]) / 2;
 
@@ -1088,22 +1088,22 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region isBullishBuyReversalBar()
-		public bool isBullishBuyReversalBar(int barsAgo)
+		#region IsBullishBuyReversalBar()
+		public bool IsBullishBuyReversalBar(int barsAgo)
 		{
-			return isBuyReversalBar(barsAgo) && isBullishBar(barsAgo);
+			return IsBuyReversalBar(barsAgo) && IsBullishBar(barsAgo);
 		}
 		#endregion
 
-		#region isBearishBuyReversalBar()
-		public bool isBearishBuyReversalBar(int barsAgo)
+		#region IsBearishBuyReversalBar()
+		public bool IsBearishBuyReversalBar(int barsAgo)
 		{
-			return isBuyReversalBar(barsAgo) && isBearishBar(barsAgo);
+			return IsBuyReversalBar(barsAgo) && IsBearishBar(barsAgo);
 		}
 		#endregion
 
-		#region isSellReversalBar()
-		public bool isSellReversalBar(int barsAgo)
+		#region IsSellReversalBar()
+		public bool IsSellReversalBar(int barsAgo)
 		{
 			double midpoint = (High[barsAgo] + Low[barsAgo]) / 2;
 
@@ -1111,22 +1111,22 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region isBullishSellReversalBar()
-		public bool isBullishSellReversalBar(int barsAgo)
+		#region IsBullishSellReversalBar()
+		public bool IsBullishSellReversalBar(int barsAgo)
 		{
-			return isSellReversalBar(barsAgo) && isBullishBar(barsAgo);
+			return IsSellReversalBar(barsAgo) && IsBullishBar(barsAgo);
 		}
 		#endregion
 
-		#region isBearishSellReversalBar()
-		public bool isBearishSellReversalBar(int barsAgo)
+		#region IsBearishSellReversalBar()
+		public bool IsBearishSellReversalBar(int barsAgo)
 		{
-			return isSellReversalBar(barsAgo) && isBearishBar(barsAgo);
+			return IsSellReversalBar(barsAgo) && IsBearishBar(barsAgo);
 		}
 		#endregion
 
-		#region isBreakout()
-		public bool isBreakout(int barsAgo, double priceOfInterest)
+		#region IsBreakoutBeyondLevel()
+		public bool IsBreakoutBeyondLevel(int barsAgo, double priceOfInterest)
 		{
 			if (Close[barsAgo + 1] > priceOfInterest) {
 				return Low[barsAgo] < priceOfInterest;
@@ -1136,8 +1136,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region isStrongBreakout()
-		public bool isStrongBreakout(int barsAgo, double priceOfInterest)
+		#region IsStrongBreakoutBeyondLevel()
+		public bool IsStrongBreakoutBeyondLevel(int barsAgo, double priceOfInterest)
 		{
 			int prev = barsAgo + 1;
 
@@ -1149,8 +1149,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region getBuyingPressure()
-		public double getBuyingPressure(int barsAgo, int period)
+		#region GetBuyingPressure()
+		public double GetBuyingPressure(int barsAgo, int period)
 		{
 			double buyingCount = 0;
 			double indicatorCount = 10;
@@ -1221,8 +1221,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region getSellingPressure()
-		public double getSellingPressure(int barsAgo, int period)
+		#region GetSellingPressure()
+		public double GetSellingPressure(int barsAgo, int period)
 		{
 			double sellingCount = 0;
 			double indicatorCount = 10;
@@ -1293,13 +1293,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region getBuySellPressure()
-		public double getBuySellPressure(int barsAgo, int period)
+		#region GetBuySellPressure()
+		public double GetBuySellPressure(int barsAgo, int period)
 		{
 			double balance = 50;
 
-			double bullValue = getBuyingPressure(barsAgo, period) * 50;
-			double bearValue = getSellingPressure(barsAgo, period) * 50;
+			double bullValue = GetBuyingPressure(barsAgo, period) * 50;
+			double bearValue = GetSellingPressure(barsAgo, period) * 50;
 
 			return 50 + bullValue - bearValue;
 		}
@@ -1321,11 +1321,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		public int NumberOfPullbacksInTrend(int barsAgo, int period)
 		{
-			if (getTrendDirection(barsAgo, period) == TrendDirection.Bullish) {
+			if (GetTrendDirection(barsAgo, period) == TrendDirection.Bullish) {
 				return NumberOfBullPullbacks(barsAgo, period);
 			}
 
-			if (getTrendDirection(barsAgo, period) == TrendDirection.Bearish) {
+			if (GetTrendDirection(barsAgo, period) == TrendDirection.Bearish) {
 				return NumberOfBearPullbacks(barsAgo, period);
 			}
 
@@ -1349,11 +1349,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		public double AveragePullbackLength(int barsAgo, int period)
 		{
-			if (getTrendDirection(barsAgo, period) == TrendDirection.Bullish) {
+			if (GetTrendDirection(barsAgo, period) == TrendDirection.Bullish) {
 				return AverageBarsInBullTrendPullback(barsAgo, period);
 			}
 
-			if (getTrendDirection(barsAgo, period) == TrendDirection.Bearish) {
+			if (GetTrendDirection(barsAgo, period) == TrendDirection.Bearish) {
 				return AverageBarsInBearTrendPullback(barsAgo, period);
 			}
 
@@ -1361,33 +1361,32 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region isBreakoutTrend()
-		public bool isBreakoutTrend(int barsAgo, int period, TrendDirection direction)
+		#region IsBreakoutTrend()
+		public bool IsBreakoutTrend(int barsAgo, int period, TrendDirection direction)
 		{
-			return NumberOfPullbacksInTrend(barsAgo, period, direction) <= 1 && AveragePullbackLength(barsAgo, period, direction) <= 2 && period >= 4;
+			return NumberOfPullbacksInTrend(barsAgo, period, direction) <= 1 && AveragePullbackLength(barsAgo, period, direction) <= 2 && period >= 5;
+		}
+
+		public bool IsBreakoutTrend(int barsAgo, int period)
+		{
+			return NumberOfPullbacksInTrend(barsAgo, period) <= 1 && AveragePullbackLength(barsAgo, period) <= 2 && period >= 5;
 		}
 		#endregion
 
-		#region isBreakoutTrend()
-		public bool isBreakoutTrend(int barsAgo, int period)
-		{
-			return NumberOfPullbacksInTrend(barsAgo, period) <= 1 && AveragePullbackLength(barsAgo, period) <= 2 && period >= 4;
-		}
-		#endregion
-
-		#region largestPullbackInTrend()
-		public double largestPullbackInBullTrend(int barsAgo, int period)
+		#region LargestPullbackInTrend()
+		#region LargestPullbackInBullTrend()
+		public double LargestPullbackInBullTrend(int barsAgo, int period)
 		{
 			double low = Low[barsAgo + period];
 			double high = High[barsAgo + period];;
 
 			for (int i = barsAgo + period; i > barsAgo; i--) {
-				if (isHigherHigh(i, 1)) {
+				if (IsHigherHigh(i, 1)) {
 					high = High[i];
 					low = Low[i];
 				}
 
-				if (isLowerLow(i, 1)) {
+				if (IsLowerLow(i, 1)) {
 					high = Math.Max(high, High[i]);
 					low = Math.Min(low, Low[i]);
 				}
@@ -1395,19 +1394,21 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			return high - low;
 		}
+		#endregion
 
-		public double largestPullbackInBearTrend(int barsAgo, int period)
+		#region LargestPullbackInBearTrend()
+		public double LargestPullbackInBearTrend(int barsAgo, int period)
 		{
 			double low = Low[barsAgo + period];
 			double high = High[barsAgo + period];
 
 			for (int i = barsAgo + period; i > barsAgo; i--) {
-				if (isLowerLow(i, 1)) {
+				if (IsLowerLow(i, 1)) {
 					high = High[i];
 					low = Low[i];
 				}
 
-				if (isHigherHigh(i, 1)) {
+				if (IsHigherHigh(i, 1)) {
 					high = Math.Max(high, High[i]);
 					low = Math.Min(low, Low[i]);
 				}
@@ -1415,8 +1416,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			return high - low;
 		}
+		#endregion
 
-		public double largestPullbackInTrend(int barsAgo, int period, TrendDirection direction) {
+		#region LargestPullbackInTrend()
+		public double LargestPullbackInTrend(int barsAgo, int period, TrendDirection direction) {
 			if (period == 0) {
 				return 0;
 			}
@@ -1424,31 +1427,34 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			double totalRange = MAX(High, period)[barsAgo] - MIN(Low, period)[barsAgo];
 
 			if (direction == TrendDirection.Bullish) {
-				return largestPullbackInBullTrend(barsAgo, period) / totalRange;
+				return LargestPullbackInBullTrend(barsAgo, period) / totalRange;
 			}
 
 			if (direction == TrendDirection.Bearish) {
-				return largestPullbackInBearTrend(barsAgo, period) / totalRange;
+				return LargestPullbackInBearTrend(barsAgo, period) / totalRange;
 			}
 
 			return 0;
 		}
+		#endregion
 
-		public double largestPullbackInTrend(int barsAgo, int period) {
+		#region LargestPullbackInTrend()
+		public double LargestPullbackInTrend(int barsAgo, int period) {
 			if (period == 0) {
 				return 0;
 			}
 
-			if (isRising(barsAgo, period)) {
-				return largestPullbackInTrend(barsAgo, period, TrendDirection.Bullish);
+			if (IsRising(barsAgo, period)) {
+				return LargestPullbackInTrend(barsAgo, period, TrendDirection.Bullish);
 			}
 
-			if (isFalling(barsAgo, period)) {
-				return largestPullbackInTrend(barsAgo, period, TrendDirection.Bearish);
+			if (IsFalling(barsAgo, period)) {
+				return LargestPullbackInTrend(barsAgo, period, TrendDirection.Bearish);
 			}
 
 			return 0;
 		}
+		#endregion
 		#endregion
 	}
 }

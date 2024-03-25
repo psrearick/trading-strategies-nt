@@ -26,10 +26,16 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 {
 	public class Legs : Indicator
 	{
+		#region Variables
 		private PriceActionUtils PA;
+		public Series<double> Starts;
+		public Series<double> BarsAgoStarts;
+		#endregion
 
+		#region OnStateChange()
 		protected override void OnStateChange()
 		{
+			#region State.SetDefaults
 			if (State == State.SetDefaults)
 			{
 				Description									= @"Enter the description for your new custom Indicator here.";
@@ -45,36 +51,89 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				//Disable this property if your indicator requires custom values that cumulate with each new market data event.
 				//See Help Guide for additional information.
 				IsSuspendedWhileInactive					= true;
-				AddPlot(Brushes.DarkCyan, "Legs Direction");
+				AddPlot(Brushes.DarkCyan, "Signal");
+				AddPlot(new Stroke(Brushes.Green, 3), PlotStyle.Line, "Leg");
 			}
+			#endregion
+
+			#region State.Configure
 			else if (State == State.Configure)
 			{
 				PA = PriceActionUtils();
 			}
-		}
+			#endregion
 
+			#region State.DataLoaded
+			else if (State == State.DataLoaded)
+			{
+				BarsAgoStarts	= new Series<double>(this, MaximumBarsLookBack.Infinite);
+				Starts			= new Series<double>(this, MaximumBarsLookBack.Infinite);
+			}
+			#endregion
+		}
+		#endregion
+
+		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			if (CurrentBar < 15) {
-				Value[0] = 0;
+			if (CurrentBar < 12) {
+				Values[0][0] = 0;
+				Values[1][0] = 0;
+				Starts[0] = 0;
 				return;
 			}
 
 			int bearish = 0;
 			int bullish = 0;
+			int barsAgoHigh = 0;
+			int barsAgoLow = 0;
+			double high = High[0];
+			double low = Low[0];
 
-			for (int i = 0; i < 15; i++) {
-				if (PA.isBearishBar(i) && PA.isFallingBar(i)) {
+			for (int i = 0; i < 12; i++) {
+				if (PA.IsBearishBar(i) && PA.IsFallingBar(i)) {
 					bearish++;
 				}
 
-				if (PA.isBullishBar(i) && PA.isRisingBar(i)) {
+				if (PA.IsBullishBar(i) && PA.IsRisingBar(i)) {
 					bullish++;
+				}
+
+				if (High[i] >= high) {
+					high = High[i];
+					barsAgoHigh = i;
+				}
+
+				if (Low[i] <= low) {
+					low = Low[i];
+					barsAgoLow = i;
 				}
 			}
 
-			Value[0] = bullish > bearish ? 1 : bearish > bullish ? -1 : 0;
+			Values[0][0] = bullish > bearish ? 1 : bearish > bullish ? -1 : 0;
+
+			BarsAgoStarts[0] = Values[0][0] == Values[0][1]
+				? BarsAgoStarts[1] + 1
+				: Values[0][0] == 1
+					? barsAgoLow
+					: Values[0][0] == -1
+						? barsAgoHigh
+						: Math.Max(barsAgoHigh, barsAgoLow);
+
+			Starts[0] = CurrentBar - BarsAgoStarts[0];
+
+			for (int i = 0; i < BarsAgoStarts[0]; i++) {
+				Values[1][i] = Values[0][0];
+			}
 		}
+		#endregion
+
+		#region ValFromStart()
+		public int ValFromStart(int barsAgo = 0)
+		{
+			return (int) Values[1][barsAgo];
+		}
+		#endregion
 	}
 }
 

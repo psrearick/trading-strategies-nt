@@ -169,7 +169,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					? TrendDirection.Bearish
 					: TrendDirection.Flat;
 
-			double pullback = PA.largestPullbackInTrend(0, (int) Movements.BarsAgoStarts[0], direction);
+			double pullback = PA.LargestPullbackInTrend(0, (int) Movements.BarsAgoStarts[0], direction);
 
 			bool deepPullback = pullback > 0.5;
 
@@ -255,7 +255,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			double low = MIN(Low, SwingBarCount)[0];
 			double range = high - low;
 
-			double pullback = PA.largestPullbackInTrend(0, (int) SwingBarCount, direction);
+			double pullback = PA.LargestPullbackInTrend(0, (int) SwingBarCount, direction);
 
 			bool deepPullback = pullback >= 1;
 
@@ -373,11 +373,28 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
+			if (SwingStarted == 0) {
+				return;
+			}
+
 			if (lastAvailableValue > lastSwingChecked) {
 				for (int i = lastSwingChecked; i < lastAvailableValue - 1; i++) {
 					int index = i;
 
+					Print("-----");
+					Print(lastAvailableValue);
+					Print(index);
+					Print(CurrentBar);
+					Print(SwingEvaluations.Count);
+					Print(SwingStarted);
+					Print(lastSwingChecked);
+					Print("SwingAccuracy");
+					Print(SwingAccuracy[index]);
+					Print(SwingValues.Count);
+					Print(SwingValues[index]);
+					Print(SwingEvaluations[index]);
 					SwingAccuracy[index] = (SwingValues[index] == SwingEvaluations[index]);
+					Print("Swing");
 				}
 			}
 
@@ -385,9 +402,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				for (int i = lastAvailableValue; i < lastSwingChecked; i++) {
 					int index = i;
 
+					Print(index);
 					SwingAccuracy[index] = false;
 				}
 			}
+
+			lastSwingChecked = lastAvailableValue;
 		}
 		#endregion
 
@@ -397,6 +417,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int lastAvailableValue = CurrentBar - TrendStarted - 1;
 
 			if (lastAvailableValue == lastTrendChecked) {
+				return;
+			}
+
+			if (TrendStarted == 0) {
 				return;
 			}
 
@@ -415,6 +439,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					TrendAccuracy[index] = false;
 				}
 			}
+
+			lastTrendChecked = lastAvailableValue;
 		}
 		#endregion
 

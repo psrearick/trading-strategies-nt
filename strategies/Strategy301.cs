@@ -150,13 +150,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 					return true;
 				}
 
-				if (HLCount.BullContinuationAttempts[0] > 4) {
+				if (HLCount.BullContinuationAttempts[0] > 3) {
 					return true;
 				}
 
 				if (TrendValues.TrendValues[0] == -1) {
 					return true;
 				}
+
+//				if (PA.LeastBarsDown(3, 5)) {
+//					return true;
+//				}
 
 				if ((Low[TrendValues.LegStarted] - 4) > stopLoss && TrendValues.LegValues[0] > 0) {
 					stopLoss = Low[TrendValues.LegStarted] - 4;
@@ -179,13 +183,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 				}
 
 
-				if (HLCount.BearContinuationAttempts[0] > 4) {
+				if (HLCount.BearContinuationAttempts[0] > 3) {
 					return true;
 				}
 
 				if (TrendValues.TrendValues[0] == 1) {
 					return true;
 				}
+
+//				if (PA.LeastBarsUp(3, 5)) {
+//					return true;
+//				}
 
 				if ((High[TrendValues.LegStarted] + 4) < stopLoss && TrendValues.LegValues[0] < 0) {
 					stopLoss = High[TrendValues.LegStarted] + 4;
@@ -346,7 +354,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 //				return false;
 //			}
 
-			if (PA.getTrendDirection() != TrendDirection.Bullish) {
+			if (PA.GetTrendDirection() != TrendDirection.Bullish) {
 				return false;
 			}
 
@@ -366,6 +374,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (TrendValues.LegValues[0] <= 0) {
 				return false;
 			}
+
+			Print(TrendValues.ComputeAccuracy(100));
 
 //			if (TrendValues.BreakoutValues[0] <= 0) {
 //				return false;
@@ -394,7 +404,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 //				return false;
 //			}
 
-			if (PA.getTrendDirection() != TrendDirection.Bearish) {
+			if (PA.GetTrendDirection() != TrendDirection.Bearish) {
 				return false;
 			}
 
