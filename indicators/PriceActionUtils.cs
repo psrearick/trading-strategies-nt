@@ -135,16 +135,16 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region IsDown()
-		public bool IsDown(int index)
+		public bool IsDown(int barsAgo)
 		{
-			return Close[index] < Close[index + 1];
+			return IsBearishBar(barsAgo);
 		}
 		#endregion
 
 		#region IsUp()
-		public bool IsUp(int index)
+		public bool IsUp(int barsAgo)
 		{
-			return Close[index] > Close[index + 1];
+			return IsBullishBar(barsAgo);
 		}
 		#endregion
 
@@ -694,6 +694,22 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public bool IsHigherLow(int barsAgo = 0, int length = 1)
 		{
 			return IsRising(Low, barsAgo, length);
+		}
+		#endregion
+
+		#region IsLowerClose()
+		// Is Close at `barsAgo` less than `length` bars earlier
+		public bool IsLowerClose(int barsAgo = 0, int length = 1)
+		{
+			return IsFalling(Close, barsAgo, length);
+		}
+		#endregion
+
+		#region IsHigherClose()
+		// Is Close at `barsAgo` greater than `length` bars earlier
+		public bool IsHigherClose(int barsAgo = 0, int length = 1)
+		{
+			return IsRising(Close, barsAgo, length);
 		}
 		#endregion
 
