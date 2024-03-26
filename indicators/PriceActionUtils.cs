@@ -74,56 +74,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region BodySize()
-		public double BodySize(int index)
-		{
-			return Close[index] - Open[index];
-		}
-		#endregion
-
-		#region RealBodySize()
-		public double RealBodySize(int index)
-		{
-			return Math.Abs(BodySize(index));
-		}
-		#endregion
-
-		#region IsBig()
-		public bool IsBig(int index)
-		{
-			return (RealBodySize(index) / (High[index] - Low[index])) > 0.75;
-		}
-		#endregion
-
-		#region IsSmall()
-		public bool IsSmall(int index)
-		{
-			return (RealBodySize(index) / (High[index] - Low[index])) < 0.25;
-		}
-		#endregion
-
-		#region IsStrong()
-		public bool IsStrong(int index)
-		{
-			return IsBig(index) && ClosedNearExtreme(index) && IsBigger(index);
-		}
-		#endregion
+		#region Chart Patterns
 
 		#region IsBigger()
 		public bool IsBigger(int index)
 		{
 			return RealBodySize(index) > RealBodySize(index + 1);
-		}
-		#endregion
-
-		#region ClosedNearExtreme()
-		public bool ClosedNearExtreme(int index)
-		{
-			if (Close[index] > Open[index]) {
-				return ((Close[index] - Low[index]) / (High[index] - Low[index])) > 0.75;
-			}
-
-			return ((High[index] - Close[index]) / (High[index] - Low[index])) > 0.75;
 		}
 		#endregion
 
@@ -134,454 +90,17 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region IsDown()
-		public bool IsDown(int barsAgo)
+		#region IsConsecutiveBullBars()
+		public bool IsConsecutiveBullBars(int barsAgo)
 		{
-			return IsBearishBar(barsAgo);
+			return IsBullishBar(barsAgo) && IsBullishBar(barsAgo + 1);
 		}
 		#endregion
 
-		#region IsUp()
-		public bool IsUp(int barsAgo)
+		#region IsConsecutiveBearBars()
+		public bool IsConsecutiveBearBars(int barsAgo)
 		{
-			return IsBullishBar(barsAgo);
-		}
-		#endregion
-
-		#region IsLargerThanAverage()
-		public bool IsLargerThanAverage(int barsAgo)
-		{
-			return RealBodySize(barsAgo) > Atr[barsAgo];
-		}
-		#endregion
-
-		#region IsSmallerThanAverage()
-		public bool IsSmallerThanAverage(int barsAgo)
-		{
-			return RealBodySize(barsAgo) < Atr[barsAgo];
-		}
-		#endregion
-
-		#region ConsecutiveBiggerBars()
-		public bool ConsecutiveBiggerBars(int period, int index = 0)
-		{
-			bool biggerBars = true;
-
-			for (int i = 0; i < period; i++) {
-				if (!IsBigger(i + index)) {
-					biggerBars = false;
-
-					break;
-				}
-			}
-
-			return biggerBars;
-		}
-		#endregion
-
-		#region ConsecutiveSmallerBars()
-		public bool ConsecutiveSmallerBars(int period, int index = 0)
-		{
-			bool smallerBars = true;
-
-			for (int i = 0; i < period; i++) {
-				if (!IsSmaller(i + index)) {
-					smallerBars = false;
-
-					break;
-				}
-			}
-
-			return smallerBars;
-		}
-		#endregion
-
-		#region ConsecutiveBarsUp()
-		public bool ConsecutiveBarsUp(int period, int index = 0)
-		{
-			bool barsUp = true;
-
-			for (int i = 0; i < period; i++) {
-				if (!IsUp(i + index)) {
-					barsUp = false;
-
-					break;
-				}
-			}
-
-			return barsUp;
-		}
-		#endregion
-
-		#region ConsecutiveBarsDown()
-		public bool ConsecutiveBarsDown(int period, int index = 0)
-		{
-			bool barsDown = true;
-
-			for (int i = 0; i < period; i++) {
-				if (!IsDown(i + index)) {
-					barsDown = false;
-
-					break;
-				}
-			}
-
-			return barsDown;
-		}
-		#endregion
-
-		#region LeastBarsDown()
-		public bool LeastBarsDown(int count, int period, int index = 0)
-		{
-			int barsDown = 0;
-
-			for (int i = 0; i < period; i++) {
-				if (IsDown(i + index)) {
-					barsDown = barsDown + 1;
-				}
-			}
-
-			return barsDown >= count;
-		}
-		#endregion
-
-		#region AverageBearBarSize()
-		public double AverageBearBarSize(int barsAgo, int period)
-		{
-			double bearBarSize = 0;
-			double bearBarCount = 0;
-			int rangeMax = Math.Min((period + barsAgo), Close.Count);
-
-			for (int i = barsAgo; i < rangeMax; i++) {
-				if (IsBearishBar(i)) {
-					bearBarCount++;
-					bearBarSize = bearBarSize + RealBodySize(i);
-				}
-			}
-
-			if (bearBarCount == 0) {
-				return 0;
-			}
-
-			return bearBarSize / bearBarCount;
-		}
-		#endregion
-
-		#region AverageBullBarSize()
-		public double AverageBullBarSize(int barsAgo, int period)
-		{
-			double bullBarSize = 0;
-			double bullBarCount = 0;
-			int rangeMax = Math.Min((period + barsAgo), Close.Count);
-
-			for (int i = barsAgo; i < rangeMax; i++) {
-				if (IsBullishBar(i)) {
-					bullBarCount++;
-					bullBarSize = bullBarSize + RealBodySize(i);
-				}
-			}
-
-			if (bullBarCount == 0) {
-				return 0;
-			}
-
-			return bullBarSize / bullBarCount;
-		}
-		#endregion
-
-		#region NumberOfConsecutiveBearBars()
-		public int NumberOfConsecutiveBearBars(int barsAgo, int period)
-		{
-			int bearBars = 0;
-			int rangeMax = Math.Min((period + barsAgo), Close.Count);
-
-			for (int i = barsAgo; i < rangeMax; i++) {
-				if (IsBearishBar(i) && IsBearishBar(i + 1)) {
-					bearBars++;
-				}
-			}
-
-			return bearBars;
-		}
-		#endregion
-
-		#region NumberOfConsecutiveBullBars()
-		public int NumberOfConsecutiveBullBars(int barsAgo, int period)
-		{
-			int bullBars = 0;
-			int rangeMax = Math.Min((period + barsAgo), Close.Count);
-
-			for (int i = barsAgo; i < rangeMax; i++) {
-				if (IsBullishBar(i) && IsBullishBar(i + 1)) {
-					bullBars++;
-				}
-			}
-
-			return bullBars;
-		}
-		#endregion
-
-		#region NumberOfBearBars()
-		public int NumberOfBearBars(int barsAgo, int period)
-		{
-			int bearBars = 0;
-			int rangeMax = Math.Min((period + barsAgo), Close.Count);
-
-			for (int i = barsAgo; i < rangeMax; i++) {
-				if (IsBearishBar(i)) {
-					bearBars++;
-				}
-			}
-
-			return bearBars;
-		}
-		#endregion
-
-		#region NumberOfBullBars()
-		public int NumberOfBullBars(int barsAgo, int period)
-		{
-			int bullBars = 0;
-			int rangeMax = Math.Min((period + barsAgo), Close.Count);
-
-			for (int i = barsAgo; i < rangeMax; i++) {
-				if (IsBullishBar(i)) {
-					bullBars++;
-				}
-			}
-
-			return bullBars;
-		}
-		#endregion
-
-		#region NumberOfBarsWithLowerTail()
-		public int NumberOfBarsWithLowerTail(int barsAgo, int period)
-		{
-			int lowerTail = 0;
-			int rangeMax = Math.Min((period + barsAgo), Close.Count);
-
-			for (int i = barsAgo; i < rangeMax; i++) {
-				if (IsBullishBar(barsAgo)) {
-					if (InPortionOfBarRange(Open, i, 33, 66)) {
-						lowerTail++;
-					}
-				}
-
-				if (IsBearishBar(barsAgo)) {
-					if (InPortionOfBarRange(Close, i, 33, 66)) {
-						lowerTail++;
-					}
-				}
-			}
-
-			return lowerTail;
-		}
-		#endregion
-
-		#region NumberOfBarsWithUpperTail()
-		public int NumberOfBarsWithUpperTail(int barsAgo, int period)
-		{
-			int upperTail = 0;
-			int rangeMax = Math.Min((period + barsAgo), Close.Count);
-
-			for (int i = barsAgo; i < rangeMax; i++) {
-				if (IsBullishBar(barsAgo)) {
-					if (InPortionOfBarRange(Close, i, 33, 66)) {
-						upperTail++;
-					}
-				}
-
-				if (IsBearishBar(barsAgo)) {
-					if (InPortionOfBarRange(Open, i, 33, 66)) {
-						upperTail++;
-					}
-				}
-			}
-
-			return upperTail;
-		}
-		#endregion
-
-		#region NumberOfBarsClosingNearHigh()
-		public int NumberOfBarsClosingNearHigh(int barsAgo, int period)
-		{
-			int bullBars = 0;
-			int rangeMax = Math.Min((period + barsAgo), Close.Count);
-
-			for (int i = barsAgo; i < rangeMax; i++) {
-				if (InPortionOfBarRange(i, 50, 100)) {
-					bullBars++;
-				}
-			}
-
-			return bullBars;
-		}
-		#endregion
-
-		#region NumberOfBarsClosingNearLow()
-		public int NumberOfBarsClosingNearLow(int barsAgo, int period)
-		{
-			int bearBars = 0;
-			int rangeMax = Math.Min((period + barsAgo), Close.Count);
-
-			for (int i = barsAgo; i < rangeMax; i++) {
-				if (InPortionOfBarRange(i, 0, 50)) {
-					bearBars++;
-				}
-			}
-
-			return bearBars;
-		}
-		#endregion
-
-		#region NumberOfBearPullbacks()
-		public int NumberOfBearPullbacks(int barsAgo, int period)
-		{
-			int bullBars = 0;
-			int rangeMax = Math.Min((period + barsAgo), Close.Count);
-
-			for (int i = barsAgo; i < rangeMax; i++) {
-				if (IsHigherHigh(i, 1)) {
-					bullBars++;
-				}
-			}
-
-			return bullBars;
-		}
-		#endregion
-
-		#region AverageBarsInTrendPullback()
-		public int AverageBarsInTrendPullback(int barsAgo, int period, ISeries <double> series, Func <int, int, bool> callback)
-		{
-			int barsInPullback = 0;
-			int pullbacks = 0;
-			double pullbackStart = 0;
-
-			int rangeMax = Math.Min((period + barsAgo), Close.Count);
-
-			for (int i = barsAgo; i < rangeMax; i++) {
-				if (pullbackStart == 0) {
-					if (callback(i, 1)) {
-						pullbackStart = series[1];
-						pullbacks++;
-						barsInPullback++;
-					}
-				} else {
-					barsInPullback++;
-
-					if (Low[0] < pullbackStart) {
-						pullbackStart = 0;
-					}
-				}
-			}
-
-			if (pullbacks == 0) {
-				return 0;
-			}
-
-			return (int) Math.Floor((double)(barsInPullback / pullbacks));
-		}
-		#endregion
-
-		#region AverageBarsInBearTrendPullback()
-		public int AverageBarsInBearTrendPullback(int barsAgo, int period) {
-			return AverageBarsInTrendPullback(barsAgo, period, High, IsHigherHigh);
-		}
-		#endregion
-
-		#region AverageBarsInBullTrendPullback()
-		public int AverageBarsInBullTrendPullback(int barsAgo, int period) {
-			return AverageBarsInTrendPullback(barsAgo, period, Low, IsLowerLow);
-		}
-		#endregion
-
-		#region NumberOfBullPullbacks()
-		public int NumberOfBullPullbacks(int barsAgo, int period)
-		{
-			int bearBars = 0;
-			int rangeMax = Math.Min((period + barsAgo), Close.Count);
-
-			for (int i = barsAgo; i < rangeMax; i++) {
-				if (IsLowerLow(i, 1)) {
-					bearBars++;
-				}
-			}
-
-			return bearBars;
-		}
-		#endregion
-
-		#region LeastBarsUp()
-		public bool LeastBarsUp(int count, int period, int index = 0)
-		{
-			int barsUp = 0;
-
-			for (int i = 0; i < period; i++) {
-				if (IsUp(i + index)) {
-					barsUp = barsUp + 1;
-				}
-			}
-
-			return barsUp >= count;
-		}
-		#endregion
-
-		#region LeastSmallBars()
-		public bool LeastSmallBars(int count, int period, int index = 0)
-		{
-			int barsSmall = 0;
-
-			for (int i = 0; i < period; i++) {
-				if (IsSmall(i + index)) {
-					barsSmall = barsSmall + 1;
-				}
-			}
-
-			return barsSmall >= count;
-		}
-		#endregion
-
-		#region LeastBigBars()
-		public bool LeastBigBars(int count, int period, int index = 0)
-		{
-			int barsBig = 0;
-
-			for (int i = 0; i < period; i++) {
-				if (IsBig(i + index)) {
-					barsBig = barsBig + 1;
-				}
-			}
-
-			return barsBig >= count;
-		}
-		#endregion
-
-		#region LeastSmallerBars()
-		public bool LeastSmallerBars(int count, int period, int index = 0)
-		{
-			int barsSmaller = 0;
-
-			for (int i = 0; i < period; i++) {
-				if (IsSmaller(i + index)) {
-					barsSmaller = barsSmaller + 1;
-				}
-			}
-
-			return barsSmaller >= count;
-		}
-		#endregion
-
-		#region LeastBiggerBars()
-		public bool LeastBiggerBars(int count, int period, int index = 0)
-		{
-			int barsBigger = 0;
-
-			for (int i = 0; i < period; i++) {
-				if (IsBigger(i + index)) {
-					barsBigger = barsBigger + 1;
-				}
-			}
-
-			return barsBigger >= count;
+			return IsBearishBar(barsAgo) && IsBearishBar(barsAgo + 1);
 		}
 		#endregion
 
@@ -596,22 +115,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public bool IsFallingBar(int barsAgo = 0)
 		{
 			return !IsHigherHigh(barsAgo) && IsLowerLow(barsAgo);
-		}
-		#endregion
-
-		#region IsBullishBar()
-		// determine if the bar at `barsAgo` is a bull bar
-		public bool IsBullishBar(int barsAgo = 0)
-		{
-			return Close[barsAgo] > Open[barsAgo];
-		}
-		#endregion
-
-		#region IsBearishBar()
-		// determine if the bar at `barsAgo` is a bear bar
-		public bool IsBearishBar(int barsAgo = 0)
-		{
-			return Close[barsAgo] < Open[barsAgo];
 		}
 		#endregion
 
@@ -734,25 +237,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region InPortionOfBarRange()
-		// determine how far a value is between the Low and High of a bar at `barsAgo`. The range is 0 - 100 with 0 being the Low and 100 being the High.
-		public bool InPortionOfBarRange(ISeries<double> source, int barsAgo, double lowestValue, double highestValue)
-		{
-			double reference = source[barsAgo] - Low[barsAgo];
-			double range = High[barsAgo] - Low[barsAgo];
-			double position = (reference / range) * 100;
-
-			return position >= lowestValue && position <= highestValue;
-		}
-		#endregion
-
-		#region InPortionOfBarRange()
-		public bool InPortionOfBarRange(int barsAgo, double lowestValue, double highestValue)
-		{
-			return InPortionOfBarRange(Close, barsAgo, lowestValue, highestValue);
-		}
-		#endregion
-
 		#region GetTrendDirection()
 		// get the trend direction over the last `length` bars, starting `barsAgo` bars before the current bar
 		public TrendDirection GetTrendDirection(int barsAgo = 0, int length = 10)
@@ -786,35 +270,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region IsTrendBar()
-		public bool IsTrendBar(int barsAgo)
-		{
-			double thresholdPercentage = 0.5;
-			double openCloseDifference = Math.Abs(Open[barsAgo] - Close[barsAgo]);
-			double barRange = High[barsAgo] - Low[barsAgo];
-
-			if (barRange == 0) {
-				return false;
-			}
-
-			return (openCloseDifference / barRange) >= thresholdPercentage;
-		}
 		#endregion
 
-		#region IsTradingRangeBar()
-		public bool IsTradingRangeBar(int barsAgo)
-		{
-			double thresholdPercentage = 0.5;
-			double openCloseDifference = Math.Abs(Open[barsAgo] - Close[barsAgo]);
-			double barRange = High[barsAgo] - Low[barsAgo];
-
-			if (barRange == 0) {
-				return false;
-			}
-
-			return (openCloseDifference / barRange) < thresholdPercentage;
-		}
-		#endregion
+		#region Signals
 
 		#region IsWeakSignalBar()
 		public bool IsWeakSignalBar(int barsAgo, TrendDirection direction = TrendDirection.Flat)
@@ -1039,6 +497,328 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#endregion
+
+		#region Counting Bar Patterns
+
+		#region Average Value of Bars Matching Pattern
+
+		#region AverageBearBarSize()
+		public double AverageBearBarSize(int barsAgo, int period)
+		{
+			double bearBarSize = 0;
+			double bearBarCount = 0;
+			int rangeMax = Math.Min((period + barsAgo), Close.Count);
+
+			for (int i = barsAgo; i < rangeMax; i++) {
+				if (IsBearishBar(i)) {
+					bearBarCount++;
+					bearBarSize = bearBarSize + RealBodySize(i);
+				}
+			}
+
+			if (bearBarCount == 0) {
+				return 0;
+			}
+
+			return bearBarSize / bearBarCount;
+		}
+		#endregion
+
+		#region AverageBullBarSize()
+		public double AverageBullBarSize(int barsAgo, int period)
+		{
+			double bullBarSize = 0;
+			double bullBarCount = 0;
+			int rangeMax = Math.Min((period + barsAgo), Close.Count);
+
+			for (int i = barsAgo; i < rangeMax; i++) {
+				if (IsBullishBar(i)) {
+					bullBarCount++;
+					bullBarSize = bullBarSize + RealBodySize(i);
+				}
+			}
+
+			if (bullBarCount == 0) {
+				return 0;
+			}
+
+			return bullBarSize / bullBarCount;
+		}
+		#endregion
+
+		#endregion
+
+		#region Consecutive Bars Matching Pattern
+
+		#region ConsecutiveBiggerBars()
+		public bool ConsecutiveBiggerBars(int period, int index = 0)
+		{
+			bool biggerBars = true;
+
+			for (int i = 0; i < period; i++) {
+				if (!IsBigger(i + index)) {
+					biggerBars = false;
+
+					break;
+				}
+			}
+
+			return biggerBars;
+		}
+		#endregion
+
+		#region ConsecutiveSmallerBars()
+		public bool ConsecutiveSmallerBars(int period, int index = 0)
+		{
+			bool smallerBars = true;
+
+			for (int i = 0; i < period; i++) {
+				if (!IsSmaller(i + index)) {
+					smallerBars = false;
+
+					break;
+				}
+			}
+
+			return smallerBars;
+		}
+		#endregion
+
+		#region ConsecutiveBarsUp()
+		public bool ConsecutiveBarsUp(int period, int index = 0)
+		{
+			bool barsUp = true;
+
+			for (int i = 0; i < period; i++) {
+				if (!IsUp(i + index)) {
+					barsUp = false;
+
+					break;
+				}
+			}
+
+			return barsUp;
+		}
+		#endregion
+
+		#region ConsecutiveBarsDown()
+		public bool ConsecutiveBarsDown(int period, int index = 0)
+		{
+			bool barsDown = true;
+
+			for (int i = 0; i < period; i++) {
+				if (!IsDown(i + index)) {
+					barsDown = false;
+
+					break;
+				}
+			}
+
+			return barsDown;
+		}
+		#endregion
+
+		#endregion
+
+		#region Number of Bars Matching Pattern
+		#region NumberOfConsecutiveBearBars()
+		public int NumberOfConsecutiveBearBars(int barsAgo, int period)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsConsecutiveBearBars);
+		}
+		#endregion
+
+		#region NumberOfConsecutiveBullBars()
+		public int NumberOfConsecutiveBullBars(int barsAgo, int period)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsConsecutiveBullBars);
+		}
+		#endregion
+
+		#region NumberOfBearBars()
+		public int NumberOfBearBars(int barsAgo, int period)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsBearishBar);
+		}
+		#endregion
+
+		#region NumberOfBullBars()
+		public int NumberOfBullBars(int barsAgo, int period)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsBullishBar);
+		}
+		#endregion
+		#endregion
+
+		#region Least Bars Matching Pattern
+		#region LeastBarsUp()
+		public bool LeastBarsUp(int count, int period, int barsAgo = 0)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsUp) >= count;
+		}
+		#endregion
+
+		#region LeastBarsDown()
+		public bool LeastBarsDown(int count, int period, int barsAgo = 0)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsDown) >= count;
+		}
+		#endregion
+
+		#region LeastSmallBars()
+		public bool LeastSmallBars(int count, int period, int index = 0)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsSmall) >= count;
+		}
+		#endregion
+
+		#region LeastBigBars()
+		public bool LeastBigBars(int count, int period, int index = 0)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsBig) >= count;
+		}
+		#endregion
+
+		#region LeastSmallerBars()
+		public bool LeastSmallerBars(int count, int period, int index = 0)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsSmaller) >= count;
+		}
+		#endregion
+
+		#region LeastBiggerBars()
+		public bool LeastBiggerBars(int count, int period, int index = 0)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsBigger) >= count;
+		}
+		#endregion
+		#endregion
+
+		#endregion
+
+		#region Bar Patterns
+
+		#region BodySize()
+		public double BodySize(int index)
+		{
+			return Close[index] - Open[index];
+		}
+		#endregion
+
+		#region RealBodySize()
+		public double RealBodySize(int index)
+		{
+			return Math.Abs(BodySize(index));
+		}
+		#endregion
+
+		#region IsBig()
+		public bool IsBig(int index)
+		{
+			return (RealBodySize(index) / (High[index] - Low[index])) > 0.75;
+		}
+		#endregion
+
+		#region IsSmall()
+		public bool IsSmall(int index)
+		{
+			return (RealBodySize(index) / (High[index] - Low[index])) < 0.25;
+		}
+		#endregion
+
+		#region IsStrong()
+		public bool IsStrong(int index)
+		{
+			return IsBig(index) && ClosedNearExtreme(index) && IsBigger(index);
+		}
+		#endregion
+
+		#region ClosedNearExtreme()
+		public bool ClosedNearExtreme(int index)
+		{
+			if (Close[index] > Open[index]) {
+				return ((Close[index] - Low[index]) / (High[index] - Low[index])) > 0.75;
+			}
+
+			return ((High[index] - Close[index]) / (High[index] - Low[index])) > 0.75;
+		}
+		#endregion
+
+		#region IsDown()
+		public bool IsDown(int barsAgo)
+		{
+			return IsBearishBar(barsAgo);
+		}
+		#endregion
+
+		#region IsUp()
+		public bool IsUp(int barsAgo)
+		{
+			return IsBullishBar(barsAgo);
+		}
+		#endregion
+
+		#region IsLargerThanAverage()
+		public bool IsLargerThanAverage(int barsAgo)
+		{
+			return RealBodySize(barsAgo) > Atr[barsAgo];
+		}
+		#endregion
+
+		#region IsSmallerThanAverage()
+		public bool IsSmallerThanAverage(int barsAgo)
+		{
+			return RealBodySize(barsAgo) < Atr[barsAgo];
+		}
+		#endregion
+
+		#region IsBullishBar()
+		// determine if the bar at `barsAgo` is a bull bar
+		public bool IsBullishBar(int barsAgo = 0)
+		{
+			return Close[barsAgo] > Open[barsAgo];
+		}
+		#endregion
+
+		#region IsBearishBar()
+		// determine if the bar at `barsAgo` is a bear bar
+		public bool IsBearishBar(int barsAgo = 0)
+		{
+			return Close[barsAgo] < Open[barsAgo];
+		}
+		#endregion
+
+		#region IsTrendBar()
+		public bool IsTrendBar(int barsAgo)
+		{
+			double thresholdPercentage = 0.5;
+			double openCloseDifference = Math.Abs(Open[barsAgo] - Close[barsAgo]);
+			double barRange = High[barsAgo] - Low[barsAgo];
+
+			if (barRange == 0) {
+				return false;
+			}
+
+			return (openCloseDifference / barRange) >= thresholdPercentage;
+		}
+		#endregion
+
+		#region IsTradingRangeBar()
+		public bool IsTradingRangeBar(int barsAgo)
+		{
+			double thresholdPercentage = 0.5;
+			double openCloseDifference = Math.Abs(Open[barsAgo] - Close[barsAgo]);
+			double barRange = High[barsAgo] - Low[barsAgo];
+
+			if (barRange == 0) {
+				return false;
+			}
+
+			return (openCloseDifference / barRange) < thresholdPercentage;
+		}
+		#endregion
+
 		#region IsDoji()
 		public bool IsDoji(int barsAgo)
 		{
@@ -1095,6 +875,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#endregion
+
+		#region Reversal Bar
+
 		#region IsBuyReversalBar()
 		public bool IsBuyReversalBar(int barsAgo)
 		{
@@ -1141,6 +925,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#endregion
+
+		#region Breakouts
+
 		#region IsBreakoutBeyondLevel()
 		public bool IsBreakoutBeyondLevel(int barsAgo, double priceOfInterest)
 		{
@@ -1165,159 +953,161 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region GetBuyingPressure()
-		public double GetBuyingPressure(int barsAgo, int period)
+		#region IsBreakoutTrend()
+		public bool IsBreakoutTrend(int barsAgo, int period, TrendDirection direction)
 		{
-			double buyingCount = 0;
-			double indicatorCount = 10;
+			return NumberOfPullbacksInTrend(barsAgo, period, direction) <= 1 && AveragePullbackLength(barsAgo, period, direction) <= 2 && period >= 5;
+		}
 
-			int bearBarCount = NumberOfBearBars(barsAgo, period);
-			int bullBarCount = NumberOfBullBars(barsAgo, period);
-
-			if (bearBarCount < bullBarCount) {
-				buyingCount++;
-			}
-
-			int consecutiveBearCount 			= NumberOfConsecutiveBearBars(barsAgo, period);
-			int consecutiveBullCount 			= NumberOfConsecutiveBullBars(barsAgo, period);
-			int consecutiveBullCountPrevious 	= NumberOfConsecutiveBullBars(barsAgo + period, period);
-			int consecutiveBearCountPrevious	= NumberOfConsecutiveBearBars(barsAgo + period, period);
-
-			if (consecutiveBearCount < consecutiveBullCount) {
-				buyingCount++;
-			}
-
-			if (consecutiveBullCountPrevious < consecutiveBullCount) {
-				buyingCount++;
-			}
-
-			if (consecutiveBearCount < consecutiveBearCountPrevious) {
-				buyingCount++;
-			}
-
-			double averageBearBar 			= AverageBearBarSize(barsAgo, period);
-			double averageBullBar 			= AverageBullBarSize(barsAgo, period);
-			double averageBullBarPrevious	= AverageBullBarSize(barsAgo + period, period);
-			double averageBearBarPrevious	= AverageBearBarSize(barsAgo + period, period);
-
-			if (averageBearBar < averageBullBar) {
-				buyingCount++;
-			}
-
-			if (averageBullBarPrevious < averageBullBar) {
-				buyingCount++;
-			}
-
-			if (averageBearBarPrevious > averageBearBar) {
-				buyingCount++;
-			}
-
-			int barsClosingNearHigh = NumberOfBarsClosingNearHigh(barsAgo, period);
-			int barsClosingNearLow  = NumberOfBarsClosingNearLow(barsAgo, period);
-
-			if (barsClosingNearLow < barsClosingNearHigh) {
-				buyingCount++;
-			}
-
-			int bearPullbacks = NumberOfBearPullbacks(barsAgo, period);
-			int bullPullbacks  = NumberOfBullPullbacks(barsAgo, period);
-
-			if (bullPullbacks < bearPullbacks) {
-				buyingCount++;
-			}
-
-			int barsWithLowerTail = NumberOfBarsWithLowerTail(barsAgo, period);
-			int barsWithUpperTail  = NumberOfBarsWithUpperTail(barsAgo, period);
-
-			if (barsWithUpperTail < barsWithLowerTail) {
-				buyingCount++;
-			}
-
-			return buyingCount / indicatorCount;
+		public bool IsBreakoutTrend(int barsAgo, int period)
+		{
+			return NumberOfPullbacksInTrend(barsAgo, period) <= 1 && AveragePullbackLength(barsAgo, period) <= 2 && period >= 5;
 		}
 		#endregion
 
-		#region GetSellingPressure()
-		public double GetSellingPressure(int barsAgo, int period)
+		#endregion
+
+		#region Bar Construction
+
+		#region InPortionOfBarRange()
+		// determine how far a value is between the Low and High of a bar at `barsAgo`. The range is 0 - 100 with 0 being the Low and 100 being the High.
+		public bool InPortionOfBarRange(ISeries<double> source, int barsAgo, double lowestValue, double highestValue)
 		{
-			double sellingCount = 0;
-			double indicatorCount = 10;
+			double reference = source[barsAgo] - Low[barsAgo];
+			double range = High[barsAgo] - Low[barsAgo];
+			double position = (reference / range) * 100;
 
-			int bearBarCount = NumberOfBearBars(barsAgo, period);
-			int bullBarCount = NumberOfBullBars(barsAgo, period);
+			return position >= lowestValue && position <= highestValue;
+		}
 
-			if (bearBarCount > bullBarCount) {
-				sellingCount++;
-			}
-
-			int consecutiveBearCount 			= NumberOfConsecutiveBearBars(barsAgo, period);
-			int consecutiveBullCount 			= NumberOfConsecutiveBullBars(barsAgo, period);
-			int consecutiveBullCountPrevious 	= NumberOfConsecutiveBullBars(barsAgo + period, period);
-			int consecutiveBearCountPrevious	= NumberOfConsecutiveBearBars(barsAgo + period, period);
-
-			if (consecutiveBearCount > consecutiveBullCount) {
-				sellingCount++;
-			}
-
-			if (consecutiveBullCountPrevious > consecutiveBullCount) {
-				sellingCount++;
-			}
-
-			if (consecutiveBearCount > consecutiveBearCountPrevious) {
-				sellingCount++;
-			}
-
-			double averageBearBar 			= AverageBearBarSize(barsAgo, period);
-			double averageBullBar 			= AverageBullBarSize(barsAgo, period);
-			double averageBullBarPrevious	= AverageBullBarSize(barsAgo + period, period);
-			double averageBearBarPrevious	= AverageBearBarSize(barsAgo + period, period);
-
-			if (averageBearBar > averageBullBar) {
-				sellingCount++;
-			}
-
-			if (averageBullBarPrevious > averageBullBar) {
-				sellingCount++;
-			}
-
-			if (averageBearBarPrevious < averageBearBar) {
-				sellingCount++;
-			}
-
-			int barsClosingNearHigh = NumberOfBarsClosingNearHigh(barsAgo, period);
-			int barsClosingNearLow  = NumberOfBarsClosingNearLow(barsAgo, period);
-
-			if (barsClosingNearLow > barsClosingNearHigh) {
-				sellingCount++;
-			}
-
-			int bearPullbacks = NumberOfBearPullbacks(barsAgo, period);
-			int bullPullbacks  = NumberOfBullPullbacks(barsAgo, period);
-
-			if (bullPullbacks > bearPullbacks) {
-				sellingCount++;
-			}
-
-			int barsWithLowerTail = NumberOfBarsWithLowerTail(barsAgo, period);
-			int barsWithUpperTail  = NumberOfBarsWithUpperTail(barsAgo, period);
-
-			if (barsWithUpperTail > barsWithLowerTail) {
-				sellingCount++;
-			}
-
-			return sellingCount / indicatorCount;
+		public bool InPortionOfBarRange(int barsAgo, double lowestValue, double highestValue)
+		{
+			return InPortionOfBarRange(Close, barsAgo, lowestValue, highestValue);
 		}
 		#endregion
 
-		#region GetBuySellPressure()
-		public double GetBuySellPressure(int barsAgo, int period)
+		#region NumberOfBarsWithLowerTail()
+		public int NumberOfBarsWithLowerTail(int barsAgo, int period)
 		{
-			double balance = 50;
+			int lowerTail = 0;
+			int rangeMax = Math.Min((period + barsAgo), Close.Count);
 
-			double bullValue = GetBuyingPressure(barsAgo, period) * 50;
-			double bearValue = GetSellingPressure(barsAgo, period) * 50;
+			for (int i = barsAgo; i < rangeMax; i++) {
+				if (IsBullishBar(barsAgo)) {
+					if (InPortionOfBarRange(Open, i, 33, 66)) {
+						lowerTail++;
+					}
+				}
 
-			return 50 + bullValue - bearValue;
+				if (IsBearishBar(barsAgo)) {
+					if (InPortionOfBarRange(Close, i, 33, 66)) {
+						lowerTail++;
+					}
+				}
+			}
+
+			return lowerTail;
+		}
+		#endregion
+
+		#region NumberOfBarsWithUpperTail()
+		public int NumberOfBarsWithUpperTail(int barsAgo, int period)
+		{
+			int upperTail = 0;
+			int rangeMax = Math.Min((period + barsAgo), Close.Count);
+
+			for (int i = barsAgo; i < rangeMax; i++) {
+				if (IsBullishBar(barsAgo)) {
+					if (InPortionOfBarRange(Close, i, 33, 66)) {
+						upperTail++;
+					}
+				}
+
+				if (IsBearishBar(barsAgo)) {
+					if (InPortionOfBarRange(Open, i, 33, 66)) {
+						upperTail++;
+					}
+				}
+			}
+
+			return upperTail;
+		}
+		#endregion
+
+		#region NumberOfBarsClosingNearHigh()
+		public int NumberOfBarsClosingNearHigh(int barsAgo, int period)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, InPortionOfBarRange, 50, 100);
+		}
+		#endregion
+
+		#region NumberOfBarsClosingNearLow()
+		public int NumberOfBarsClosingNearLow(int barsAgo, int period)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, InPortionOfBarRange, 0, 50);
+		}
+		#endregion
+
+		#endregion
+
+		#region Pullbacks
+
+		#region NumberOfBearPullbacks()
+		public int NumberOfBearPullbacks(int barsAgo, int period)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsHigherHigh);
+		}
+		#endregion
+
+		#region NumberOfBullPullbacks()
+		public int NumberOfBullPullbacks(int barsAgo, int period)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsLowerLow);
+		}
+		#endregion
+
+		#region AverageBarsInTrendPullback()
+		private int AverageBarsInTrendPullback(int barsAgo, int period, ISeries <double> series, Func <int, int, bool> callback)
+		{
+			int barsInPullback = 0;
+			int pullbacks = 0;
+			double pullbackStart = 0;
+
+			int rangeMax = Math.Min((period + barsAgo), Close.Count);
+
+			for (int i = barsAgo; i < rangeMax; i++) {
+				if (pullbackStart == 0) {
+					if (callback(i, 1)) {
+						pullbackStart = series[1];
+						pullbacks++;
+						barsInPullback++;
+					}
+				} else {
+					barsInPullback++;
+
+					if (Low[0] < pullbackStart) {
+						pullbackStart = 0;
+					}
+				}
+			}
+
+			if (pullbacks == 0) {
+				return 0;
+			}
+
+			return (int) Math.Floor((double)(barsInPullback / pullbacks));
+		}
+		#endregion
+
+		#region AverageBarsInBearTrendPullback()
+		public int AverageBarsInBearTrendPullback(int barsAgo, int period) {
+			return AverageBarsInTrendPullback(barsAgo, period, High, IsHigherHigh);
+		}
+		#endregion
+
+		#region AverageBarsInBullTrendPullback()
+		public int AverageBarsInBullTrendPullback(int barsAgo, int period) {
+			return AverageBarsInTrendPullback(barsAgo, period, Low, IsLowerLow);
 		}
 		#endregion
 
@@ -1374,18 +1164,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			return 0;
-		}
-		#endregion
-
-		#region IsBreakoutTrend()
-		public bool IsBreakoutTrend(int barsAgo, int period, TrendDirection direction)
-		{
-			return NumberOfPullbacksInTrend(barsAgo, period, direction) <= 1 && AveragePullbackLength(barsAgo, period, direction) <= 2 && period >= 5;
-		}
-
-		public bool IsBreakoutTrend(int barsAgo, int period)
-		{
-			return NumberOfPullbacksInTrend(barsAgo, period) <= 1 && AveragePullbackLength(barsAgo, period) <= 2 && period >= 5;
 		}
 		#endregion
 
@@ -1469,6 +1247,223 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			return 0;
+		}
+		#endregion
+		#endregion
+
+		#endregion
+
+		#region BuyingPressure
+		#region GetBuyingPressure()
+		// gets buying pressure as a number between 0 and 1, the higher the number, the greater the pressure
+		public double GetBuyingPressure(int barsAgo, int period)
+		{
+			double buyingCount = 0;
+			double indicatorCount = 10;
+
+			int bearBarCount = NumberOfBearBars(barsAgo, period);
+			int bullBarCount = NumberOfBullBars(barsAgo, period);
+
+			if (bearBarCount < bullBarCount) {
+				buyingCount++;
+			}
+
+			int consecutiveBearCount 			= NumberOfConsecutiveBearBars(barsAgo, period);
+			int consecutiveBullCount 			= NumberOfConsecutiveBullBars(barsAgo, period);
+			int consecutiveBullCountPrevious 	= NumberOfConsecutiveBullBars(barsAgo + period, period);
+			int consecutiveBearCountPrevious	= NumberOfConsecutiveBearBars(barsAgo + period, period);
+
+			if (consecutiveBearCount < consecutiveBullCount) {
+				buyingCount++;
+			}
+
+			if (consecutiveBullCountPrevious < consecutiveBullCount) {
+				buyingCount++;
+			}
+
+			if (consecutiveBearCount < consecutiveBearCountPrevious) {
+				buyingCount++;
+			}
+
+			double averageBearBar 			= AverageBearBarSize(barsAgo, period);
+			double averageBullBar 			= AverageBullBarSize(barsAgo, period);
+			double averageBullBarPrevious	= AverageBullBarSize(barsAgo + period, period);
+			double averageBearBarPrevious	= AverageBearBarSize(barsAgo + period, period);
+
+			if (averageBearBar < averageBullBar) {
+				buyingCount++;
+			}
+
+			if (averageBullBarPrevious < averageBullBar) {
+				buyingCount++;
+			}
+
+			if (averageBearBarPrevious > averageBearBar) {
+				buyingCount++;
+			}
+
+			int barsClosingNearHigh = NumberOfBarsClosingNearHigh(barsAgo, period);
+			int barsClosingNearLow  = NumberOfBarsClosingNearLow(barsAgo, period);
+
+			if (barsClosingNearLow < barsClosingNearHigh) {
+				buyingCount++;
+			}
+
+			int bearPullbacks = NumberOfBearPullbacks(barsAgo, period);
+			int bullPullbacks  = NumberOfBullPullbacks(barsAgo, period);
+
+			if (bullPullbacks < bearPullbacks) {
+				buyingCount++;
+			}
+
+			int barsWithLowerTail = NumberOfBarsWithLowerTail(barsAgo, period);
+			int barsWithUpperTail  = NumberOfBarsWithUpperTail(barsAgo, period);
+
+			if (barsWithUpperTail < barsWithLowerTail) {
+				buyingCount++;
+			}
+
+			return buyingCount / indicatorCount;
+		}
+		#endregion
+
+		#region GetSellingPressure()
+		// gets selling pressure as a number between 0 and 1, the higher the number, the greater the pressure
+		public double GetSellingPressure(int barsAgo, int period)
+		{
+			double sellingCount = 0;
+			double indicatorCount = 10;
+
+			int bearBarCount = NumberOfBearBars(barsAgo, period);
+			int bullBarCount = NumberOfBullBars(barsAgo, period);
+
+			if (bearBarCount > bullBarCount) {
+				sellingCount++;
+			}
+
+			int consecutiveBearCount 			= NumberOfConsecutiveBearBars(barsAgo, period);
+			int consecutiveBullCount 			= NumberOfConsecutiveBullBars(barsAgo, period);
+			int consecutiveBullCountPrevious 	= NumberOfConsecutiveBullBars(barsAgo + period, period);
+			int consecutiveBearCountPrevious	= NumberOfConsecutiveBearBars(barsAgo + period, period);
+
+			if (consecutiveBearCount > consecutiveBullCount) {
+				sellingCount++;
+			}
+
+			if (consecutiveBullCountPrevious > consecutiveBullCount) {
+				sellingCount++;
+			}
+
+			if (consecutiveBearCount > consecutiveBearCountPrevious) {
+				sellingCount++;
+			}
+
+			double averageBearBar 			= AverageBearBarSize(barsAgo, period);
+			double averageBullBar 			= AverageBullBarSize(barsAgo, period);
+			double averageBullBarPrevious	= AverageBullBarSize(barsAgo + period, period);
+			double averageBearBarPrevious	= AverageBearBarSize(barsAgo + period, period);
+
+			if (averageBearBar > averageBullBar) {
+				sellingCount++;
+			}
+
+			if (averageBullBarPrevious > averageBullBar) {
+				sellingCount++;
+			}
+
+			if (averageBearBarPrevious < averageBearBar) {
+				sellingCount++;
+			}
+
+			int barsClosingNearHigh = NumberOfBarsClosingNearHigh(barsAgo, period);
+			int barsClosingNearLow  = NumberOfBarsClosingNearLow(barsAgo, period);
+
+			if (barsClosingNearLow > barsClosingNearHigh) {
+				sellingCount++;
+			}
+
+			int bearPullbacks = NumberOfBearPullbacks(barsAgo, period);
+			int bullPullbacks  = NumberOfBullPullbacks(barsAgo, period);
+
+			if (bullPullbacks > bearPullbacks) {
+				sellingCount++;
+			}
+
+			int barsWithLowerTail = NumberOfBarsWithLowerTail(barsAgo, period);
+			int barsWithUpperTail  = NumberOfBarsWithUpperTail(barsAgo, period);
+
+			if (barsWithUpperTail > barsWithLowerTail) {
+				sellingCount++;
+			}
+
+			return sellingCount / indicatorCount;
+		}
+		#endregion
+
+		#region GetBuySellPressure()
+		// gets a numeric value representing the buying power
+		// the value is between 0 and 100, 50 is even, above 50 is bullish pressure, below 50 is bearish pressure
+		public double GetBuySellPressure(int barsAgo, int period)
+		{
+			double balance = 50;
+
+			double bullValue = GetBuyingPressure(barsAgo, period) * 50;
+			double bearValue = GetSellingPressure(barsAgo, period) * 50;
+
+			return 50 + bullValue - bearValue;
+		}
+		#endregion
+		#endregion
+
+		#region TEMPLATE METHODS
+		#region Delegates
+		public delegate bool IBCallbackDelegate(int arg1);
+		public delegate bool IIBCallbackDelegate(int arg1, int arg2);
+		public delegate bool IDDBCallbackDelegate(int arg1, double arg2, double arg3);
+		#endregion
+
+		#region NumberOfOccurrencesInPeriod()
+
+		private int NumberOfOccurrencesInPeriod(int barsAgo, int period, IBCallbackDelegate criteria)
+		{
+			int barsThatMeetCriteria = 0;
+			int maxRange = Math.Min((period + barsAgo), Close.Count);
+
+			for (int i = barsAgo; i < maxRange; i++) {
+				if (criteria(i)) {
+					barsThatMeetCriteria++;
+				}
+			}
+
+			return barsThatMeetCriteria;
+		}
+
+		private int NumberOfOccurrencesInPeriod(int barsAgo, int period, IIBCallbackDelegate criteria, int criteriaPeriod = 1)
+		{
+			int barsThatMeetCriteria = 0;
+			int maxRange = Math.Min((period + barsAgo), Close.Count);
+
+			for (int i = barsAgo; i < maxRange; i++) {
+				if (criteria(i, criteriaPeriod)) {
+					barsThatMeetCriteria++;
+				}
+			}
+
+			return barsThatMeetCriteria;
+		}
+
+		private int NumberOfOccurrencesInPeriod(int barsAgo, int period, IDDBCallbackDelegate criteria, int arg1, int arg2)
+		{
+			int barsThatMeetCriteria = 0;
+			int maxRange = Math.Min((period + barsAgo), Close.Count);
+
+			for (int i = barsAgo; i < maxRange; i++) {
+				if (criteria(i, arg1, arg2)) {
+					barsThatMeetCriteria++;
+				}
+			}
+
+			return barsThatMeetCriteria;
 		}
 		#endregion
 		#endregion
