@@ -667,28 +667,28 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region LeastSmallBars()
-		public bool LeastSmallBars(int count, int period, int index = 0)
+		public bool LeastSmallBars(int count, int period, int barsAgo = 0)
 		{
 			return NumberOfOccurrencesInPeriod(barsAgo, period, IsSmall) >= count;
 		}
 		#endregion
 
 		#region LeastBigBars()
-		public bool LeastBigBars(int count, int period, int index = 0)
+		public bool LeastBigBars(int count, int period, int barsAgo = 0)
 		{
 			return NumberOfOccurrencesInPeriod(barsAgo, period, IsBig) >= count;
 		}
 		#endregion
 
 		#region LeastSmallerBars()
-		public bool LeastSmallerBars(int count, int period, int index = 0)
+		public bool LeastSmallerBars(int count, int period, int barsAgo = 0)
 		{
 			return NumberOfOccurrencesInPeriod(barsAgo, period, IsSmaller) >= count;
 		}
 		#endregion
 
 		#region LeastBiggerBars()
-		public bool LeastBiggerBars(int count, int period, int index = 0)
+		public bool LeastBiggerBars(int count, int period, int barsAgo = 0)
 		{
 			return NumberOfOccurrencesInPeriod(barsAgo, period, IsBigger) >= count;
 		}
