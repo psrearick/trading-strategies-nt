@@ -35,6 +35,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public Series<double> AverageLegLengths;
 		public Series<double> LegLengthStandardDeviations;
 		public Series<double> LegDirectionRatios;
+		public Series<int> LegBars;
 		private List<int> LegLengths = new List<int>();
 		private List<int> LegDirections = new List<int>(); // 1 for bullish, -1 for bearish, 0 for flat
 		private int WindowSize = 81;
@@ -81,6 +82,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			{
 				BarsAgoStarts				= new Series<int>(this, MaximumBarsLookBack.Infinite);
 				Starts						= new Series<int>(this, MaximumBarsLookBack.Infinite);
+				LegBars						= new Series<int>(this, MaximumBarsLookBack.Infinite);
 				AverageLegLengths			= new Series<double>(this, MaximumBarsLookBack.Infinite);
 				LegLengthStandardDeviations	= new Series<double>(this, MaximumBarsLookBack.Infinite);
 				LegDirectionRatios			= new Series<double>(this, MaximumBarsLookBack.Infinite);
@@ -138,6 +140,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			} else {
 				Values[1][0] = directionValue;
 			}
+
+			LegBars[0] = Math.Abs(barsAgoHigh - barsAgoLow);
 
 			// Store leg lengths and directions
 			if (longEnough && tallEnough) {
