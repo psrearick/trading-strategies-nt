@@ -28,6 +28,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	{
 		#region Variables
 		public ATR Atr;
+		public EMA EmaFast;
+		public EMA EmaSlow;
 		#endregion
 
 		#region OnStateChange()
@@ -57,7 +59,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			#region State.Configure
 			else if (State == State.Configure)
 			{
-				Atr = ATR(14);
+				Atr 	= ATR(14);
+				EmaFast	= EMA(9);
+				EmaSlow	= EMA(21);
 			}
 			#endregion
 			#region State.DataLoaded
@@ -168,6 +172,20 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region IsBearishFallingBar()
+		public bool IsBearishFallingBar(int barsAgo)
+		{
+			return IsBearishBar(barsAgo) && IsFallingBar(barsAgo);
+		}
+		#endregion
+
+		#region IsBullishRisingBar()
+		public bool IsBullishRisingBar(int barsAgo)
+		{
+			return IsBullishBar(barsAgo) && IsRisingBar(barsAgo);
+		}
+		#endregion
+
 		#region IsHigherHigh()
 		// Is High at `barsAgo` greater than `length` bars earlier
 		public bool IsHigherHigh(int barsAgo = 0, int length = 1)
@@ -237,25 +255,52 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region GetTrendDirection()
-		// get the trend direction over the last `length` bars, starting `barsAgo` bars before the current bar
-		public TrendDirection GetTrendDirection(int barsAgo = 0, int length = 10)
+		#region BarsAgoHigh()
+		public int BarsAgoHigh(int barsAgo = 0, int period = 12)
 		{
-			if (Close.Count < length + barsAgo) return TrendDirection.Flat;
+			int barsAgoHigh = 0;
+			double high = High[0];
 
-			int bullishBars = 0;
-			int bearishBars = 0;
-
-			for (int i = barsAgo; i < barsAgo + length; i++) {
-
-				if (IsBullishBar(i) && IsRising(i)) {
-					bullishBars++;
-				}
-
-				if (IsBearishBar(i) && IsFalling(i)) {
-					bearishBars++;
+			for (int i = barsAgo; i < barsAgo + period; i++) {
+				if (High[i] >= high) {
+					high = High[i];
+					barsAgoHigh = i;
 				}
 			}
+
+			return barsAgoHigh;
+		}
+		#endregion
+
+		#region BarsAgoLow()
+		public int BarsAgoLow(int barsAgo = 0, int period = 12)
+		{
+			int barsAgoLow = 0;
+			double low = Low[0];
+
+			for (int i = barsAgo; i < barsAgo + period; i++) {
+				if (Low[i] <= low) {
+					low = Low[i];
+					barsAgoLow = i;
+				}
+			}
+
+			return barsAgoLow;
+		}
+		#endregion
+
+		#endregion
+
+		#region Trend Recognition
+
+		#region GetTrendDirection()
+		// get the trend direction over the last `length` bars, starting `barsAgo` bars before the current bar
+		public TrendDirection GetTrendDirection(int barsAgo = 0, int period = 10)
+		{
+			if (Close.Count < period + barsAgo) return TrendDirection.Flat;
+
+			int bullishBars = NumberOfBullishRisingBars(barsAgo, period);
+			int bearishBars = NumberOfBearishFallingBars(barsAgo, period);
 
 			if (bullishBars > bearishBars) {
 				return TrendDirection.Bullish;
@@ -265,11 +310,197 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return TrendDirection.Bearish;
 			}
 
-
 			return TrendDirection.Flat;
 		}
 		#endregion
 
+		#region GetWeakTrendDirection()
+		public TrendDirection GetWeakTrendDirection(int barsAgo, int period)
+		{
+			return IsWeakBullishTrend(barsAgo, period)
+				? TrendDirection.Bullish
+				: IsWeakBearishTrend(barsAgo, period)
+					? TrendDirection.Bearish
+					: TrendDirection.Flat;
+		}
+		#endregion
+
+		#region IsWeakBullishTrend()
+		public bool IsWeakBullishTrend(int barsAgo, int period)
+		{
+			return IsBullishBarSizes(barsAgo, period)
+				&& IsEMABullish(barsAgo)
+				&& GetTrendDirection(barsAgo, period) == TrendDirection.Bullish;
+		}
+		#endregion
+
+		#region IsWeakBearishTrend()
+		public bool IsWeakBearishTrend(int barsAgo, int period)
+		{
+			return IsBearishBarSizes(barsAgo, period)
+				&& IsEMABearish(barsAgo)
+				&& GetTrendDirection(barsAgo, period) == TrendDirection.Bearish;
+		}
+		#endregion
+
+		#region GetStrongTrendDirection()
+		public TrendDirection GetStrongTrendDirection(int barsAgo, int period)
+		{
+			return IsStrongBullishTrend(barsAgo, period)
+				? TrendDirection.Bullish
+				: IsStrongBearishTrend(barsAgo, period)
+					? TrendDirection.Bearish
+					: TrendDirection.Flat;
+		}
+		#endregion
+
+		#region IsStrongBullishTrend()
+		public bool IsStrongBullishTrend(int barsAgo, int period)
+		{
+			return IsBullishBarSizes(barsAgo, period)
+				&& IsEMABullishDivergence(barsAgo, period)
+				&& GetTrendDirection(barsAgo, period) == TrendDirection.Bullish;
+		}
+		#endregion
+
+		#region IsStrongBearishTrend()
+		public bool IsStrongBearishTrend(int barsAgo, int period)
+		{
+			return IsBearishBarSizes(barsAgo, period)
+				&& IsEMABearishDivergence(barsAgo, period)
+				&& GetTrendDirection(barsAgo, period) == TrendDirection.Bearish;
+		}
+		#endregion
+
+		#region IsBullishBarSizes()
+		public bool IsBullishBarSizes(int barsAgo, int period)
+		{
+			return AverageBullishBarSizes(barsAgo, period) > AverageBearishBarSizes(barsAgo, period);
+		}
+		#endregion
+
+		#region IsBearishBarSizes()
+		public bool IsBearishBarSizes(int barsAgo, int period)
+		{
+			return AverageBullishBarSizes(barsAgo, period) < AverageBearishBarSizes(barsAgo, period);
+		}
+		#endregion
+
+		#region AverageBullishBarSizes()
+		public double AverageBullishBarSizes(int barsAgo, int period)
+		{
+			int bullishBars 	= 0;
+			double bullishATRs	= 0;
+
+			for (int i = barsAgo; i < (barsAgo + period); i++) {
+				if (!IsBullishBar(i)) {
+					continue;
+				}
+
+				bullishBars++;
+				bullishATRs += Atr[barsAgo];
+			}
+
+			if (bullishBars == 0) {
+				return 0;
+			}
+
+			return bullishATRs / bullishBars;
+		}
+		#endregion
+
+		#region AverageBearishBarSizes()
+		public double AverageBearishBarSizes(int barsAgo, int period)
+		{
+			int bearishBars		= 0;
+			double bearishATRs	= 0;
+
+			for (int i = barsAgo; i < (barsAgo + period); i++) {
+				if (!IsBearishBar(i)) {
+					continue;
+				}
+
+				bearishBars++;
+				bearishATRs += Atr[barsAgo];
+			}
+
+			if (bearishBars == 0) {
+				return 0;
+			}
+
+			return bearishATRs / bearishBars;
+		}
+		#endregion
+
+		#region IsEMADiverging()
+		public bool IsEMADiverging(int barsAgo, int period = 1)
+		{
+			return GetDistanceBetweenEmas(barsAgo) > GetDistanceBetweenEmas(barsAgo + period);
+		}
+		#endregion
+
+		#region IsEMAConverging()
+		public bool IsEMAConverging(int barsAgo, int period = 1)
+		{
+			return GetDistanceBetweenEmas(barsAgo) < GetDistanceBetweenEmas(barsAgo + period);
+		}
+		#endregion
+
+		#region IsEMABullishDivergence()
+		public bool IsEMABullishDivergence(int barsAgo, int period = 1)
+		{
+			return IsEMABullish(barsAgo) && IsEMADiverging(barsAgo, period);
+		}
+		#endregion
+
+		#region IsEMABearishDivergence()
+		public bool IsEMABearishDivergence(int barsAgo, int period = 1)
+		{
+			return IsEMABearish(barsAgo) && IsEMADiverging(barsAgo, period);
+		}
+		#endregion
+
+		#region IsEMABullishConvergence()
+		public bool IsEMABullishConvergence(int barsAgo, int period = 1)
+		{
+			return IsEMABullish(barsAgo) && IsEMAConverging(barsAgo, period);
+		}
+		#endregion
+
+		#region IsEMABearishConvergence()
+		public bool IsEMABearishConvergence(int barsAgo, int period = 1)
+		{
+			return IsEMABearish(barsAgo) && IsEMAConverging(barsAgo, period);
+		}
+		#endregion
+
+		#region IsEMABullish()
+		public bool IsEMABullish(int barsAgo)
+		{
+			return EmaFast[barsAgo] > EmaSlow[barsAgo];
+		}
+		#endregion
+
+		#region IsEMABearish()
+		public bool IsEMABearish(int barsAgo)
+		{
+			return EmaFast[barsAgo] < EmaSlow[barsAgo];
+		}
+		#endregion
+
+		#region GetEMADirection()
+		public TrendDirection GetEMADirection(int barsAgo)
+		{
+			return IsEMABearish(barsAgo) ? TrendDirection.Bearish : IsEMABullish(barsAgo) ? TrendDirection.Bullish : TrendDirection.Flat;
+		}
+		#endregion
+
+		#region GetDistanceBetweenEmas()
+		public double GetDistanceBetweenEmas(int barsAgo)
+		{
+			return Math.Abs(EmaFast[barsAgo] - EmaSlow[barsAgo]);
+		}
+		#endregion
 		#endregion
 
 		#region Signals
@@ -649,6 +880,21 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			return NumberOfOccurrencesInPeriod(barsAgo, period, IsBullishBar);
 		}
 		#endregion
+
+		#region NumberOfBearishFallingBars()
+		public int NumberOfBearishFallingBars(int barsAgo, int period)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsBearishFallingBar);
+		}
+		#endregion
+
+		#region NumberOfBullishRisingBars()
+		public int NumberOfBullishRisingBars(int barsAgo, int period)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsBullishRisingBar);
+		}
+		#endregion
+
 		#endregion
 
 		#region Least Bars Matching Pattern
