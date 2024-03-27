@@ -218,8 +218,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    if (LegDirections.Count == 0) return 0;
 		    int bullishCount = LegDirections.Count(x => x > 0);
 		    int bearishCount = LegDirections.Count(x => x < 0);
-		    return bullishCount / (double) bearishCount;
-//		    return bullishCount / (double) LegDirections.Count;
+		    return bullishCount / (double) LegDirections.Count;
 		}
 
 		#region ValFromStart()

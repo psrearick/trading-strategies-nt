@@ -328,7 +328,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region IsWeakBullishTrend()
 		public bool IsWeakBullishTrend(int barsAgo, int period)
 		{
-			return IsBullishBarSizes(barsAgo, period)
+			return
+				IsBullishBarSizes(barsAgo, period)
 				&& IsEMABullish(barsAgo)
 				&& GetTrendDirection(barsAgo, period) == TrendDirection.Bullish;
 		}
@@ -337,7 +338,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region IsWeakBearishTrend()
 		public bool IsWeakBearishTrend(int barsAgo, int period)
 		{
-			return IsBearishBarSizes(barsAgo, period)
+			return
+				IsBearishBarSizes(barsAgo, period)
 				&& IsEMABearish(barsAgo)
 				&& GetTrendDirection(barsAgo, period) == TrendDirection.Bearish;
 		}
