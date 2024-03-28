@@ -36,8 +36,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public Series<double> LegLengthStandardDeviations;
 		public Series<double> LegDirectionRatios;
 		public Series<int> LegBars;
-		private List<int> LegLengths = new List<int>();
-		private List<int> LegDirections = new List<int>(); // 1 for bullish, -1 for bearish, 0 for flat
+		private Series<double> LegLengths;
+		private Series<double> LegDirections;
 		private int WindowSize = 81;
 		#endregion
 
@@ -86,6 +86,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				AverageLegLengths			= new Series<double>(this, MaximumBarsLookBack.Infinite);
 				LegLengthStandardDeviations	= new Series<double>(this, MaximumBarsLookBack.Infinite);
 				LegDirectionRatios			= new Series<double>(this, MaximumBarsLookBack.Infinite);
+				LegLengths					= new Series<double>(this, MaximumBarsLookBack.Infinite);
+				LegDirections				= new Series<double>(this, MaximumBarsLookBack.Infinite);
 			}
 			#endregion
 		}
@@ -94,15 +96,16 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			if (CurrentBar < (Period * Period)) {
+			if (CurrentBar < WindowSize) {
 				Values[0][0] = 0;
 				Values[1][0] = 0;
 				Starts[0] = 0;
+		        LegLengths[0] 		= 0;
+		        LegDirections[0]	= 0;
 				return;
 			}
 
 			int AdjustedPeriod = GetPeriod();
-
 
 			// For the last 12 bars, count bars that close lower than they open, have lower lows, and do not have higher highs
 			int bearishBars = PA.NumberOfBearishFallingBars(0, AdjustedPeriod);
@@ -143,18 +146,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			LegBars[0] = Math.Abs(barsAgoHigh - barsAgoLow);
 
+		        LegLengths[0] 		= 0;
+		        LegDirections[0]	= 0;
+
 			// Store leg lengths and directions
 			if (longEnough && tallEnough) {
 				int legLength = Math.Abs(barsAgoHigh - barsAgoLow);
-		        LegLengths.Add(legLength);
-		        LegDirections.Add(directionValue);
-
-		        // Ensure we don't exceed the window size
-		        if (LegLengths.Count > WindowSize)
-		        {
-		            LegLengths.RemoveAt(0);
-		            LegDirections.RemoveAt(0);
-		        }
+		        LegLengths[0] 		= legLength;
+		        LegDirections[0]	= directionValue;
 			}
 
 			// Set the number of bars since the most recent swing high/low
@@ -173,7 +172,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			// Set the previous bars since the swing high/low to the current trend direction
 			for (int i = 0; i <= BarsAgoStarts[0]; i++) {
-				Values[0][i] = Values[1][0];
+				Values[0][i] 		= Values[1][0];
+				LegDirections[0]	= Values[1][0];
 			}
 
 			AverageLegLengths[0] 			= CalculateAverageLegLength();
@@ -202,23 +202,65 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private double CalculateAverageLegLength()
 		{
 		    if (LegLengths.Count == 0) return 0;
-		    return LegLengths.Average();
+			int window = Math.Min(WindowSize, LegLengths.Count);
+
+			return SUM(LegLengths, window)[0] / window;
 		}
 
 		private double CalculateLegLengthStandardDeviation()
 		{
 		    if (LegLengths.Count == 0) return 0;
-		    double average = LegLengths.Average();
-		    double sumOfSquaresOfDifferences = LegLengths.Select(val => (val - average) * (val - average)).Sum();
-		    return Math.Sqrt(sumOfSquaresOfDifferences / LegLengths.Count);
+			int window = Math.Min(WindowSize, LegLengths.Count);
+			double average = SUM(LegLengths, window)[0] / window;
+
+			double sumOfSquaresOfDifferences = 0;
+
+			for (int i = 0; i < window; i++) {
+				sumOfSquaresOfDifferences += ((LegLengths[i] - average) * (LegLengths[i] - average));
+			}
+
+		    return Math.Sqrt(sumOfSquaresOfDifferences / window);
 		}
 
 		private double CalculateLegDirectionRatio()
 		{
 		    if (LegDirections.Count == 0) return 0;
-		    int bullishCount = LegDirections.Count(x => x > 0);
-		    int bearishCount = LegDirections.Count(x => x < 0);
-		    return bullishCount / (double) LegDirections.Count;
+			int window = Math.Min(WindowSize, LegLengths.Count);
+
+			int bullishCount = 0;
+			int bearishCount = 0;
+
+			for (int i = 0; i < window; i++) {
+				if (LegDirections[i] > 0) {
+					bullishCount++;
+				}
+
+				if (LegDirections[i] < 0) {
+					bearishCount++;
+				}
+			}
+
+		    return bullishCount / (double) (bullishCount + bearishCount);
+		}
+
+		public double CalculateLegDirectionRatioForPeriod(int barsAgo, int length)
+		{
+			if (length == 0) return 0;
+
+			int bullishCount = 0;
+			int bearishCount = 0;
+
+			for (int i = barsAgo; i < (barsAgo + length); i++) {
+				if (Values[0][i] > 0) {
+					bullishCount++;
+				}
+
+				if (Values[0][i] < 0) {
+					bearishCount++;
+				}
+			}
+
+			return bullishCount / (double) (bullishCount + bearishCount);
 		}
 
 		#region ValFromStart()
