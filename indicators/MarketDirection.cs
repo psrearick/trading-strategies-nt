@@ -28,6 +28,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	{
 		#region Variables
 		private PriceActionUtils PA;
+		private Utils Utls;
 		private Legs LegShort;
 		private Legs LegLong;
 		private Series<TrendDirection> Direction;
@@ -38,12 +39,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private Brush brushUp2;
 		private Brush brushDown1;
 		private Brush brushDown2;
-//		private bool hasBullishTrend;
-//		private bool hasBearishTrend;
-//		private Ray bullishTrendline;
-//		private Ray bullishTrendChannelLine;
-//		private Ray bearishTrendline;
-//		private Ray bearishTrendChannelLine;
 		int WindowSize = 81;
 		#endregion
 
@@ -105,6 +100,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				LegShort	= Legs(6);
 				LegLong		= Legs(20);
 				PA			= PriceActionUtils();
+				Utls		= new Utils();
 			}
 			#endregion
 
@@ -170,160 +166,22 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			SetChannels();
 
-
-
-//				BackBrush = LegLong[0] > 0 ? brushUp2
-//							: LegLong[0] < 0 ? brushDown2
-//							: null;
-//			if (highStdDev) {
-
-////			Print(legDir);
-
-//				BackBrush = legDir > 0.5 ? brushUp2
-//							: legDir <= 0.5 ? brushDown2
-//							: null;
-
-
-
-
-//			}
-
-//			double pullbackSize = PA.LargestPullbackInTrend(0, CurrentLongTrendLength, currentLongDirection);
-//			double range 		= MAX(High, CurrentLongTrendLength)[0] - MIN(Low, CurrentLongTrendLength)[0];
-
-//			if (broadChannelLegs && PA.IsBroadChannel(0, currentLongTrendLength, currentLongDirection)) {
-//				for (int i = 0; i < currentLongTrendLength; i++) {
-//					BroadChannels[i] = LegLong[0] > 0
-//						? TrendDirection.Bullish
-//						: LegLong[0] < 0
-//							? TrendDirection.Bearish
-//							: TrendDirection.Flat;
-
-//					if (BroadChannels[i] == TrendDirection.Bullish) {
-//						BackBrushes[i] = brushUp2;
-//					}
-
-//					if (BroadChannels[i] == TrendDirection.Bearish) {
-//						BackBrushes[i] = brushDown2;
-//					}
-//				}
-//			}
-
-//			if (tightChannelLegs && PA.IsTightChannel(0, currentLongTrendLength, currentLongDirection)) {
-//				Print(currentLongDirection);
-//				for (int i = 0; i < currentLongTrendLength; i++) {
-//					TightChannels[i] = LegLong[0] > 0
-//						? TrendDirection.Bullish
-//						: LegLong[0] < 0
-//							? TrendDirection.Bearish
-//							: TrendDirection.Flat;
-
-//					if (TightChannels[i] == TrendDirection.Bullish) {
-//						BackBrushes[i] = brushUp1;
-//					}
-
-//					if (TightChannels[i] == TrendDirection.Bearish) {
-//						BackBrushes[i] = brushDown1;
-//					}
-//				}
-//			}
-
-//			if (broadChannelLegs ||tightChannelLegs && (pullbackSize >= 0.67)) {}
-
-
-//			double longDirection = LegShort.CalculateLegDirectionRatioForPeriod(0, currentLongTrendLength);
-
-//			for (int i = 0; i < currentLongTrendLength; i++) {
-//				if (longDirection > 0.5 && LegLong[0] > 0) {
-//					BackBrush = brushUp1;
-//				}
-
-//				if (longDirection < 0.5 && LegLong[0] < 0) {
-//					BackBrush = brushDown1;
-//				}
-//			}
-
-//			double previousLongDirection = LegShort.CalculateLegDirectionRatioForPeriod(lastBarOfLongTrend, firstBarOfPreviousLongTrend);
-//			for (int i = lastBarOfLongTrend; i <= firstBarOfPreviousLongTrend; i++) {
-//				if (longDirection > 0.5 && LegLong[0] > 0) {
-//					BackBrush = brushUp1;
-//				}
-
-//				if (longDirection < 0.5 && LegLong[0] < 0) {
-//					BackBrush = brushDown1;
-//				}
-//			}
-
-
-
-
-
-
-
-
-//			int currentTrendLength	= LegShort.BarsAgoStarts[0];
-//			int lastBarOfTrend		= currentTrendLength + 1;
-//			int previousTrendLength	= LegShort.BarsAgoStarts[lastBarOfTrend];
-//			int firstBarOfTrend		= currentTrendLength + previousTrendLength;
-
-//			for (int i = lastBarOfTrend; i <= firstBarOfTrend; i++) {
-//				Direction[i] 							= LegShort.LegDirectionAtBar(i);
-//			}
-
-//			if (Leg.Starts[0] != Leg.Starts[1] && Direction[firstBarOfTrend] != TrendDirection.Flat) {
-//				Brush TrendBrush 			= Direction[firstBarOfTrend] == TrendDirection.Bullish ? brushUp1 : brushDown1;
-//				Brush TrendChannelBrush 	= Direction[firstBarOfTrend] == TrendDirection.Bullish ? brushUp2 : brushDown2;
-//				double startYHigh 			= High[firstBarOfTrend];
-//				double endYHigh 			= High[lastBarOfTrend];
-//				double startYLow			= Low[firstBarOfTrend];
-//				double endYLow				= Low[lastBarOfTrend];
-
-//				if (Direction[firstBarOfTrend] == TrendDirection.Bullish && hasBullishTrend) {
-//					double previousStartYHigh	= bullishTrendChannelLine.StartAnchor.Price;
-//					double previousStartYLow	= bullishTrendline.StartAnchor.Price;
-
-//					if (previousStartYHigh < startYHigh && previousStartYLow < startYLow) {
-//						bullishTrendChannelLine.EndAnchor.Price	= endYHigh;
-//						bullishTrendline.StartAnchor.Price		= endYLow;
-
-//						return;
-//					}
-//				} else if (Direction[firstBarOfTrend] == TrendDirection.Bullish) {
-
-//					double trendStartY 			= Direction[firstBarOfTrend] == TrendDirection.Bullish ? startYLow : startYHigh;
-//					double trendEndY 			= Direction[firstBarOfTrend] == TrendDirection.Bullish ? endYLow : endYHigh;
-//					double trendChannelStartY 	= Direction[firstBarOfTrend] == TrendDirection.Bullish ? startYHigh : startYLow;
-//					double trendChannelEndY		= Direction[firstBarOfTrend] == TrendDirection.Bullish ? endYHigh : endYLow;
-
-//					bullishTrendline 		= Draw.Ray(this, "rayTrend" + (CurrentBar - lastBarOfTrend).ToString(), firstBarOfTrend, trendStartY, lastBarOfTrend, trendEndY, TrendBrush);
-//					bullishTrendChannelLine = Draw.Ray(this, "rayTrendChannel" + (CurrentBar - lastBarOfTrend).ToString(), firstBarOfTrend, trendChannelStartY, lastBarOfTrend, trendChannelEndY, TrendChannelBrush);
-//				} else if (hasBearishTrend) {
-//					double previousStartYHigh	= bearishTrendline.StartAnchor.Price;
-//					double previousStartYLow	= bearishTrendChannelLine.StartAnchor.Price;
-
-//					if (previousStartYHigh > startYHigh && previousStartYLow > startYLow) {
-//						bearishTrendline.StartAnchor.Price			= endYHigh;
-//						bearishTrendChannelLine.StartAnchor.Price	= endYLow;
-
-//						return;
-//					}
-//				} else {
-//					double trendStartY 			= Direction[firstBarOfTrend] == TrendDirection.Bullish ? startYLow : startYHigh;
-//					double trendEndY 			= Direction[firstBarOfTrend] == TrendDirection.Bullish ? endYLow : endYHigh;
-//					double trendChannelStartY 	= Direction[firstBarOfTrend] == TrendDirection.Bullish ? startYHigh : startYLow;
-//					double trendChannelEndY		= Direction[firstBarOfTrend] == TrendDirection.Bullish ? endYHigh : endYLow;
-//					Draw.Ray(this, "rayTrend" + lastBarOfTrend, firstBarOfTrend, trendStartY, lastBarOfTrend, trendEndY, TrendBrush);
-//					Draw.Ray(this, "rayTrendChannel" + lastBarOfTrend, firstBarOfTrend, trendChannelStartY, lastBarOfTrend, trendChannelEndY, TrendChannelBrush);
-//				}
-//			}
+			for (int i = 0; i < WindowSize; i++) {
+				BackBrushes[i] =
+					TightChannels[i] == TrendDirection.Bullish ? brushUp1
+					: TightChannels[i] == TrendDirection.Bearish ? brushDown1
+					: BroadChannels[i] == TrendDirection.Bullish ? brushUp2
+					: BroadChannels[i] == TrendDirection.Bearish ? brushDown2
+					: null;
+			}
 		}
 		#endregion
 
 		#region SetChannels()
-		private bool SetChannels() {
-			List<int> bullishIdx	 			= new List<int>();
-			List<int> bearishIdx	 			= new List<int>();
-			List<int> tradingRangeIdx	 		= new List<int>();
+		private void SetChannels() {
+//			List<int> bullishIdx	 			= new List<int>();
+//			List<int> bearishIdx	 			= new List<int>();
+//			List<int> tradingRangeIdx	 		= new List<int>();
 
 			List<int> legLongDirections 		= new List<int>();
 			List<int> legDirections 			= new List<int>();
@@ -333,19 +191,20 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			List<double> legChanges 			= new List<double>();
 			List<double> legLengthStdDevs		= new List<double>();
 
-			List<int> bullishLegLengths 		= new List<int>();
-			List<double> bullishLegChanges 		= new List<double>();
-			List<double> bullishLegStdDevs 		= new List<double>();
+//			List<int> bullishLegLengths 		= new List<int>();
+//			List<double> bullishLegChanges 		= new List<double>();
+//			List<double> bullishLegStdDevs 		= new List<double>();
 
-			List<int> bearishLegLengths 		= new List<int>();
-			List<double> bearishLegChanges 		= new List<double>();
-			List<double> bearishLegStdDevs 		= new List<double>();
+//			List<int> bearishLegLengths 		= new List<int>();
+//			List<double> bearishLegChanges 		= new List<double>();
+//			List<double> bearishLegStdDevs 		= new List<double>();
 
-			List<int> tradingRangeLegLengths 	= new List<int>();
-			List<double> tradingRangeLegChanges = new List<double>();
-			List<double> tradingRangeLegStdDevs	= new List<double>();
+//			List<int> tradingRangeLegLengths 	= new List<int>();
+//			List<double> tradingRangeLegChanges = new List<double>();
+//			List<double> tradingRangeLegStdDevs	= new List<double>();
 
-			for (int i = WindowSize - 1; i >= 0; i++) {
+
+			for (int i = WindowSize - 1; i >= 0; i--) {
 				int idx 		= i + 1;
 				Legs L 			= LegShort;
 				int lDir 		= (int) L[idx];
@@ -365,29 +224,27 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 									:  Close[idx] - Close[L.BarsAgoStarts[idx]];
 				double stdDev	= L.LegLengthStandardDeviations[idx];
 
+//				if (lDir > 0) {
+//					bullishLegLengths.Add(length);
+//					bullishLegChanges.Add(change);
+//					bullishLegStdDevs.Add(stdDev);
+//				}
 
+//				if (lDir < 0) {
+//					bearishLegLengths.Add(length);
+//					bearishLegChanges.Add(change);
+//					bearishLegStdDevs.Add(stdDev);
+//				}
 
-				if (lDir > 0) {
-					bullishLegLengths.Add(length);
-					bullishLegChanges.Add(change);
-					bullishLegStdDevs.Add(stdDev);
-				}
+//				if (lDir == 0) {
+//					tradingRangeLegLengths.Add(length);
+//					tradingRangeLegChanges.Add(change);
+//					tradingRangeLegStdDevs.Add(stdDev);
+//				}
 
-				if (lDir < 0) {
-					bearishLegLengths.Add(length);
-					bearishLegChanges.Add(change);
-					bearishLegStdDevs.Add(stdDev);
-				}
-
-				if (lDir == 0) {
-					tradingRangeLegLengths.Add(length);
-					tradingRangeLegChanges.Add(change);
-					tradingRangeLegStdDevs.Add(stdDev);
-				}
-
-				bullishIdx.Add(bullishLegLengths.Count - 1);
-				bearishIdx.Add(bearishLegLengths.Count - 1);
-				tradingRangeIdx.Add(tradingRangeLegLengths.Count - 1);
+//				bullishIdx.Add(bullishLegLengths.Count - 1);
+//				bearishIdx.Add(bearishLegLengths.Count - 1);
+//				tradingRangeIdx.Add(tradingRangeLegLengths.Count - 1);
 
 				legLongDirections.Add(longLDir);
 				legDirections.Add(lDir);
@@ -398,13 +255,24 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				legLengthStdDevs.Add(stdDev);
 			}
 
-			List<int> channelDirections 	= new List<int>();
-			List<int> channelDirectionIdxs 	= new List<int>();
+			if (legIndexes.Count == 0) {
+				return;
+			}
+
+			List<int> channelDirections 			= new List<int>();
+			List<double> channelDirectionStdDevs 	= new List<double>();
+			List<int> channelDirectionIdxs 			= new List<int>();
+			List<int> channelDirectionLengths 		= new List<int>();
 
 			int previousDirectionalLegDirection = 0;
+			double previousDirectionalLegChange = 0;
+			int previousDirectionalLegLength = 0;
 			int previousLegDirection = 0;
-			int previousLegDirectionLength = 0;
+			int previousLegLength = 0;
 			double previousLegChange = 0;
+			int counterDirectionalLegsInCurrentDirection = 0;
+			int consecutiveCounterDirectionalLegsInCurrentDirection = 0;
+			int directionalLegsInCurrentDirection = 0;
 			int currentDirection = 0;
 			int currentDirectionLength = 0;
 			double currentDirectionChange = 0;
@@ -419,62 +287,162 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					currentDirection 		= legDirections[i];
 					currentDirectionLength	= legLengths[i];
 
+					if (legDirections[i] != 0) {
+						directionalLegsInCurrentDirection = 1;
+					}
+
 					channelDirections.Add(currentDirection);
 					channelDirectionIdxs.Add(legIndexes[i]);
+					channelDirectionLengths.Add(currentDirectionLength);
 					continue;
 				}
 
+				// if trading range > 20 - becomes trading range, previous direction does not matter
 				if (legDirections[i] == 0 && legLengths[i] >= 20) {
-					currentLegDirection 			= 0;
-					currentLegLength 				= legLengths[i];
-					currentDirectionLength 			= legLengths[i];
-					currentDirection 				= 0;
-					previousLegDirection 			= 0;
-					previousDirectionalLegDirection	= 0;
+					currentLegDirection 				= 0;
+					currentLegLength 					= legLengths[i];
+					currentDirectionLength 				= legLengths[i];
+					currentDirection 					= 0;
+					previousLegDirection 				= 0;
+					previousLegLength					= 0;
+					previousDirectionalLegDirection		= 0;
+
+					directionalLegsInCurrentDirection			= 0;
+					counterDirectionalLegsInCurrentDirection 	= 0;
+
+					consecutiveCounterDirectionalLegsInCurrentDirection 	= 0;
 
 					channelDirections.Add(0);
 					channelDirectionIdxs.Add(legIndexes[i]);
+					channelDirectionLengths.Add(currentDirectionLength);
 
 					continue;
 				}
 
+				previousLegDirection 	= currentLegDirection;
+				previousLegLength 		= currentLegLength;
+				previousLegChange 		= currentLegChange;
+
+				if (previousLegDirection != 0) {
+					previousDirectionalLegDirection = previousLegDirection;
+					previousDirectionalLegChange	= previousLegChange;
+					previousDirectionalLegLength	= previousLegLength;
+				}
+
+				currentLegDirection 	= legDirections[i];
+				currentLegLength 		= legLengths[i];
+				currentLegChange		= legChanges[i];
+
+				// if in trading range - channel stays the same
 				if (legDirections[i] == 0) {
 					currentDirectionLength += legLengths[i];
-					currentLegDirection 	= legDirections[i];
-					currentLegLength 		= legLengths[i];
-					currentLegChange		= legChanges[i];
+					currentDirectionChange += legChanges[i];
 
-					channelDirections.Add(0);
+					channelDirections.Add(legDirections[i]);
 					channelDirectionIdxs.Add(legIndexes[i]);
+					channelDirectionLengths.Add(currentDirectionLength);
 
 					continue;
 				}
 
+				// if in same direction - channel stays the same
 				if (legDirections[i] == currentDirection) {
 					currentDirectionLength += legLengths[i];
 					currentDirectionChange += legChanges[i];
-					currentLegDirection 	= legDirections[i];
-					currentLegLength 		= legLengths[i];
-					currentLegChange		= legChanges[i];
 
-					channelDirections.Add(0);
+					directionalLegsInCurrentDirection	+= 1;
+					consecutiveCounterDirectionalLegsInCurrentDirection = 0;
+
+					channelDirections.Add(legDirections[i]);
 					channelDirectionIdxs.Add(legIndexes[i]);
+					channelDirectionLengths.Add(currentDirectionLength);
 
 					continue;
 				}
 
+				// Counter-trend leg
+				counterDirectionalLegsInCurrentDirection 	+= 1;
 
+				if (currentLegDirection == previousDirectionalLegDirection) {
+					consecutiveCounterDirectionalLegsInCurrentDirection++;
+				} else {
+					consecutiveCounterDirectionalLegsInCurrentDirection = 1;
+				}
 
-				// if in same direction - channel stays the same
-				// if in trading range - channel stays the same
-				// if reverses most recent direction (greater change) - channel reverses
-				// if has more bars that most recent direction - channel reverses
+				bool reversed = false;
+
 				// if has more legs than most recent direction - channel reverses
-				// if trading range > 20 - becomes trading range, previous direction does not matter
+				if (counterDirectionalLegsInCurrentDirection > directionalLegsInCurrentDirection) {
+					reversed = true;
+				}
 
+				// if reverses most recent direction (greater change) - channel reverses
+				if (currentLegChange > previousDirectionalLegChange && previousDirectionalLegDirection != currentLegDirection) {
+					reversed = true;
+				}
+
+				// if reverses direction (greater change) - channel reverses
+				if (currentLegChange > currentDirectionChange) {
+					reversed = true;
+				}
+
+				// if has more bars that most recent direction - channel reverses
+				if (currentLegLength > previousDirectionalLegLength && previousDirectionalLegDirection != currentLegDirection) {
+					reversed = true;
+				}
+
+				// if two consecutive countertrend legs - channel reverses
+				if (previousDirectionalLegDirection == currentLegDirection) {
+					reversed = true;
+				}
+
+				if (reversed) {
+					currentDirectionLength = consecutiveCounterDirectionalLegsInCurrentDirection;
+					currentDirectionChange = legChanges[i];
+
+					directionalLegsInCurrentDirection	= 1;
+
+					channelDirections.Add(legDirections[i]);
+					channelDirectionIdxs.Add(legIndexes[i]);
+					channelDirectionLengths.Add(currentDirectionLength);
+
+					continue;
+				}
+
+				currentDirectionLength += legLengths[i];
+				currentDirectionChange += legChanges[i];
 			}
 
-			return false;
+			if (channelDirectionIdxs.Count == 0) {
+				return;
+			}
+
+			SMA stdDevSMA = SMA(LegShort.LegLengthStandardDeviations, 10);
+
+			for (int i = 0; i < channelDirections.Count; i++) {
+				channelDirectionStdDevs.Add(LegShort.CalculateLegLengthStandardDeviation(channelDirectionIdxs[i], channelDirectionLengths[i]));
+			}
+
+			for (int i = 0; i < legIndexes.Count; i++) {
+				int barIndex = legIndexes[i];
+
+				for (int idx = 0; idx < channelDirectionIdxs.Count; idx++) {
+					int channelIndex = channelDirectionIdxs[idx];
+
+					if (i < channelIndex) {
+						continue;
+					}
+
+					double stdDevReference = stdDevSMA[channelIndex];
+					if (channelDirectionStdDevs[idx] > stdDevReference) {
+						BroadChannels[barIndex] = Utls.DirectionFromInt(channelDirections[idx]);
+					} else {
+						TightChannels[barIndex] = Utls.DirectionFromInt(channelDirections[idx]);
+					}
+
+					break;
+				}
+			}
 		}
 		#endregion
 	}

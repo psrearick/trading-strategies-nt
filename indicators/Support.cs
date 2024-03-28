@@ -1,6 +1,7 @@
 #region Using declarations
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -42,6 +43,94 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	};
 	#endregion
 	#endregion
+
+	public class Utils : Indicator
+	{
+		public TrendDirection DirectionFromInt(int direction)
+		{
+			return direction > 0 ? TrendDirection.Bullish : direction < 0 ? TrendDirection.Bearish : TrendDirection.Flat;
+		}
+
+		public void PrintMessage(string message,
+		        [CallerMemberName] string memberName = "",
+		        [CallerFilePath] string sourceFilePath = "",
+		        [CallerLineNumber] int sourceLineNumber = 0)
+		{
+			string meta = "[" + sourceLineNumber + "] " + memberName + " (" + sourceFilePath + ") || ";
+		    Print(meta + message);
+		}
+
+		public void PrintMessage(double message,
+		        [CallerMemberName] string memberName = "",
+		        [CallerFilePath] string sourceFilePath = "",
+		        [CallerLineNumber] int sourceLineNumber = 0)
+		{
+			PrintMessage(message.ToString(), memberName, sourceFilePath, sourceLineNumber);
+		}
+
+		public void PrintMessage(int message,
+		        [CallerMemberName] string memberName = "",
+		        [CallerFilePath] string sourceFilePath = "",
+		        [CallerLineNumber] int sourceLineNumber = 0)
+		{
+			PrintMessage(message.ToString(), memberName, sourceFilePath, sourceLineNumber);
+		}
+	}
 }
 
+#region NinjaScript generated code. Neither change nor remove.
 
+namespace NinjaTrader.NinjaScript.Indicators
+{
+	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
+	{
+		private PR.Utils[] cacheUtils;
+		public PR.Utils Utils()
+		{
+			return Utils(Input);
+		}
+
+		public PR.Utils Utils(ISeries<double> input)
+		{
+			if (cacheUtils != null)
+				for (int idx = 0; idx < cacheUtils.Length; idx++)
+					if (cacheUtils[idx] != null &&  cacheUtils[idx].EqualsInput(input))
+						return cacheUtils[idx];
+			return CacheIndicator<PR.Utils>(new PR.Utils(), input, ref cacheUtils);
+		}
+	}
+}
+
+namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
+{
+	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
+	{
+		public Indicators.PR.Utils Utils()
+		{
+			return indicator.Utils(Input);
+		}
+
+		public Indicators.PR.Utils Utils(ISeries<double> input )
+		{
+			return indicator.Utils(input);
+		}
+	}
+}
+
+namespace NinjaTrader.NinjaScript.Strategies
+{
+	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
+	{
+		public Indicators.PR.Utils Utils()
+		{
+			return indicator.Utils(Input);
+		}
+
+		public Indicators.PR.Utils Utils(ISeries<double> input )
+		{
+			return indicator.Utils(input);
+		}
+	}
+}
+
+#endregion
