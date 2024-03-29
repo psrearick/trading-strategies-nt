@@ -155,6 +155,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			if (!isTrendSet)
 			{
 				SetTrend();
+			} else {
+				EvaluateTrendForCurrentBar();
 			}
 
 			BackBrush = null;
@@ -166,6 +168,21 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					: BroadChannels[i] == TrendDirection.Bearish ? brushDown2
 					: null;
 			}
+		}
+		#endregion
+
+		#region EvaluateTrendForCurrentBar()
+		private void EvaluateTrendForCurrentBar()
+		{
+			EvaluateChangesInLegDirection(0);
+
+			if (CurrentBar != legIndexes.Last()) {
+				return;
+			}
+
+			EvaluateLegInContextOfTheCurrentChannel(legIndexes.Count - 1);
+			AddChannelStdDev(channelDirectionIdxs.Count - 1);
+			SetChannelType(0);
 		}
 		#endregion
 
@@ -222,6 +239,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			if (barsAgoDirection == legDirection) {
+				return;
+			}
+
+			if (legDirection == currentLegDirection) {
 				return;
 			}
 
