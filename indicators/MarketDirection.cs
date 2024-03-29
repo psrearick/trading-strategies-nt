@@ -133,16 +133,52 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			if (CurrentBar < WindowSize) {
+			LegShort.Update();
+			LegLong.Update();
+			PA.Update();
+
+			if (!IsWarmedUp()) {
 				Direction[0] = TrendDirection.Flat;
 				return;
 			}
 
-			int currentTrendLength		= LegShort.BarsAgoStarts[0];
+			EvaluateTrendForBreakouts();
 
-			bool isBreakout = PA.IsBreakoutTrend(0, currentTrendLength);
+			if (!isTrendSet) {
+				SetTrend();
+			} else {
+				EvaluateTrendForCurrentBar();
+			}
 
-			if (isBreakout) {
+			StyleBackground();
+		}
+		#endregion
+
+		#region IsWarmedUp()
+		private bool IsWarmedUp()
+		{
+			if (CurrentBar < WindowSize) {
+				return false;
+			}
+
+			if (CurrentBar < Math.Max(LegShort.Period, LegLong.Period)) {
+		        return false;
+		    }
+
+			if (CurrentBar > Math.Min(LegShort.Bars, LegLong.Bars)) {
+		        return false;
+		    }
+
+			return true;
+		}
+		#endregion
+
+		#region EvaluateTrendForBreakouts()
+		private void EvaluateTrendForBreakouts()
+		{
+			int currentTrendLength = LegShort.BarsAgoStarts[0];
+
+			if (PA.IsBreakoutTrend(0, currentTrendLength)) {
 				for (int i = 0; i < currentTrendLength; i++) {
 					BreakoutDirection[i] = LegShort[0] > 0
 						? TrendDirection.Bullish
@@ -151,14 +187,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 							: TrendDirection.Flat;
 				}
 			}
+		}
+		#endregion
 
-			if (!isTrendSet)
-			{
-				SetTrend();
-			} else {
-				EvaluateTrendForCurrentBar();
-			}
-
+		#region StyleBackground()
+		private void StyleBackground()
+		{
 			BackBrush = null;
 			for (int i = 0; i < WindowSize; i++) {
 				BackBrushes[i] =
@@ -175,14 +209,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private void EvaluateTrendForCurrentBar()
 		{
 			EvaluateChangesInLegDirection(0);
-
-			if (CurrentBar != legIndexes.Last()) {
-				return;
-			}
-
 			EvaluateLegInContextOfTheCurrentChannel(legIndexes.Count - 1);
 			AddChannelStdDev(channelDirectionIdxs.Count - 1);
-			SetChannelType(0);
+			SetChannelTypeAndDirection(0);
 		}
 		#endregion
 
@@ -196,7 +225,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				EvaluateChangesInLegDirection(i);
 			}
 
-			InitializeChannelList(WindowSize - 1);
+			if (legDirections.Count == 0) {
+				return;
+			}
+
+			InitializeChannelList(0);
 
 			// evaluate identified legs in ascending order - chronological
 			for (int i = 0; i < legDirections.Count; i++) {
@@ -214,7 +247,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			// sort channels into tight and broad channels
 			for (int i = WindowSize - 1; i >= 0; i--) {
-				SetChannelType(i);
+				SetChannelTypeAndDirection(i);
 			}
 
 			isTrendSet = true;
@@ -225,12 +258,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		// Add information for new legs identified at `barsAgo` before before the `CurrentBar`
 		private void EvaluateChangesInLegDirection(int barsAgo = 0)
 		{
-			if (legIndexes.Count > 0 && legIndexes.Last() == barsAgo) {
+			if (legIndexes.Count > 0 && legIndexes.Last() == (CurrentBar - barsAgo)) {
 				return;
 			}
 
 			int idx 						= barsAgo + 1;
-			TrendDirection barsAgoDirection	= Utls.DirectionFromInt((int) LegShort[barsAgo]);
+			TrendDirection barsAgoDirection	= Utls.DirectionFromInt((int) Direction[barsAgo]);
 			TrendDirection legDirection 	= Utls.DirectionFromInt((int) LegShort[idx]);
 			TrendDirection longLegDirection = Utls.DirectionFromInt((int) LegLong[idx]);
 
@@ -242,15 +275,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			if (legDirection == currentLegDirection) {
-				return;
-			}
-
 			int length 		= LegShort.BarsAgoStarts[idx];
 			double change	= legDirection == TrendDirection.Bullish ? High[idx] - Low[length]
 								: legDirection == TrendDirection.Bearish ? Low[idx] - High[length]
 								: (double) Close[idx] - Close[length];
-
 			legDirections.Add(legDirection);
 			legIndexes.Add(CurrentBar - barsAgo); // Absolute Reference
 			legLengths.Add(length);
@@ -289,7 +317,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			IncrementChannelList(legIndex);
+//			IncrementChannelList(legIndex);
 
 			// if in trading range - channel stays the same
 			if (legDirections[legIndex] == TrendDirection.Flat) {
@@ -303,7 +331,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			AddCounterTrendDirectionLeg(legIndex);
+			// leg is a counter-trend leg
+	        AddCounterTrendDirectionLeg(legIndex);
 		}
 		#endregion
 
@@ -460,30 +489,36 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region SetChannelType()
+		#region SetChannelTypeAndDirection()
 		// distinguish between tight and broad channels
-		private void SetChannelType(int index)
+		private void SetChannelTypeAndDirection(int index)
 		{
 			SMA stdDevSMA 	= SMA(LegShort.LegLengthStandardDeviations, 10);
-			int legIndex 	= CurrentBar - index;
+//			int legIndex 	= CurrentBar - index;
 
-			for (int idx = 0; idx < channelDirectionIdxs.Count; idx++) {
-				int channelIndex = channelDirectionIdxs[idx];
+//			for (int idx = 0; idx < channelDirectionIdxs.Count; idx++) {
+//				int channelIndex = channelDirectionIdxs[idx];
 
-				if (legIndex < channelIndex) {
-					continue;
-				}
+//				if (legIndex < channelIndex) {
+//					continue;
+//				}
 
-				double stdDevReference = stdDevSMA[channelIndex];
+				int channelIndex = channelDirectionIdxs.Count - 1;
 
-				if (channelDirectionStdDevs[idx] > stdDevReference) {
-					BroadChannels[index] = channelDirections[idx];
+				double stdDevReference = stdDevSMA[0];
+
+				TrendDirection directionAtIndex = channelDirections[channelIndex];
+
+				Direction[0] = directionAtIndex;
+
+				if (channelDirectionStdDevs[channelIndex] > stdDevReference) {
+					BroadChannels[0] = directionAtIndex;
 				} else {
-					TightChannels[index] = channelDirections[idx];
+					TightChannels[0] = directionAtIndex;
 				}
 
-				break;
-			}
+//				break;
+//			}
 
 		}
 		#endregion
