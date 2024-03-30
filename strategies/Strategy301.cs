@@ -30,11 +30,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 	{
 		#region Variables
 		private PriceActionUtils PA;
-
 		private Legs legs;
 		private MarketDirection marketDirection;
+		private ATR atr;
+		private StdDev stdDevAtr;
+		private SMA avgAtr;
 
-		private double stopLoss = 0;
+		private double stopLoss 			= 0;
+		private int choppinessThresholdLow	= 40;
+		private int choppinessThresholdHigh	= 60;
+		private List<double> chopHistory = new List<double>();
+		private bool reset = false;
+		private int day = 0;
 
 		private DateTime LastDataDay	= new DateTime(2023, 03, 17);
 		private DateTime OpenTime		= DateTime.Parse("10:00", System.Globalization.CultureInfo.InvariantCulture);
@@ -71,7 +78,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 				TimeShift									= -6;
 				ShortPeriod = 6;
 				LongPeriod = 20;
-//				LegPeriod = 16;
 				Quantity = 2;
 			}
 			#endregion
@@ -87,6 +93,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				PA 					= PriceActionUtils();
 				marketDirection		= MarketDirection(ShortPeriod, LongPeriod);
 				legs				= marketDirection.LegLong;
+				atr					= ATR(14);
+				stdDevAtr			= StdDev(atr, 20);
+				avgAtr				= SMA(atr, 20);
 			}
 			#endregion
 		}
@@ -224,12 +233,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 				if (swingLow < Low[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-					SetProfitTarget("Entry1", CalculationMode.Ticks, stopLossDistance * 0.25);
 
-					EnterLong(quantity1, "Entry1");
+					EnterLong(quantity1, "LongEntry1");
 
 					if (quantity2 > 0) {
-						EnterLong(quantity2, "Entry2");
+						SetProfitTarget("LongEntry2", CalculationMode.Ticks, stopLossDistance * 0.25);
+						EnterLong(quantity2, "LongEntry2");
 					}
 				}
 			}
@@ -241,11 +250,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 				if (swingHigh > High[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-					SetProfitTarget("Entry1", CalculationMode.Ticks, stopLossDistance * 0.25);
-					EnterShort(quantity1, "Entry1");
+					EnterShort(quantity1, "ShortEntry1");
 
 					if (quantity2 > 0) {
-						EnterShort(quantity2, "Entry2");
+						SetProfitTarget("ShortEntry2", CalculationMode.Ticks, stopLossDistance * 0.25);
+						EnterShort(quantity2, "ShortEntry2");
 					}
 				}
 			}
@@ -259,17 +268,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (PA.GetBuySellPressure(0, legs.BarsAgoStarts[0]) < 95) {
-				return false;
-			}
-
-			if (!PA.IsBuyReversalBar(1)) {
+			if (PA.GetBuySellPressure(0, legs.BarsAgoStarts[0]) < 80) {
 				return false;
 			}
 
 			if (PA.GetStrongTrendDirection(0, 20) != TrendDirection.Bullish) {
                 return false;
             }
+
+			if (!PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bullish)) {
+				return false;
+			}
+
+			if ((avgAtr[0] - stdDevAtr[0]) > atr[0]) {
+				return false;
+			}
 
 			return true;
 		}
@@ -282,17 +295,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (PA.GetBuySellPressure(0, legs.BarsAgoStarts[0]) > 5) {
-				return false;
-			}
-
-			if (!PA.IsSellReversalBar(1)) {
+			if (PA.GetBuySellPressure(0, legs.BarsAgoStarts[0]) > 20) {
 				return false;
 			}
 
 			if (PA.GetStrongTrendDirection(0, 20) != TrendDirection.Bearish) {
                 return false;
             }
+
+			if (!PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bearish)) {
+				return false;
+			}
+
+			if ((avgAtr[0] - stdDevAtr[0]) > atr[0]) {
+				return false;
+			}
 
 			return true;
 		}
@@ -311,12 +328,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		[Display(Name="Long Period", Description="Long Period", Order=1, GroupName="Parameters")]
 		public int LongPeriod
 		{ get; set; }
-
-//		[NinjaScriptProperty]
-//		[Range(6, int.MaxValue)]
-//		[Display(Name="Leg Period", Description="Leg Period", Order=2, GroupName="Parameters")]
-//		public int LegPeriod
-//		{ get; set; }
 
 		[NinjaScriptProperty]
 		[Range(int.MinValue, int.MaxValue)]
