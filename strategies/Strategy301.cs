@@ -30,21 +30,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 	{
 		#region Variables
 		private PriceActionUtils PA;
-		private EMA Ema;
-		private HighsAndLowsCounter HLCount;
-		private TrendTypes TrendValues;
-//		private TrendSnap TrendValues;
 
-//		private Legs LegIdentifier;
-//		private Swings SwingIdentifier;
-//		private Trends TrendIdentifier;
-//		private TrendDirection tradeDirection = TrendDirection.Flat;
+		private Legs legs;
+		private MarketDirection marketDirection;
 
-		//private double EntryPrice = 0;
 		private double stopLoss = 0;
-//		private double trendExtreme = 0;
-//		private double previousSwing = 0;
-//		private bool inLongTradingRange = false;
 
 		private DateTime LastDataDay	= new DateTime(2023, 03, 17);
 		private DateTime OpenTime		= DateTime.Parse("10:00", System.Globalization.CultureInfo.InvariantCulture);
@@ -79,29 +69,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 				// See the Help Guide for additional information
 				IsInstantiatedOnEachOptimizationIteration	= true;
 				TimeShift									= -6;
-//				CycleThreshold								= 5;
-//				CycleExitThreshold							= 3;
+				ShortPeriod = 6;
+				LongPeriod = 20;
+				LegPeriod = 16;
 			}
 			#endregion
 
 			#region State.Configure
 			else if (State == State.Configure)
 			{
-//				AddDataSeries(Data.BarsPeriodType.Second, 60);
 			}
 			#endregion
 
 			#region State.DataLoaded
 			if (State == State.DataLoaded) {
-				PA 			= PriceActionUtils();
-				HLCount		= HighsAndLowsCounter();
-				TrendValues	= TrendTypes();
-//				TrendValues	= TrendSnap();
-				Ema = EMA(21);
-//				MC = MarketCycle();
-//				LegIdentifier = Legs();
-//				SwingIdentifier = Swings();
-//				TrendIdentifier = Trends();
+				PA 					= PriceActionUtils();
+				legs				= Legs(LegPeriod);
+				marketDirection		= MarketDirection(ShortPeriod, LongPeriod);
 			}
 			#endregion
 		}
@@ -110,21 +94,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1) {// || CurrentBars[1] < 1) {
+			if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1) {
 				return;
             }
 
-//			if (BarsInProgress != 0) {
-//				return;
-//			}
-
-//			previousSwing = TrendValues.SwingValues[0];
-
-//			TrendValues.Evaluate();
-
-//			if (TrendValues.TradingRangeCount > 20) {
-//				inLongTradingRange = true;
-//			}
+			LegPeriod = LongPeriod;
 
 			exitPositions();
 
@@ -136,102 +110,40 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private bool shouldExit() {
 			double currentStopLoss = stopLoss;
 			if (Position.MarketPosition == MarketPosition.Long) {
-
-				bool consecutiveClosesBelow = true;
-
-				for (int i = 0; i < 5; i++) {
-					if (Close[i] > Ema[i]) {
-						consecutiveClosesBelow = false;
-						break;
-					}
-				}
-
-				if (consecutiveClosesBelow) {
+				if (marketDirection.Direction[0] == TrendDirection.Bearish) {
 					return true;
 				}
 
-				if (HLCount.BullContinuationAttempts[0] > 3) {
+				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bearish)) {
 					return true;
 				}
 
-				if (TrendValues.TrendValues[0] == -1) {
-					return true;
-				}
+				double swingLow = MIN(Low, legs.BarsAgoStarts[0])[0];
 
-//				if (PA.LeastBarsDown(3, 5)) {
-//					return true;
-//				}
-
-				if ((Low[TrendValues.LegStarted] - 4) > stopLoss && TrendValues.LegValues[0] > 0) {
-					stopLoss = Low[TrendValues.LegStarted] - 4;
+				if (swingLow > stopLoss && legs[0] > 0) {
+					stopLoss = swingLow;
 					SetStopLoss(CalculationMode.Price, stopLoss);
 				}
 			}
 
 			if (Position.MarketPosition == MarketPosition.Short) {
-				bool consecutiveClosesAbove = true;
-
-				for (int i = 0; i < 5; i++) {
-					if (Close[i] < Ema[i]) {
-						consecutiveClosesAbove = false;
-						break;
-					}
-				}
-
-				if (consecutiveClosesAbove) {
+				if (marketDirection.Direction[0] == TrendDirection.Bullish) {
 					return true;
 				}
 
-
-				if (HLCount.BearContinuationAttempts[0] > 3) {
+				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bullish)) {
 					return true;
 				}
 
-				if (TrendValues.TrendValues[0] == 1) {
-					return true;
-				}
+				double swingHigh = MAX(High, legs.BarsAgoStarts[0])[0];
 
-//				if (PA.LeastBarsUp(3, 5)) {
-//					return true;
-//				}
-
-				if ((High[TrendValues.LegStarted] + 4) < stopLoss && TrendValues.LegValues[0] < 0) {
-					stopLoss = High[TrendValues.LegStarted] + 4;
+				if (swingHigh < stopLoss && legs[0] < 0) {
+					stopLoss = swingHigh;
 					SetStopLoss(CalculationMode.Price, stopLoss);
 				}
 			}
 
 			return false;
-		}
-		#endregion
-
-		#region averageSwingBars()
-		private int averageSwingBars()
-		{
-			int directionChanges = 0;
-			int directionBars = 0;
-			int iterationDirection = 0;
-			int iterations = 81;
-
-			for (int i = 0; i < iterations; i++) {
-				if (TrendValues.SwingValues[i] != 0) {
-					directionBars++;
-				}
-
-				if (iterationDirection == (int) TrendValues.SwingValues[i]) {
-					continue;
-				}
-
-				iterationDirection = (int) TrendValues.SwingValues[i];
-
-				if (iterationDirection == 0) {
-					continue;
-				}
-
-				directionChanges++;
-			}
-
-			return (int) Math.Round((double) (directionBars / directionChanges), 0);
 		}
 		#endregion
 
@@ -304,9 +216,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 			bool shortMatch	= shortPatternMatched();
 
 			if (longMatch) {
-				double swingLow = Math.Min(MIN(Low, TrendValues.SwingStarted)[0], MIN(Low, 4)[0]);
+				double swingLow = Math.Min(MIN(Low, legs.BarsAgoStarts[0])[0], MIN(Low, 4)[0]);
 				stopLoss = swingLow;
-				double stopLossDistance = 4 * (Close[0] - stopLoss) + 5;
+				double stopLossDistance = 4 * (Close[0] - stopLoss);
 
 				if (stopLossDistance > 200) {
 					return;
@@ -319,9 +231,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 			}
 
 			if (shortMatch) {
-				double swingHigh = Math.Max(MAX(High, TrendValues.SwingStarted)[0], MAX(High, 4)[0]);
+				double swingHigh = Math.Max(MAX(High, legs.BarsAgoStarts[0])[0], MAX(High, 4)[0]);
 				stopLoss = swingHigh;
-				double stopLossDistance = 4 * (stopLoss - Close[0]) + 5;
+				double stopLossDistance = 4 * (stopLoss - Close[0]);
 
 				if (stopLossDistance > 200) {
 					return;
@@ -338,52 +250,29 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region longPatternMatched()
 		private bool longPatternMatched()
 		{
-//			if (Close[0] < Ema[0]) {// || Close[1] < Ema[1]) {
-//				return false;
-//			}
-
-			if (HLCount.BullContinuationAttempts[0] > 1) {
+			if (marketDirection.Direction[0] != TrendDirection.Bullish) {
 				return false;
 			}
 
-//			if (HLCount.BullContinuationAttempts[0] == 0) {
-//				return false;
-//			}
-
-//			if (HLCount.BullContinuationAttempts[0] > HLCount.BearContinuationAttempts[0]) {
-//				return false;
-//			}
-
-			if (PA.GetTrendDirection() != TrendDirection.Bullish) {
+			if (MAX(High, legs.BarsAgoStarts[0])[0] == High[0]) {
 				return false;
 			}
 
-//			if (MAX(High, 8)[0] > High[0]) {
+//			if (!PA.IsTrendBar(0)) {
 //				return false;
 //			}
 
-
-			if (TrendValues.TrendValues[0] < 0) {
-				return false;
-			}
-
-			if (TrendValues.SwingValues[0] <= 0) {
-				return false;
-			}
-
-			if (TrendValues.LegValues[0] <= 0) {
-				return false;
-			}
-
-			Print(TrendValues.ComputeAccuracy(100));
-
-//			if (TrendValues.BreakoutValues[0] <= 0) {
+//			if (!PA.IsBullishBar(0)) {
 //				return false;
 //			}
 
-//			if (averageSwingBars() > 14) {
+//			if (!legs.IsCounterTrendLeg(0, TrendDirection.Bullish)) {
 //				return false;
 //			}
+
+			if (PA.GetStrongTrendDirection(0, 20) != TrendDirection.Bullish) {
+                return false;
+            }
 
 			return true;
 		}
@@ -392,49 +281,29 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region shortPatternMatched()
 		private bool shortPatternMatched()
 		{
-			if (HLCount.BearContinuationAttempts[0] > 1) {
+			if (marketDirection.Direction[0] != TrendDirection.Bearish) {
 				return false;
 			}
 
-//			if (HLCount.BearContinuationAttempts[0] == 0) {
-//				return false;
-//			}
-
-//			if (HLCount.BullContinuationAttempts[0] < HLCount.BearContinuationAttempts[0]) {
-//				return false;
-//			}
-
-			if (PA.GetTrendDirection() != TrendDirection.Bearish) {
+			if (MIN(Low, legs.BarsAgoStarts[0])[0] == Low[0]) {
 				return false;
 			}
 
-//			if (TrendValues.BreakoutValues[0] < 0 && TrendValues.SwingValues[0] < 0) {
-//				return true;
-//			}
-
-//			if (Close[0] > Ema[0]) {// || Close[1] > Ema[1]) {
+//			if (!PA.IsTrendBar(0)) {
 //				return false;
 //			}
 
-//			if (averageSwingBars() > 14) {
+//			if (!PA.IsBearishBar(0)) {
 //				return false;
 //			}
 
-			if (TrendValues.TrendValues[0] > 0) {
-				return false;
-			}
-
-			if (TrendValues.SwingValues[0] >= 0) {
-				return false;
-			}
-
-			if (TrendValues.LegValues[0] >= 0) {
-				return false;
-			}
-
-//			if (TrendValues.BreakoutValues[1] >= 0) {
+//			if (!legs.IsCounterTrendLeg(0, TrendDirection.Bearish)) {
 //				return false;
 //			}
+
+			if (PA.GetStrongTrendDirection(0, 20) != TrendDirection.Bearish) {
+                return false;
+            }
 
 			return true;
 		}
@@ -442,17 +311,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		#region Properties
 
-//		[NinjaScriptProperty]
-//		[Range(1, 9)]
-//		[Display(Name="Cycle", Description="Cycle", Order=1, GroupName="Parameters")]
-//		public double CycleThreshold
-//		{ get; set; }
+		[NinjaScriptProperty]
+		[Range(6, int.MaxValue)]
+		[Display(Name="Short Period", Description="Short Period", Order=0, GroupName="Parameters")]
+		public int ShortPeriod
+		{ get; set; }
 
-//		[NinjaScriptProperty]
-//		[Range(1, 9)]
-//		[Display(Name="Cycle Exit", Description="Cycle Exit", Order=2, GroupName="Parameters")]
-//		public int CycleExitThreshold
-//		{ get; set; }
+		[NinjaScriptProperty]
+		[Range(6, int.MaxValue)]
+		[Display(Name="Long Period", Description="Long Period", Order=1, GroupName="Parameters")]
+		public int LongPeriod
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Range(6, int.MaxValue)]
+		[Display(Name="Leg Period", Description="Leg Period", Order=2, GroupName="Parameters")]
+		public int LegPeriod
+		{ get; set; }
 
 		[NinjaScriptProperty]
 		[Range(int.MinValue, int.MaxValue)]
