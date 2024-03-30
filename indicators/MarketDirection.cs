@@ -115,14 +115,17 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				brushDown2 = Brushes.Red.Clone();
 				brushDown2.Opacity = 0.200;
 				brushDown2.Freeze();
+
+				ShortPeriod = 6;
+				LongPeriod = 20;
 			}
 			#endregion
 
 			#region State.Configure
 			else if (State == State.Configure)
 			{
-				LegShort	= Legs(6);
-				LegLong		= Legs(20);
+				LegShort	= Legs(ShortPeriod);
+				LegLong		= Legs(LongPeriod);
 				PA			= PriceActionUtils();
 				Utls		= new Utils();
 			}
@@ -288,6 +291,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			int length 		= LegShort.BarsAgoStarts[idx];
+
 			double change	= legDirection == TrendDirection.Bullish ? High[idx] - Low[length]
 								: legDirection == TrendDirection.Bearish ? Low[idx] - High[length]
 								: (double) Close[idx] - Close[length];
@@ -527,6 +531,19 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 		}
 		#endregion
+
+		#region Properties
+		[NinjaScriptProperty]
+		[Range(6, int.MaxValue)]
+		[Display(Name="Short Period", Description="Short Period", Order=0, GroupName="Parameters")]
+		public int ShortPeriod
+		{ get; set; }
+		[NinjaScriptProperty]
+		[Range(6, int.MaxValue)]
+		[Display(Name="Long Period", Description="Long Period", Order=1, GroupName="Parameters")]
+		public int LongPeriod
+		{ get; set; }
+		#endregion
 	}
 }
 
@@ -537,18 +554,18 @@ namespace NinjaTrader.NinjaScript.Indicators
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
 		private PR.MarketDirection[] cacheMarketDirection;
-		public PR.MarketDirection MarketDirection()
+		public PR.MarketDirection MarketDirection(int shortPeriod, int longPeriod)
 		{
-			return MarketDirection(Input);
+			return MarketDirection(Input, shortPeriod, longPeriod);
 		}
 
-		public PR.MarketDirection MarketDirection(ISeries<double> input)
+		public PR.MarketDirection MarketDirection(ISeries<double> input, int shortPeriod, int longPeriod)
 		{
 			if (cacheMarketDirection != null)
 				for (int idx = 0; idx < cacheMarketDirection.Length; idx++)
-					if (cacheMarketDirection[idx] != null &&  cacheMarketDirection[idx].EqualsInput(input))
+					if (cacheMarketDirection[idx] != null && cacheMarketDirection[idx].ShortPeriod == shortPeriod && cacheMarketDirection[idx].LongPeriod == longPeriod && cacheMarketDirection[idx].EqualsInput(input))
 						return cacheMarketDirection[idx];
-			return CacheIndicator<PR.MarketDirection>(new PR.MarketDirection(), input, ref cacheMarketDirection);
+			return CacheIndicator<PR.MarketDirection>(new PR.MarketDirection(){ ShortPeriod = shortPeriod, LongPeriod = longPeriod }, input, ref cacheMarketDirection);
 		}
 	}
 }
@@ -557,14 +574,14 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.PR.MarketDirection MarketDirection()
+		public Indicators.PR.MarketDirection MarketDirection(int shortPeriod, int longPeriod)
 		{
-			return indicator.MarketDirection(Input);
+			return indicator.MarketDirection(Input, shortPeriod, longPeriod);
 		}
 
-		public Indicators.PR.MarketDirection MarketDirection(ISeries<double> input )
+		public Indicators.PR.MarketDirection MarketDirection(ISeries<double> input , int shortPeriod, int longPeriod)
 		{
-			return indicator.MarketDirection(input);
+			return indicator.MarketDirection(input, shortPeriod, longPeriod);
 		}
 	}
 }
@@ -573,14 +590,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.PR.MarketDirection MarketDirection()
+		public Indicators.PR.MarketDirection MarketDirection(int shortPeriod, int longPeriod)
 		{
-			return indicator.MarketDirection(Input);
+			return indicator.MarketDirection(Input, shortPeriod, longPeriod);
 		}
 
-		public Indicators.PR.MarketDirection MarketDirection(ISeries<double> input )
+		public Indicators.PR.MarketDirection MarketDirection(ISeries<double> input , int shortPeriod, int longPeriod)
 		{
-			return indicator.MarketDirection(input);
+			return indicator.MarketDirection(input, shortPeriod, longPeriod);
 		}
 	}
 }

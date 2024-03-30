@@ -1215,6 +1215,85 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		#endregion
 
+		#region Channels
+
+		#region IsTightChannel()
+		public bool IsTightChannel(int barsAgo, int period)
+		{
+			if (NumberOfPullbacksInTrend(barsAgo, period) > (double) Math.Round((double) period / 3)) {
+				return false;
+			}
+
+			if (AveragePullbackLength(barsAgo, period) > 3) {
+				return false;
+			}
+
+			if (period < 5) {
+				return false;
+			}
+
+			if (LargestPullbackInTrend(barsAgo, period) > 0.67) {
+				return false;
+			}
+
+			return true;
+		}
+
+		public bool IsTightChannel(int barsAgo, int period, TrendDirection direction)
+		{
+			if (direction == TrendDirection.Flat) {
+				return false;
+			}
+
+			if (NumberOfPullbacksInTrend(barsAgo, period, direction) > (double) Math.Round((double) period / 3)) {
+				return false;
+			}
+
+			if (AveragePullbackLength(barsAgo, period, direction) > 3) {
+				return false;
+			}
+
+			if (period < 6) {
+				return false;
+			}
+
+			if (LargestPullbackInTrend(barsAgo, period, direction) > 0.67) {
+				return false;
+			}
+
+			return true;
+		}
+		#endregion
+
+		#region IsBroadChannel()
+		public bool IsBroadChannel(int barsAgo, int period, TrendDirection direction)
+		{
+			if (direction == TrendDirection.Flat) {
+				return false;
+			}
+
+			if (NumberOfPullbacksInTrend(barsAgo, period) > (double) Math.Round((double) period / 2)) {
+				return false;
+			}
+
+			if (AveragePullbackLength(barsAgo, period) > 5) {
+				return false;
+			}
+
+			if (period < 10) {
+				return false;
+			}
+
+			if (LargestPullbackInTrend(barsAgo, period, direction) > 1) {
+				return false;
+			}
+
+			return true;
+		}
+		#endregion
+
+		#endregion
+
 		#region Bar Construction
 
 		#region InPortionOfBarRange()
