@@ -52,7 +52,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				Name										= "Strategy 3.0.1";
 				Calculate									= Calculate.OnBarClose;
 				EntriesPerDirection							= 1;
-				EntryHandling								= EntryHandling.AllEntries;
+				EntryHandling								= EntryHandling.UniqueEntries;
 				IsExitOnSessionCloseStrategy				= true;
 				ExitOnSessionCloseSeconds					= 30;
 				IsFillLimitOnTouch							= false;
@@ -71,7 +71,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 				TimeShift									= -6;
 				ShortPeriod = 6;
 				LongPeriod = 20;
-				LegPeriod = 16;
+//				LegPeriod = 16;
+				Quantity = 2;
 			}
 			#endregion
 
@@ -84,8 +85,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			#region State.DataLoaded
 			if (State == State.DataLoaded) {
 				PA 					= PriceActionUtils();
-				legs				= Legs(LegPeriod);
 				marketDirection		= MarketDirection(ShortPeriod, LongPeriod);
+				legs				= marketDirection.LegLong;
 			}
 			#endregion
 		}
@@ -97,8 +98,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1) {
 				return;
             }
-
-			LegPeriod = LongPeriod;
 
 			exitPositions();
 
@@ -215,18 +214,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 			bool longMatch 	= longPatternMatched();
 			bool shortMatch	= shortPatternMatched();
 
+			int quantity2 = (int) Math.Floor((double) Quantity / 2);
+			int quantity1 = Quantity - quantity2;
+
 			if (longMatch) {
 				double swingLow = Math.Min(MIN(Low, legs.BarsAgoStarts[0])[0], MIN(Low, 4)[0]);
 				stopLoss = swingLow;
 				double stopLossDistance = 4 * (Close[0] - stopLoss);
 
-				if (stopLossDistance > 200) {
-					return;
-				}
-
 				if (swingLow < Low[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-					EnterLong(1, "longEntry");
+					SetProfitTarget("Entry1", CalculationMode.Ticks, stopLossDistance * 0.25);
+
+					EnterLong(quantity1, "Entry1");
+
+					if (quantity2 > 0) {
+						EnterLong(quantity2, "Entry2");
+					}
 				}
 			}
 
@@ -235,13 +239,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 				stopLoss = swingHigh;
 				double stopLossDistance = 4 * (stopLoss - Close[0]);
 
-				if (stopLossDistance > 200) {
-					return;
-				}
-
 				if (swingHigh > High[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-					EnterShort(1, "shortEntry");
+					SetProfitTarget("Entry1", CalculationMode.Ticks, stopLossDistance * 0.25);
+					EnterShort(quantity1, "Entry1");
+
+					if (quantity2 > 0) {
+						EnterShort(quantity2, "Entry2");
+					}
 				}
 			}
 		}
@@ -254,21 +259,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (MAX(High, legs.BarsAgoStarts[0])[0] == High[0]) {
+			if (PA.GetBuySellPressure(0, legs.BarsAgoStarts[0]) < 95) {
 				return false;
 			}
 
-//			if (!PA.IsTrendBar(0)) {
-//				return false;
-//			}
-
-//			if (!PA.IsBullishBar(0)) {
-//				return false;
-//			}
-
-//			if (!legs.IsCounterTrendLeg(0, TrendDirection.Bullish)) {
-//				return false;
-//			}
+			if (!PA.IsBuyReversalBar(1)) {
+				return false;
+			}
 
 			if (PA.GetStrongTrendDirection(0, 20) != TrendDirection.Bullish) {
                 return false;
@@ -285,21 +282,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (MIN(Low, legs.BarsAgoStarts[0])[0] == Low[0]) {
+			if (PA.GetBuySellPressure(0, legs.BarsAgoStarts[0]) > 5) {
 				return false;
 			}
 
-//			if (!PA.IsTrendBar(0)) {
-//				return false;
-//			}
-
-//			if (!PA.IsBearishBar(0)) {
-//				return false;
-//			}
-
-//			if (!legs.IsCounterTrendLeg(0, TrendDirection.Bearish)) {
-//				return false;
-//			}
+			if (!PA.IsSellReversalBar(1)) {
+				return false;
+			}
 
 			if (PA.GetStrongTrendDirection(0, 20) != TrendDirection.Bearish) {
                 return false;
@@ -323,16 +312,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 		public int LongPeriod
 		{ get; set; }
 
-		[NinjaScriptProperty]
-		[Range(6, int.MaxValue)]
-		[Display(Name="Leg Period", Description="Leg Period", Order=2, GroupName="Parameters")]
-		public int LegPeriod
-		{ get; set; }
+//		[NinjaScriptProperty]
+//		[Range(6, int.MaxValue)]
+//		[Display(Name="Leg Period", Description="Leg Period", Order=2, GroupName="Parameters")]
+//		public int LegPeriod
+//		{ get; set; }
 
 		[NinjaScriptProperty]
 		[Range(int.MinValue, int.MaxValue)]
-		[Display(Name="Time Shift (Hours)", Description="Time Shift", Order=3, GroupName="Parameters")]
+		[Display(Name="Time Shift (Hours)", Description="Time Shift", Order=2, GroupName="Parameters")]
 		public int TimeShift
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Range(1, int.MaxValue)]
+		[Display(Name="Quantity", Description="Quantity", Order=3, GroupName="Parameters")]
+		public int Quantity
 		{ get; set; }
 
 		#endregion
