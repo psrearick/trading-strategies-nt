@@ -32,12 +32,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private PriceActionUtils PA;
 		private Legs legs;
 		private MarketDirection marketDirection;
-		private MarketDirection marketDirectionShort;
-//		private MarketDirection marketDirectionMedium;
+//		private MarketDirection marketDirectionShort;
 		private MarketDirection marketDirectionLong;
+		private TrendStrength trendStrength;
+		private TradesExporter tradesExporter;
 		private ATR atr;
 		private StdDev stdDevAtr;
 		private SMA avgAtr;
+		private RSI rsi;
+		private bool highAtr = false;
+		private double CurrentStdDevOfAverageATR;
 
 		private double stopLoss 			= 0;
 		private int choppinessThresholdLow	= 40;
@@ -45,8 +49,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private List<double> chopHistory = new List<double>();
 		private bool reset = false;
 		private int day = 0;
-		private int LongPeriodLow = 12;
-		private int LongPeriodHigh = 26;
 
 		private DateTime LastDataDay	= new DateTime(2023, 03, 17);
 		private DateTime OpenTime		= DateTime.Parse("10:00", System.Globalization.CultureInfo.InvariantCulture);
@@ -81,9 +83,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 				// See the Help Guide for additional information
 				IsInstantiatedOnEachOptimizationIteration	= true;
 				TimeShift									= -6;
-				ShortPeriod = 12;
-				LongPeriod = 18;
-				Quantity = 2;
+				ShortPeriod 								= 12;
+				Quantity 									= 1;
+				ATRMultiplier								= 1;
+				LowATRMultiplier							= 3;
+				HighATRMultiplier							= 1.25;
 			}
 			#endregion
 
@@ -96,15 +100,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 			#region State.DataLoaded
 			if (State == State.DataLoaded) {
 				PA 						= PriceActionUtils();
-				marketDirectionShort	= MarketDirection(ShortPeriod, LongPeriodLow);
-				marketDirectionLong		= MarketDirection(ShortPeriod, LongPeriodHigh);
-//				marketDirectionLong		= MarketDirection(ShortPeriod, LongPeriodHigh);
-//				marketDirectionLong	= MarketDirection((int)Math.Floor((double) ShortPeriod * 1.5), LongPeriod + (int) Math.Floor((double) ShortPeriod / 2));
-//				marketDirection		= MarketDirection(ShortPeriod, LongPeriod);
-//				legs				= marketDirection.LegLong;
+//				marketDirectionShort	= MarketDirection(ShortPeriod, ShortPeriod);
+				marketDirectionLong		= MarketDirection(ShortPeriod, ShortPeriod * 2);
 				atr						= ATR(14);
 				stdDevAtr				= StdDev(atr, 20);
 				avgAtr					= SMA(atr, 20);
+				rsi						= RSI(14, 1);
+				tradesExporter			= TradesExporter(Name, Instrument.MasterInstrument.Name);
+				trendStrength			= TrendStrength();
 			}
 			#endregion
 		}
@@ -117,10 +120,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return;
             }
 
-			marketDirection = marketDirectionShort;
-			if ((avgAtr[0] - stdDevAtr[0]) > atr[0]) {
-				marketDirection = marketDirectionLong;
-			}
+			CurrentStdDevOfAverageATR = (atr[0] - avgAtr[0]) / stdDevAtr[0];
+
+//			highAtr = (avgAtr[0] - stdDevAtr[0]) < atr[0];
+			highAtr = CurrentStdDevOfAverageATR > 1;
+
+			marketDirection = marketDirectionLong;
+//			if (highAtr) {
+//				marketDirection = marketDirectionShort;
+//			}
 
 			marketDirection.Update();
 			legs = marketDirection.LegLong;
@@ -128,6 +136,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 			exitPositions();
 
 			setEntries();
+		}
+		#endregion
+
+		#region OnExecutionUpdate()
+		protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
+		{
+			if (TradesExporterActivated && SystemPerformance.AllTrades.Count > 0)
+			{
+				tradesExporter.OnNewTrade(SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1]);
+			}
 		}
 		#endregion
 
@@ -140,6 +158,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 				}
 
 				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bearish)) {
+					return true;
+				}
+
+				if (MAX(High, 8)[0] < MAX(High, legs.BarsAgoStarts[0])[0]) {
 					return true;
 				}
 
@@ -157,6 +179,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 				}
 
 				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bullish)) {
+					return true;
+				}
+
+				if (MIN(Low, 8)[0] > MIN(Low, legs.BarsAgoStarts[0])[0]) {
 					return true;
 				}
 
@@ -240,42 +266,84 @@ namespace NinjaTrader.NinjaScript.Strategies
 			bool longMatch 	= longPatternMatched();
 			bool shortMatch	= shortPatternMatched();
 
-			int quantity2 = (int) Math.Floor((double) Quantity / 2);
-			int quantity1 = Quantity - quantity2;
+			int adjustedQuantity = CurrentStdDevOfAverageATR > ATRMultiplier ? Quantity : Quantity * 3;
+			double stopLossMultiple =  CurrentStdDevOfAverageATR > ATRMultiplier ? 1 : HighATRMultiplier;
+//			double stopLossMultiple =  CurrentStdDevOfAverageATR > ATRMultiplier ? 1 : ATRMultiplier;
 
-			double stopLossMultiple = 0.5;
-//			if ((avgAtr[0] - stdDevAtr[0]) > atr[0]) {
-//				stopLossMultiple = 0.25;
-//			}
+//			int adjustedQuantity = 1;
+//			int adjustedQuantity	= highAtr ? Quantity : Quantity * 2;
+//			double stopLossMultiple = highAtr ? HighATRMultiplier : LowATRMultiplier;
+//			double stopLossMultiple = 1;
+
+			int quantity2 = (int) Math.Floor((double) adjustedQuantity / 2);
+			int quantity1 = adjustedQuantity - quantity2;
 
 			if (longMatch) {
+//				if (PA.GetStrongTrendDirection(0, 20) == TrendDirection.Bullish) {
+//	                quantity1 += Quantity * 2;
+//					quantity2 += Quantity * 2;
+
+////					if (legs.BarsAgoStarts[0] > 8 && legs.BarsAgoStarts[0] < 12) {
+////	                	quantity1 += Quantity * 3;
+////						quantity2 += Quantity * 3;
+////					}
+
+////					if (legs.LegDirectionAtBar(0) != TrendDirection.Bullish) {
+////	                	quantity1 += Quantity * 6;
+////						quantity2 += Quantity * 6;
+////					}
+
+//////					if (legs.BarsAgoStarts[0] >= 10 && legs.BarsAgoStarts[0] < 12) {
+//////	                quantity1 += Quantity * 10;
+//////					quantity2 += Quantity * 10;
+//////					}
+//	            }
 				double swingLow = Math.Min(MIN(Low, legs.BarsAgoStarts[0])[0], MIN(Low, 4)[0]);
 				stopLoss = swingLow;
-				double stopLossDistance = 4 * (Close[0] - stopLoss);
+				double stopLossDistance = 4 * (Close[0] - stopLoss) + 1;
 
 				if (swingLow < Low[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-
+					SetProfitTarget("LongEntry1", CalculationMode.Ticks, stopLossDistance * stopLossMultiple);
 					EnterLong(quantity1, "LongEntry1");
 
 					if (quantity2 > 0) {
-						SetProfitTarget("LongEntry2", CalculationMode.Ticks, stopLossDistance * stopLossMultiple);
 						EnterLong(quantity2, "LongEntry2");
 					}
 				}
 			}
 
 			if (shortMatch) {
+//				if (PA.GetStrongTrendDirection(0, 20) == TrendDirection.Bearish) {
+//	                quantity1 += Quantity * 2;
+//					quantity2 += Quantity * 2;
+
+//					if (legs.BarsAgoStarts[0] > 8 && legs.BarsAgoStarts[0] < 12) {
+//	                	quantity1 += Quantity * 3;
+//						quantity2 += Quantity * 3;
+//					}
+
+//					if (legs.LegDirectionAtBar(0) != TrendDirection.Bullish) {
+//	                	quantity1 += Quantity * 6;
+//						quantity2 += Quantity * 6;
+//					}
+
+////					if (legs.BarsAgoStarts[0] >= 10 && legs.BarsAgoStarts[0] < 12) {
+////	                quantity1 += Quantity * 10;
+////					quantity2 += Quantity * 10;
+////					}
+//	            }
+
 				double swingHigh = Math.Max(MAX(High, legs.BarsAgoStarts[0])[0], MAX(High, 4)[0]);
 				stopLoss = swingHigh;
-				double stopLossDistance = 4 * (stopLoss - Close[0]);
+				double stopLossDistance = 4 * (stopLoss - Close[0]) + 1;
 
 				if (swingHigh > High[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
+					SetProfitTarget("ShortEntry1", CalculationMode.Ticks, stopLossDistance * stopLossMultiple);
 					EnterShort(quantity1, "ShortEntry1");
 
 					if (quantity2 > 0) {
-						SetProfitTarget("ShortEntry2", CalculationMode.Ticks, stopLossDistance * stopLossMultiple);
 						EnterShort(quantity2, "ShortEntry2");
 					}
 				}
@@ -290,21 +358,42 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (PA.GetBuySellPressure(0, legs.BarsAgoStarts[0]) < 80) {
+			if (trendStrength.StrengthOfTrend[0] == 0 || trendStrength.StrengthOfTrend[0] > 1) {
 				return false;
 			}
 
-			if (PA.GetStrongTrendDirection(0, 20) != TrendDirection.Bullish) {
-                return false;
-            }
+			if (trendStrength.Direction[0] != TrendDirection.Bullish) {
+				return false;
+			}
+
+			if (legs.BarsAgoStarts[0] > 4) {
+				return false;
+			}
+
+//			if (legs.BarsAgoStarts[0] < 10) {
+//				return false;
+//			}
+
+//			int threshold = highAtr ? 95 : 85;
+//			if (PA.GetBuySellPressure(0, legs.BarsAgoStarts[0]) < 95) {
+//				return false;
+//			}
+
+//			if (PA.GetStrongTrendDirection(0, 20) != TrendDirection.Bullish) {
+//                return false;
+//            }
+
+//			if (CurrentStdDevOfAverageATR > ATRMultiplier) {
+//				return false;
+//			}
 
 //			if (!PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bullish)) {
 //				return false;
 //			}
 
-//			if ((avgAtr[0] - stdDevAtr[0]) > atr[0]) {
-//				return false;
-//			}
+	        if (rsi[0] > 70 || rsi[0] < 50) {
+	            return false;
+	        }
 
 			return true;
 		}
@@ -317,21 +406,46 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (PA.GetBuySellPressure(0, legs.BarsAgoStarts[0]) > 20) {
+			if (trendStrength.StrengthOfTrend[0] == 0 || trendStrength.StrengthOfTrend[0] > 1) {
 				return false;
 			}
 
-			if (PA.GetStrongTrendDirection(0, 20) != TrendDirection.Bearish) {
-                return false;
-            }
+			if (trendStrength.Direction[0] != TrendDirection.Bearish) {
+				return false;
+			}
+
+			if (legs.BarsAgoStarts[0] > 4) {
+				return false;
+			}
+
+//			if (legs.LegDirectionAtBar(0) != TrendDirection.Bearish) {
+//				return false;
+//			}
+
+//			if (legs.BarsAgoStarts[0] < 10) {
+//				return false;
+//			}
+
+//			int threshold = highAtr ? 5 : 15;
+//			if (PA.GetBuySellPressure(0, legs.BarsAgoStarts[0]) > 5) {
+//				return false;
+//			}
+
+//			if (PA.GetStrongTrendDirection(0, 20) != TrendDirection.Bearish) {
+//                return false;
+//            }
+
+//			if (CurrentStdDevOfAverageATR > ATRMultiplier) {
+//				return false;
+//			}
 
 //			if (!PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bearish)) {
 //				return false;
 //			}
 
-//			if ((avgAtr[0] - stdDevAtr[0]) > atr[0]) {
-//				return false;
-//			}
+			if (rsi[0] > 50 || rsi[0] < 30) {
+	            return false;
+	        }
 
 			return true;
 		}
@@ -340,27 +454,44 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region Properties
 
 		[NinjaScriptProperty]
-		[Range(6, int.MaxValue)]
-		[Display(Name="Short Period", Description="Short Period", Order=0, GroupName="Parameters")]
+		[Range(2, int.MaxValue)]
+		[Display(Name="Period", Description="Period", Order=0, GroupName="Parameters")]
 		public int ShortPeriod
 		{ get; set; }
 
 		[NinjaScriptProperty]
-		[Range(6, int.MaxValue)]
-		[Display(Name="Long Period", Description="Long Period", Order=1, GroupName="Parameters")]
-		public int LongPeriod
-		{ get; set; }
-
-		[NinjaScriptProperty]
 		[Range(int.MinValue, int.MaxValue)]
-		[Display(Name="Time Shift (Hours)", Description="Time Shift", Order=2, GroupName="Parameters")]
+		[Display(Name="Time Shift (Hours)", Description="Time Shift", Order=1, GroupName="Parameters")]
 		public int TimeShift
 		{ get; set; }
 
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
-		[Display(Name="Quantity", Description="Quantity", Order=3, GroupName="Parameters")]
+		[Display(Name="Quantity", Description="Quantity", Order=2, GroupName="Parameters")]
 		public int Quantity
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Range(double.MinValue, double.MaxValue)]
+		[Display(Name="ATR Multiplier", Description="ATR Multiplier", Order=3, GroupName="Parameters")]
+		public double ATRMultiplier
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Range(0.25, double.MaxValue)]
+		[Display(Name="Low Target Multiplier", Description="Low Target Multiplier", Order=4, GroupName="Parameters")]
+		public double LowATRMultiplier
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Range(0.25, double.MaxValue)]
+		[Display(Name="High Target Multiplier", Description="High Target Multiplier", Order=5, GroupName="Parameters")]
+		public double HighATRMultiplier
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Display(Name="Export Trades", Description="Export Trades", Order=6, GroupName="Parameters")]
+		public bool TradesExporterActivated
 		{ get; set; }
 
 		#endregion

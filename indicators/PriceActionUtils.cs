@@ -490,6 +490,35 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region IsEMAFastBullish()
+		public bool IsEMAFastBullish(int barsAgo = 0)
+		{
+			return IsRising(EmaFast, barsAgo, 1);
+		}
+		#endregion
+
+		#region IsEMASlowBullish()
+		public bool IsEMASlowBullish(int barsAgo = 0)
+		{
+			return IsRising(EmaSlow, barsAgo, 1);
+		}
+		#endregion
+
+		#region IsEMAFastBearish()
+		public bool IsEMAFastBearish(int barsAgo = 0)
+		{
+			return IsFalling(EmaFast, barsAgo, 1);
+		}
+		#endregion
+
+		#region IsEMASlowBearish()
+		public bool IsEMASlowBearish(int barsAgo = 0)
+		{
+			return IsFalling(EmaSlow, barsAgo, 1);
+		}
+		#endregion
+
+
 		#region GetEMADirection()
 		public TrendDirection GetEMADirection(int barsAgo)
 		{
@@ -697,7 +726,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region IsWeakFollowThroughBar()
 		public bool IsWeakFollowThroughBar(int barsAgo)
 		{
-			bool isReversalBar = Close[barsAgo + 1] > Open[barsAgo + 1]
+			bool isReversalBar = IsBullishBar(barsAgo)
 				? IsBuyReversalBar(barsAgo)
 				: IsSellReversalBar(barsAgo);
 
@@ -714,19 +743,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return false;
 			}
 
-			TrendDirection previousDirection = Close[barsAgo + 1] > Open[barsAgo + 1]
-				? TrendDirection.Bullish
-				: TrendDirection.Bearish;
-
-			TrendDirection direction = Close[barsAgo] > Open[barsAgo]
-				? TrendDirection.Bullish
-				: TrendDirection.Bearish;
-
-			if (previousDirection != direction) {
-				return false;
-			}
-
-			return IsTrendBar(barsAgo);
+			return GetBarTrend(barsAgo) == GetBarTrend(barsAgo + 1) ? IsTrendBar(barsAgo) : false;
 		}
 		#endregion
 
@@ -1034,6 +1051,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public bool IsBearishBar(int barsAgo = 0)
 		{
 			return Close[barsAgo] < Open[barsAgo];
+		}
+		#endregion
+
+		#region GetBarTrend()
+		public TrendDirection GetBarTrend(int barsAgo = 0)
+		{
+			return IsBullishBar(barsAgo) ? TrendDirection.Bullish
+					: IsBearishBar(barsAgo) ? TrendDirection.Bearish
+					: TrendDirection.Flat;
 		}
 		#endregion
 
@@ -1735,6 +1761,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			double balance = 50;
 
 			double bullValue = GetBuyingPressure(barsAgo, period) * 50;
+
 			double bearValue = GetSellingPressure(barsAgo, period) * 50;
 
 			return 50 + bullValue - bearValue;
