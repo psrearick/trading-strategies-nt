@@ -422,64 +422,130 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region EvaluateWithTrendPressure()
-		private bool EvaluateWithTrendPressure(int barsAgo, bool positive) {}
+		private bool EvaluateWithTrendPressure(int barsAgo, bool positive) {
+			int previousSwing		= md.Direction[barsAgo] == TrendDirection.Bearish
+				? pa.BarsAgoHigh(barsAgo, md.LegLong.BarsAgoStarts[barsAgo])
+				: pa.BarsAgoLow(barsAgo, md.LegLong.BarsAgoStarts[barsAgo]);
+			double buySellPressure 	= pa.GetBuySellPressure(barsAgo, previousSwing);
+			bool hasPressure		= md.Direction[barsAgo] == TrendDirection.Bullish ? buySellPressure > 75 : buySellPressure < 25;
+
+			return positive ? hasPressure : !hasPressure;
+		}
 		#endregion
 
 		#region EvaluateStrongWithTrendPressure()
-		private bool EvaluateStrongWithTrendPressure(int barsAgo, bool positive) {}
+		private bool EvaluateStrongWithTrendPressure(int barsAgo, bool positive) {
+			int previousSwing		= md.Direction[barsAgo] == TrendDirection.Bearish
+				? pa.BarsAgoHigh(barsAgo, md.LegLong.BarsAgoStarts[barsAgo])
+				: pa.BarsAgoLow(barsAgo, md.LegLong.BarsAgoStarts[barsAgo]);
+			double buySellPressure 	= pa.GetBuySellPressure(barsAgo, previousSwing);
+			bool hasPressure		= md.Direction[barsAgo] == TrendDirection.Bullish ? buySellPressure > 90 : buySellPressure < 10;
+
+			return positive ? hasPressure : !hasPressure;
+		}
 		#endregion
 
 		#region EvaluateWithTrendTrendBar()
-		private bool EvaluateWithTrendTrendBar(int barsAgo, bool positive) {}
+		private bool EvaluateWithTrendTrendBar(int barsAgo, bool positive) {
+			bool IsWithTrendTrendBar = pa.IsTrendBar(barsAgo) && (md.Direction[barsAgo] == TrendDirection.Bullish ? pa.IsBullishBar(barsAgo) : pa.IsBearishBar(barsAgo));
+
+			return positive ? IsWithTrendTrendBar : !IsWithTrendTrendBar;
+		}
 		#endregion
 
 		#region EvaluateBreakoutBarPattern()
-		private bool EvaluateBreakoutBarPattern(int barsAgo, bool positive) {}
+		private bool EvaluateBreakoutBarPattern(int barsAgo, bool positive) {
+			bool IsBreakoutBarPattern = pa.DoesInsideOutsideMatch("ii", barsAgo) || pa.DoesInsideOutsideMatch("ioi", barsAgo);
+
+			return positive ? IsBreakoutBarPattern : !IsBreakoutBarPattern;
+		}
 		#endregion
 
 		#region EvaluateWeakBar()
-		private bool EvaluateWeakBar(int barsAgo, bool positive) {}
+		private bool EvaluateWeakBar(int barsAgo, bool positive) {
+			bool IsWeakBar = pa.IsDoji(barsAgo) || pa.IsTradingRangeBar(barsAgo);
+
+			return positive ? IsWeakBar : !IsWeakBar;
+		}
 		#endregion
 
 		#region EvaluateStrongFollowThrough()
-		private bool EvaluateStrongFollowThrough(int barsAgo, bool positive) {}
+		private bool EvaluateStrongFollowThrough(int barsAgo, bool positive) {
+			bool IsStrongFollowThrough = pa.IsStrongFollowThroughBar(barsAgo);
+
+			return positive ? IsStrongFollowThrough : !IsStrongFollowThrough;
+		}
 		#endregion
 
 		#region EvaluateBreakout()
-		private bool EvaluateBreakout(int barsAgo, bool positive) {}
+		private bool EvaluateBreakout(int barsAgo, bool positive) {
+			bool IsBreakout	= md.Stage[barsAgo] == MarketCycleStage.Breakout;
+
+			return positive ? IsBreakout : !IsBreakout;
+		}
 		#endregion
 
 		#region EvaluateBroadChannel()
-		private bool EvaluateBroadChannel(int barsAgo, bool positive) {}
+		private bool EvaluateBroadChannel(int barsAgo, bool positive) {
+			bool IsBroadChannel = md.Stage[barsAgo] == MarketCycleStage.BroadChannel;
+
+			return positive ? IsBroadChannel : !IsBroadChannel;
+		}
 		#endregion
 
 		#region EvaluateTightChannel()
-		private bool EvaluateTightChannel(int barsAgo, bool positive) {}
+		private bool EvaluateTightChannel(int barsAgo, bool positive) {
+			bool IsTightChannel = md.Stage[barsAgo] == MarketCycleStage.TightChannel;
+
+			return positive ? IsTightChannel : !IsTightChannel;
+		}
 		#endregion
 
 		#region EvaluateWeakTrend()
-		private bool EvaluateWeakTrend(int barsAgo, bool positive) {}
+		private bool EvaluateWeakTrend(int barsAgo, bool positive) {
+			int previousSwing = md.Direction[barsAgo] == TrendDirection.Bearish
+				? pa.BarsAgoHigh(barsAgo, md.LegLong.BarsAgoStarts[barsAgo])
+				: pa.BarsAgoLow(barsAgo, md.LegLong.BarsAgoStarts[barsAgo]);
+
+			bool IsWeakTrend = md.Direction[barsAgo] == TrendDirection.Bullish ? pa.IsWeakBullishTrend(barsAgo, previousSwing) : pa.IsWeakBearishTrend(barsAgo, previousSwing);
+
+			return positive ? IsWeakTrend : !IsWeakTrend;
+		}
 		#endregion
 
 		#region EvaluateStrongTrend()
-		private bool EvaluateStrongTrend(int barsAgo, bool positive) {}
+		private bool EvaluateStrongTrend(int barsAgo, bool positive) {
+			int previousSwing = md.Direction[barsAgo] == TrendDirection.Bearish
+				? pa.BarsAgoHigh(barsAgo, md.LegLong.BarsAgoStarts[barsAgo])
+				: pa.BarsAgoLow(barsAgo, md.LegLong.BarsAgoStarts[barsAgo]);
+
+			bool IsStrongTrend = md.Direction[barsAgo] == TrendDirection.Bullish ? pa.IsStrongBullishTrend(barsAgo, previousSwing) : pa.IsStrongBearishTrend(barsAgo, previousSwing);
+
+			return positive ? IsStrongTrend : !IsStrongTrend;
+		}
 		#endregion
 
 		#region EvaluateRSIInRange()
 		private bool EvaluateRSIInRange(int barsAgo, bool positive) {
-//					IsRSIInRange = Direction == TrendDirection.Bullish ? (Rsi > 50 && Rsi < 70) : (Rsi > 30 && Rsi < 50);
+//					IsRSIInRange = md.Direction[barsAgo] == TrendDirection.Bullish ? (Rsi > 50 && Rsi < 70) : (Rsi > 30 && Rsi < 50);
+
+			return positive ? IsRSIInRange : !IsRSIInRange;
 		}
 		#endregion
 
 		#region EvaluateAboveAverageATR()
 		private bool EvaluateAboveAverageATR(int barsAgo, bool positive) {
 //			IsAboveAverageATR			= Atr > AvgAtr;
+
+			return positive ? IsAboveAverageATR : !IsAboveAverageATR;
 		}
 		#endregion
 
 		#region EvaluateBelowAverageATR()
 		private bool EvaluateBelowAverageATR(int barsAgo, bool positive) {
 //					IsBelowAverageATR			= Atr < AvgAtr;
+
+			return positive ? IsTightChannel : !IsTightChannel;
 		}
 		#endregion
 
@@ -487,6 +553,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private bool EvaluateAboveAverageATRByAStdDev(int barsAgo, bool positive) {
 
 //					IsAboveAverageATRByAStdDev	= (Atr - AvgAtr) > StdDevAtr;
+
+			return positive ? IsAboveAverageATRByAStdDev : !IsAboveAverageATRByAStdDev;
 		}
 		#endregion
 
