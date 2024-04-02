@@ -412,10 +412,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region EvaluateLeadsFastEMAByMoreThanATR()
-		private bool EvaluatLeadsFastEMAByMoreThanATR(int barsAgo, bool positive) {
+		private bool EvaluateLeadsFastEMAByMoreThanATR(int barsAgo, bool positive) {
 			bool leads = md.Direction[barsAgo] == TrendDirection.Bullish
 				? Low[barsAgo] > (emaFast[barsAgo] + atr[barsAgo])
-				: HighEntry[barsAgo] < (emaFast[barsAgo] - atr[barsAgo]);
+				: High[barsAgo] < (emaFast[barsAgo] - atr[barsAgo]);
 
 			return positive ? leads : !leads;
 		}
