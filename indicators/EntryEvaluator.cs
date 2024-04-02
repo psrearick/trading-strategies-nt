@@ -186,7 +186,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		public MarketCycleStage TrendType;
 		public int EntryBar;
-		public double PreviousSwing;
+		public int PreviousSwing;
+		public double PreviousSwingValue;
 
 		public bool IsClosed;
 		public bool IsSuccessful;
@@ -218,38 +219,26 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public bool IsEMAConverging;
 		public bool IsWithTrendEMA;
 
-//		public double BuySellPressure;
-//		public bool IsWithTrendPressure;
-//		public bool IsStrongWithTrendPressure;
+		public double BuySellPressure;
+		public bool IsWithTrendPressure;
+		public bool IsStrongWithTrendPressure;
 
-//		public bool IsWithTrendTrendBar;
-//		public bool IsBreakoutBarPattern;
+		public bool IsWithTrendTrendBar;
+		public bool IsBreakoutBarPattern;
+		public bool IsWeakBar;
+		public bool IsStrongFollowThrough;
 
-//		public bool IsWeakBar;
-//		public bool IsBreakout;
-//		public bool IsBroadChannel;
-//		public bool IsTightChannel;
+		public bool IsBreakout;
+		public bool IsBroadChannel;
+		public bool IsTightChannel;
 
-//		public bool IsStrongFollowThrough;
+		public bool IsWeakTrend;
+		public bool IsStrongTrend;
 
-//		public bool IsWeakTrend;
-//		public bool IsStrongTrend;
-
-//		public bool IsRSIInRange;
-
-//		public bool IsAboveAverageATR;
-//		public bool IsBelowAverageATR;
-//		public bool IsAboveAverageATRByAStdDev;
-
-		// with-trend trendbar
-		// ii, ioi
-		// doji, trading range bar
-		// strong/weak follow through
-		// is breakout
-		// Bar Patterns?
-		// weak trend direction
-		// strong trend direction
-		// Buying Pressure
+		public bool IsRSIInRange;
+		public bool IsAboveAverageATR;
+		public bool IsBelowAverageATR;
+		public bool IsAboveAverageATRByAStdDev;
 
 		#endregion
 
@@ -267,18 +256,58 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	    {
 			CalculateEMAValues();
 			CalculateStopDistance();
-//			CalculateDistanceOfChange();
-//			CalculateProfitLoss();
-//			CalculateBuyingPressure();
-
-
+			CalculateBuySellPressure();
+			EvaluateBarTrend();
+			EvaluateChartTrend();
+			EvaluateIndicators();
 	    }
+		#endregion
+
+		#region EvaluateIndicators()
+		private void EvaluateIndicators()
+		{
+			IsRSIInRange 				= Direction == TrendDirection.Bullish ? (Rsi > 50 && Rsi < 70) : (Rsi > 30 && Rsi < 50);
+			IsAboveAverageATR			= Atr > AvgAtr;
+			IsBelowAverageATR			= Atr < AvgAtr;
+			IsAboveAverageATRByAStdDev	= (Atr - AvgAtr) > StdDevAtr;
+		}
+		#endregion
+
+		#region EvaluateBarTrend()
+		private void EvaluateBarTrend()
+		{
+			IsWithTrendTrendBar 	= pa.IsTrendBar(0) && (Direction == TrendDirection.Bullish ? pa.IsBullishBar(0) : pa.IsBearishBar(0));
+			IsBreakoutBarPattern	= pa.DoesInsideOutsideMatch("ii", 0) || pa.DoesInsideOutsideMatch("ioi", 0);
+			IsWeakBar				= pa.IsDoji(0) || pa.IsTradingRangeBar(0);
+			IsStrongFollowThrough	= pa.IsStrongFollowThroughBar(0);
+		}
+		#endregion
+
+		#region EvaluateChartTrend()
+		private void EvaluateChartTrend()
+		{
+			IsBreakout		= TrendType == MarketCycleStage.Breakout;
+			IsBroadChannel	= TrendType == MarketCycleStage.BroadChannel;
+			IsTightChannel	= TrendType == MarketCycleStage.TightChannel;
+			IsWeakTrend		= Direction == TrendDirection.Bullish ? pa.IsWeakBullishTrend(0, PreviousSwing) : pa.IsWeakBearishTrend(0, PreviousSwing);
+			IsStrongTrend	= Direction == TrendDirection.Bullish ? pa.IsStrongBullishTrend(0, PreviousSwing) : pa.IsStrongBearishTrend(0, PreviousSwing);
+		}
+		#endregion
+
+		#region CalculateBuySellPressure()
+		public void CalculateBuySellPressure()
+		{
+			BuySellPressure 			= pa.GetBuySellPressure(0, PreviousSwing);
+			IsWithTrendPressure 		= Direction == TrendDirection.Bullish ? BuySellPressure > 75 : BuySellPressure < 25;
+			IsStrongWithTrendPressure	= Direction == TrendDirection.Bullish ? BuySellPressure > 90 : BuySellPressure < 10;
+		}
 		#endregion
 
 		#region CalculateStopDistance()
 		private void CalculateStopDistance()
 		{
-			StopDistance = Direction == TrendDirection.Bullish ? Close - PreviousSwing : PreviousSwing - Close;
+			PreviousSwingValue = Direction == TrendDirection.Bullish ? source.Low[PreviousSwing] : source.High[PreviousSwing];
+			StopDistance = Direction == TrendDirection.Bullish ? Close - PreviousSwingValue : PreviousSwingValue - Close;
 		}
 		#endregion
 
@@ -307,8 +336,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			if (GreatestLoss > StopDistance) {
 				IsSuccessful = false;
 				IsClosed = true;
-
-				return;
 			}
 	    }
 		#endregion
