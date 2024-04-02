@@ -259,8 +259,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region EvaluateCriteria()
 		public bool EvaluateCriteria(int barsAgo)
 		{
-//			Print(String.Join(", ", criteria[barsAgo].Select(c => c.Key + ": " + c.Value.ToString()).ToList()));
-
 			int criteriaCount = criteria[barsAgo].Count;
 
 			if (criteriaCount == 0) {
@@ -294,10 +292,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					matchedCount += EvaluateWithTrendSlowEMA(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "LeadsFastEMAByMoreThanATR") {
-					matchedCount += EvaluateRSI(barsAgo, positive) ? 1 : 0;
-					if (!EvaluateLeadsFastEMAByMoreThanATR(barsAgo, positive)) {
-						return false;
-					}
+					matchedCount += EvaluateLeadsFastEMAByMoreThanATR(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsWithTrendPressure") {
 					matchedCount += EvaluateWithTrendPressure(barsAgo, positive) ? 1 : 0;
@@ -312,70 +307,37 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					matchedCount += EvaluateBreakoutBarPattern(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsWeakBar") {
-					matchedCount += EvaluateRSI(barsAgo, positive) ? 1 : 0;
-					if (!EvaluateWeakBar(barsAgo, positive)) {
-						return false;
-					}
+					matchedCount += EvaluateWeakBar(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsStrongFollowThrough") {
-					matchedCount += EvaluateRSI(barsAgo, positive) ? 1 : 0;
-					if (!EvaluateStrongFollowThrough(barsAgo, positive)) {
-						return false;
-					}
+					matchedCount += EvaluateStrongFollowThrough(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsBreakout") {
-					matchedCount += EvaluateRSI(barsAgo, positive) ? 1 : 0;
-					if (!EvaluateBreakout(barsAgo, positive)) {
-						return false;
-					}
+					matchedCount += EvaluateBreakout(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsBroadChannel") {
-					matchedCount += EvaluateRSI(barsAgo, positive) ? 1 : 0;
-					if (!EvaluateBroadChannel(barsAgo, positive)) {
-						return false;
-					}
+					matchedCount += EvaluateBroadChannel(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsTightChannel") {
-					matchedCount += EvaluateRSI(barsAgo, positive) ? 1 : 0;
-					if (!EvaluateTightChannel(barsAgo, positive)) {
-						return false;
-					}
+					matchedCount += EvaluateTightChannel(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsWeakTrend") {
-					matchedCount += EvaluateRSI(barsAgo, positive) ? 1 : 0;
-					if (!EvaluateWeakTrend(barsAgo, positive)) {
-						return false;
-					}
+					matchedCount += EvaluateWeakTrend(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsStrongTrend") {
-					matchedCount += EvaluateRSI(barsAgo, positive) ? 1 : 0;
-					if (!EvaluateStrongTrend(barsAgo, positive)) {
-						return false;
-					}
+					matchedCount += EvaluateStrongTrend(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsRSIInRange") {
-					matchedCount += EvaluateRSI(barsAgo, positive) ? 1 : 0;
-					if (!EvaluateRSIInRange(barsAgo, positive)) {
-						return false;
-					}
+					matchedCount += EvaluateRSIInRange(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsAboveAverageATR") {
-					matchedCount += EvaluateRSI(barsAgo, positive) ? 1 : 0;
-					if (!EvaluateAboveAverageATR(barsAgo, positive)) {
-						return false;
-					}
+					matchedCount += EvaluateAboveAverageATR(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsBelowAverageATR") {
-					matchedCount += EvaluateRSI(barsAgo, positive) ? 1 : 0;
-					if (!EvaluateBelowAverageATR(barsAgo, positive)) {
-						return false;
-					}
+					matchedCount += EvaluateBelowAverageATR(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsAboveAverageATRByAStdDev") {
-					matchedCount += EvaluateRSI(barsAgo, positive) ? 1 : 0;
-					if (!EvaluateAboveAverageATRByAStdDev(barsAgo, positive)) {
-						return false;
-					}
+					matchedCount += EvaluateAboveAverageATRByAStdDev(barsAgo, positive) ? 1 : 0;
 				}
 			}
 
@@ -388,50 +350,75 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		#region EvaluateRSI()
 		private bool EvaluateRSI(int barsAgo, bool positive) {
-			if (md.Direction[barsAgo] == TrendDirection.Bullish) {
-				if (criterion.Value > 0) {
-
-				} else {
-
-				}
-			}
-
-			if (md.Direction[barsAgo] == TrendDirection.Bearish) {
-				if (criterion.Value > 0) {
-
-				} else {
-
-				}
-			}
+			return positive ? rsi[barsAgo] > 70 : rsi[barsAgo] < 30;
 		}
 		#endregion
 
 		#region EvaluateATR()
-		private bool EvaluateATR(int barsAgo, bool positive) {}
+		private bool EvaluateATR(int barsAgo, bool positive) {
+			double atrMax = MAX(atr, 20)[barsAgo];
+			double atrMin = MIN(atr, 20)[barsAgo];
+
+			double atrUpper = ((atrMax - atrMin) * 0.7) + atrMin;
+			double atrLower = ((atrMax - atrMin) * 0.3) + atrMin;
+
+			return positive ? atr[barsAgo] > atrUpper : atr[barsAgo] < atrLower;
+		}
 		#endregion
 
 		#region EvaluateEMADiverging()
-		private bool EvaluateEMADiverging(int barsAgo, bool positive) {}
+		private bool EvaluateEMADiverging(int barsAgo, bool positive) {
+			bool divergence = md.Direction[barsAgo] == TrendDirection.Bullish
+				? pa.IsEMABullishDivergence(barsAgo, 1)
+				: pa.IsEMABearishDivergence(barsAgo, 1);
+
+			return positive ? divergence : !divergence;
+		}
 		#endregion
 
 		#region EvaluateEMAConverging()
-		private bool EvaluateEMAConverging(int barsAgo, bool positive) {}
+		private bool EvaluateEMAConverging(int barsAgo, bool positive) {
+			bool convergence = md.Direction[barsAgo] == TrendDirection.Bullish
+				? pa.IsEMABullishConvergence(barsAgo, 1)
+				: pa.IsEMABearishConvergence(barsAgo, 1);
+
+			return positive ? convergence : !convergence;
+		}
 		#endregion
 
 		#region EvaluateWithTrendEMA()
-		private bool EvaluateWithTrendEMA(int barsAgo, bool positive) {}
+		private bool EvaluateWithTrendEMA(int barsAgo, bool positive) {
+			bool withTrend = md.Direction[barsAgo] == TrendDirection.Bullish
+				? pa.IsEMABullish(barsAgo) : pa.IsEMABearish(barsAgo);
+
+			return positive ? withTrend : !withTrend;
+		}
 		#endregion
 
 		#region EvaluateWithTrendFastEMA()
-		private bool EvaluateWithTrendFastEMA(int barsAgo, bool positive) {}
+		private bool EvaluateWithTrendFastEMA(int barsAgo, bool positive) {
+			TrendDirection FastEMADirection = pa.IsEMAFastBullish(barsAgo) ? TrendDirection.Bullish : pa.IsEMAFastBearish(barsAgo) ? TrendDirection.Bearish : TrendDirection.Flat;
+
+			return positive ? FastEMADirection == md.Direction[barsAgo] : FastEMADirection != md.Direction[barsAgo];
+		}
 		#endregion
 
 		#region EvaluateWithTrendSlowEMA()
-		private bool EvaluateWithTrendSlowEMA(int barsAgo, bool positive) {}
+		private bool EvaluateWithTrendSlowEMA(int barsAgo, bool positive) {
+			TrendDirection SlowEMADirection = pa.IsEMASlowBullish(barsAgo) ? TrendDirection.Bullish : pa.IsEMASlowBearish(barsAgo) ? TrendDirection.Bearish : TrendDirection.Flat;
+
+			return positive ? SlowEMADirection == md.Direction[barsAgo] : SlowEMADirection != md.Direction[barsAgo];
+		}
 		#endregion
 
 		#region EvaluateLeadsFastEMAByMoreThanATR()
-		private bool EvaluatLeadsFastEMAByMoreThanATR(int barsAgo, bool positive) {}
+		private bool EvaluatLeadsFastEMAByMoreThanATR(int barsAgo, bool positive) {
+			bool leads = md.Direction[barsAgo] == TrendDirection.Bullish
+				? Low[barsAgo] > (emaFast[barsAgo] + atr[barsAgo])
+				: HighEntry[barsAgo] < (emaFast[barsAgo] - atr[barsAgo]);
+
+			return positive ? leads : !leads;
+		}
 		#endregion
 
 		#region EvaluateWithTrendPressure()
@@ -481,7 +468,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region EvaluateRSIInRange()
 		private bool EvaluateRSIInRange(int barsAgo, bool positive) {
 //					IsRSIInRange = Direction == TrendDirection.Bullish ? (Rsi > 50 && Rsi < 70) : (Rsi > 30 && Rsi < 50);
-
 		}
 		#endregion
 
