@@ -289,6 +289,20 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region HighestHigh()
+		public double HighestHigh(int barsAgo = 0, int period = 12)
+		{
+			return MAX(High, period)[barsAgo];
+		}
+		#endregion
+
+		#region LowestLow()
+		public double LowestLow(int barsAgo = 0, int period = 12)
+		{
+			return MIN(Low, period)[barsAgo];
+		}
+		#endregion
+
 		#endregion
 
 		#region Trend Recognition

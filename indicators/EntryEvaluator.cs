@@ -178,6 +178,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	{
 		#region Variables
 
+		private int window = 81;
+
 		private EntryEvaluator source;
 		private PriceActionUtils pa;
 		public TrendDirection Direction;
@@ -287,22 +289,27 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			DistanceMoved = Direction == TrendDirection.Bullish ? source.Close[0] - Close : Close - source.Close[0];
+			int period 		= source.CurrentBar - EntryBar;
+			DistanceMoved 	= Direction == TrendDirection.Bullish ? source.Close[0] - Close : Close - source.Close[0];
+			HighestHigh 	= pa.HighestHigh(0, period);
+			LowestLow		= pa.LowestLow(0, period);
+			GreatestProfit	= Direction == TrendDirection.Bullish ? HighestHigh - Close : Close - LowestLow;
+			GreatestLoss	= Direction == TrendDirection.Bullish ? Close - LowestLow : HighestHigh - Close;
+			ProfitMultiples	= GreatestProfit / StopDistance;
 
-			int barsAgo = source.CurrentBar - EntryBar;
+			if ((source.CurrentBar - EntryBar) > window) {
+				IsSuccessful = ProfitMultiples > 1;
+				IsClosed = true;
 
+				return;
+			}
 
+			if (GreatestLoss > StopDistance) {
+				IsSuccessful = false;
+				IsClosed = true;
 
-//	        IsClosed
-	//		IsSuccessful;
-
-	//		StopDistance;
-	//		DistanceMoved;
-	//		HighestHigh;
-	//		LowestLow;
-	//		GreatestProfit;
-	//		GreatestLoss;
-	//		ProfitMultiples;
+				return;
+			}
 	    }
 		#endregion
 
