@@ -116,10 +116,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
 			pa.Update();
 		}
+		#endregion
 
 		#region CalculateAdditionalValues()
 		public void CalculateAdditionalValues()
