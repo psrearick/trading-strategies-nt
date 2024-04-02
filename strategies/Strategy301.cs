@@ -364,9 +364,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (marketDirection.Direction[1] == TrendDirection.Bullish) {
-				return false;
-			}
+//			if (marketDirection.Direction[1] == TrendDirection.Bullish) {
+//				return false;
+//			}
 
 			if (entryEvaluator.matched[0] < 0.5) {
 				return false;
@@ -380,9 +380,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 //				return false;
 //			}
 
-//			if (legs.BarsAgoStarts[0] > 4) {
-//				return false;
-//			}
+			if (legs.BarsAgoStarts[0] > 5) {
+				return false;
+			}
 
 ////			if (legs.BarsAgoStarts[0] < 10) {
 ////				return false;
@@ -420,9 +420,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (marketDirection.Direction[1] == TrendDirection.Bearish) {
-				return false;
-			}
+//			if (marketDirection.Direction[1] == TrendDirection.Bearish) {
+//				return false;
+//			}
 
 			if (entryEvaluator.matched[0] < 0.5) {
 				return false;
@@ -436,9 +436,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 //				return false;
 //			}
 
-//			if (legs.BarsAgoStarts[0] > 4) {
-//				return false;
-//			}
+			if (legs.BarsAgoStarts[0] > 5) {
+				return false;
+			}
 
 ////			if (legs.LegDirectionAtBar(0) != TrendDirection.Bearish) {
 ////				return false;

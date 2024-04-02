@@ -39,10 +39,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private int window = 20;
 		private List<EntrySignal> entries = new List<EntrySignal>(20);
 		private Dictionary<string, double> correlations = new Dictionary<string, double>();
-    	private List<string> significantCorrelations = new List<string>();
-		public Series<Dictionary<string, double>> criteria;
+		private Dictionary<string, double> significantCorrelations = new Dictionary<string, double>();
 		public Series<double> matched;
-		public Series<double> profitMultiples;
 		#endregion
 
 		#region OnStateChange()
@@ -81,9 +79,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			if (State == State.DataLoaded) {
 				stdDevAtr	= StdDev(atr, 20);
 				avgAtr		= SMA(atr, 20);
-				criteria 	= new Series<Dictionary<string, double>>(this, MaximumBarsLookBack.TwoHundredFiftySix);
+//				criteria 	= new Series<Dictionary<string, double>>(this, MaximumBarsLookBack.TwoHundredFiftySix);
 				matched		= new Series<double>(this, MaximumBarsLookBack.TwoHundredFiftySix);
-				profitMultiples		= new Series<double>(this, MaximumBarsLookBack.TwoHundredFiftySix);
+//				profitMultiples		= new Series<double>(this, MaximumBarsLookBack.TwoHundredFiftySix);
 			}
 			#endregion
 		}
@@ -92,17 +90,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-//			pa.Update();
-//			md.Update();
-//			rsi.Update();
-//			atr.Update();
-//			stdDevAtr.Update();
-//			avgAtr.Update();
-//			emaFast.Update();
-//			emaSlow.Update();
-
 			if (CurrentBar < 100) {
-				criteria[0] = new Dictionary<string, double>();
 				matched[0]	= 0;
 				return;
 			}
@@ -114,14 +102,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	            CalculateCorrelations();
 	        }
 
-			criteria[0] = new Dictionary<string, double>(criteria[1]);
-			if (significantCorrelations.Count > 0) {
-				criteria[0] = new Dictionary<string, double>(correlations.Where(c => Math.Abs(c.Value) > 0.5).ToDictionary(i => i.Key, i => i.Value));
-
-//				successful = entries.Where(e => e.IsSuccessful).Select(e => e.ProfitMultiples).ToList();
-//				profitMultiples[0] = successful.Count > 0 ? successful.Average() : 1;
-			}
-
 			EvaluateCriteria(0);
 		}
 		#endregion
@@ -130,7 +110,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private void CalculateCorrelations()
 		{
 			correlations.Clear();
-			List<EntrySignal> closedEntries = entries.Where(e => e.IsClosed).Select(e => e).ToList();
+			List<EntrySignal> closedEntries = entries.Where(e => e.IsClosed || e.IsSuccessful).Select(e => e).ToList();
 
 	        correlations["RSI"] = correlationCoefficient(closedEntries.Select(e => e.Rsi).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
 	        correlations["ATR"] = correlationCoefficient(closedEntries.Select(e => e.Atr).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
@@ -156,7 +136,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			correlations["IsBelowAverageATR"] = correlationCoefficient(closedEntries.Select(e => e.IsBelowAverageATR ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
 			correlations["IsAboveAverageATRByAStdDev"] = correlationCoefficient(closedEntries.Select(e => e.IsAboveAverageATRByAStdDev ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
 
-	        significantCorrelations = correlations.Where(c => Math.Abs(c.Value) > 0.5).Select(c => c.Key).ToList();
+	        significantCorrelations = correlations.Where(c => Math.Abs(c.Value) > 0.5).ToDictionary(i => i.Key, i => i.Value);
 		}
 		#endregion
 
@@ -201,7 +181,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			if (md.Direction[0] == TrendDirection.Bullish && md.Direction[1] != TrendDirection.Bullish) {
+//			if (md.Direction[0] == TrendDirection.Bullish && md.Direction[1] != TrendDirection.Bullish) {
+			if (md.Direction[0] == TrendDirection.Bullish && md.LegLong.BarsAgoStarts[0] <= 5) {
 				EntrySignal entry 		= EntrySignal(CurrentBar);
 				entry.Direction = TrendDirection.Bullish;
 
@@ -210,7 +191,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			if (md.Direction[0] == TrendDirection.Bearish && md.Direction[1] != TrendDirection.Bearish) {
+//			if (md.Direction[0] == TrendDirection.Bearish && md.Direction[1] != TrendDirection.Bearish) {
+			if (md.Direction[0] == TrendDirection.Bearish && md.LegLong.BarsAgoStarts[0] <= 5) {
 				EntrySignal entry 		= EntrySignal(CurrentBar);
 				entry.Direction = TrendDirection.Bearish;
 
@@ -264,7 +246,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region EvaluateCriteria()
 		public bool EvaluateCriteria(int barsAgo)
 		{
-			int criteriaCount = criteria[barsAgo].Count;
+			int criteriaCount = significantCorrelations.Count;
 
 			if (criteriaCount == 0) {
 				matched[0] = 0;
@@ -273,7 +255,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			int matchedCount = 0;
 
-			foreach (var criterion in criteria[barsAgo]) {
+			foreach (var criterion in significantCorrelations) {
 				bool positive = criterion.Value > 0;
 				if (criterion.Key == "RSI") {
 					matchedCount += EvaluateRSI(barsAgo, positive) ? 1 : 0;
