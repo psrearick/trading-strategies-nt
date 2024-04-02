@@ -34,6 +34,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private MarketDirection marketDirection;
 //		private MarketDirection marketDirectionShort;
 		private MarketDirection marketDirectionLong;
+		private EntryEvaluator entryEvaluator;
 		private TrendStrength trendStrength;
 		private TradesExporter tradesExporter;
 		private ATR atr;
@@ -94,11 +95,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			#region State.Configure
 			else if (State == State.Configure)
 			{
-			}
-			#endregion
-
-			#region State.DataLoaded
-			if (State == State.DataLoaded) {
 				PA 						= PriceActionUtils();
 //				marketDirectionShort	= MarketDirection(ShortPeriod, ShortPeriod);
 				marketDirectionLong		= MarketDirection(ShortPeriod, ShortPeriod * 2);
@@ -108,6 +104,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 				rsi						= RSI(14, 1);
 				tradesExporter			= TradesExporter(Name, Instrument.MasterInstrument.Name);
 				trendStrength			= TrendStrength();
+				entryEvaluator			= EntryEvaluator();
+			}
+			#endregion
+
+			#region State.DataLoaded
+			if (State == State.DataLoaded) {
 			}
 			#endregion
 		}
@@ -157,20 +159,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 					return true;
 				}
 
-				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bearish)) {
-					return true;
-				}
+//				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bearish)) {
+//					return true;
+//				}
 
-				if (MAX(High, 8)[0] < MAX(High, legs.BarsAgoStarts[0])[0]) {
-					return true;
-				}
+//				if (MAX(High, 8)[0] < MAX(High, legs.BarsAgoStarts[0])[0]) {
+//					return true;
+//				}
 
-				double swingLow = MIN(Low, legs.BarsAgoStarts[0])[0];
+//				double swingLow = MIN(Low, legs.BarsAgoStarts[0])[0];
 
-				if (swingLow > stopLoss && legs[0] > 0) {
-					stopLoss = swingLow;
-					SetStopLoss(CalculationMode.Price, stopLoss);
-				}
+//				if (swingLow > stopLoss && legs[0] > 0) {
+//					stopLoss = swingLow;
+//					SetStopLoss(CalculationMode.Price, stopLoss);
+//				}
 			}
 
 			if (Position.MarketPosition == MarketPosition.Short) {
@@ -178,20 +180,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 					return true;
 				}
 
-				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bullish)) {
-					return true;
-				}
+//				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bullish)) {
+//					return true;
+//				}
 
-				if (MIN(Low, 8)[0] > MIN(Low, legs.BarsAgoStarts[0])[0]) {
-					return true;
-				}
+//				if (MIN(Low, 8)[0] > MIN(Low, legs.BarsAgoStarts[0])[0]) {
+//					return true;
+//				}
 
-				double swingHigh = MAX(High, legs.BarsAgoStarts[0])[0];
+//				double swingHigh = MAX(High, legs.BarsAgoStarts[0])[0];
 
-				if (swingHigh < stopLoss && legs[0] < 0) {
-					stopLoss = swingHigh;
-					SetStopLoss(CalculationMode.Price, stopLoss);
-				}
+//				if (swingHigh < stopLoss && legs[0] < 0) {
+//					stopLoss = swingHigh;
+//					SetStopLoss(CalculationMode.Price, stopLoss);
+//				}
 			}
 
 			return false;
@@ -266,17 +268,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 			bool longMatch 	= longPatternMatched();
 			bool shortMatch	= shortPatternMatched();
 
-			int adjustedQuantity = CurrentStdDevOfAverageATR > ATRMultiplier ? Quantity : Quantity * 3;
-			double stopLossMultiple =  CurrentStdDevOfAverageATR > ATRMultiplier ? 1 : HighATRMultiplier;
-//			double stopLossMultiple =  CurrentStdDevOfAverageATR > ATRMultiplier ? 1 : ATRMultiplier;
+//			int adjustedQuantity = CurrentStdDevOfAverageATR > ATRMultiplier ? Quantity : Quantity * 3;
+//			double stopLossMultiple =  CurrentStdDevOfAverageATR > ATRMultiplier ? 1 : HighATRMultiplier;
+////			double stopLossMultiple =  CurrentStdDevOfAverageATR > ATRMultiplier ? 1 : ATRMultiplier;
 
-//			int adjustedQuantity = 1;
-//			int adjustedQuantity	= highAtr ? Quantity : Quantity * 2;
-//			double stopLossMultiple = highAtr ? HighATRMultiplier : LowATRMultiplier;
-//			double stopLossMultiple = 1;
+////			int adjustedQuantity = 1;
+////			int adjustedQuantity	= highAtr ? Quantity : Quantity * 2;
+////			double stopLossMultiple = highAtr ? HighATRMultiplier : LowATRMultiplier;
+////			double stopLossMultiple = 1;
 
-			int quantity2 = (int) Math.Floor((double) adjustedQuantity / 2);
-			int quantity1 = adjustedQuantity - quantity2;
+//			int quantity2 = (int) Math.Floor((double) adjustedQuantity / 2);
+//			int quantity1 = adjustedQuantity - quantity2;
+
+			int quantity1 = Quantity;
+			double stopLossMultiple = 1;// Math.Max(1, Math.Floor(entryEvaluator.profitMultiples[0]));
+//			Print(stopLossMultiple);
 
 			if (longMatch) {
 //				if (PA.GetStrongTrendDirection(0, 20) == TrendDirection.Bullish) {
@@ -307,9 +313,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 					SetProfitTarget("LongEntry1", CalculationMode.Ticks, stopLossDistance * stopLossMultiple);
 					EnterLong(quantity1, "LongEntry1");
 
-					if (quantity2 > 0) {
-						EnterLong(quantity2, "LongEntry2");
-					}
+//					if (quantity2 > 0) {
+//						EnterLong(quantity2, "LongEntry2");
+//					}
 				}
 			}
 
@@ -343,9 +349,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 					SetProfitTarget("ShortEntry1", CalculationMode.Ticks, stopLossDistance * stopLossMultiple);
 					EnterShort(quantity1, "ShortEntry1");
 
-					if (quantity2 > 0) {
-						EnterShort(quantity2, "ShortEntry2");
-					}
+//					if (quantity2 > 0) {
+//						EnterShort(quantity2, "ShortEntry2");
+//					}
 				}
 			}
 		}
@@ -358,42 +364,50 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (trendStrength.StrengthOfTrend[0] == 0 || trendStrength.StrengthOfTrend[0] > 1) {
+			if (marketDirection.Direction[1] == TrendDirection.Bullish) {
 				return false;
 			}
 
-			if (trendStrength.Direction[0] != TrendDirection.Bullish) {
+			if (entryEvaluator.matched[0] < 0.5) {
 				return false;
 			}
 
-			if (legs.BarsAgoStarts[0] > 4) {
-				return false;
-			}
-
-//			if (legs.BarsAgoStarts[0] < 10) {
+//			if (trendStrength.StrengthOfTrend[0] == 0 || trendStrength.StrengthOfTrend[0] > 1) {
 //				return false;
 //			}
 
-//			int threshold = highAtr ? 95 : 85;
-//			if (PA.GetBuySellPressure(0, legs.BarsAgoStarts[0]) < 95) {
+//			if (trendStrength.Direction[0] != TrendDirection.Bullish) {
 //				return false;
 //			}
 
-//			if (PA.GetStrongTrendDirection(0, 20) != TrendDirection.Bullish) {
-//                return false;
-//            }
-
-//			if (CurrentStdDevOfAverageATR > ATRMultiplier) {
+//			if (legs.BarsAgoStarts[0] > 4) {
 //				return false;
 //			}
 
-//			if (!PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bullish)) {
-//				return false;
-//			}
+////			if (legs.BarsAgoStarts[0] < 10) {
+////				return false;
+////			}
 
-	        if (rsi[0] > 70 || rsi[0] < 50) {
-	            return false;
-	        }
+////			int threshold = highAtr ? 95 : 85;
+////			if (PA.GetBuySellPressure(0, legs.BarsAgoStarts[0]) < 95) {
+////				return false;
+////			}
+
+////			if (PA.GetStrongTrendDirection(0, 20) != TrendDirection.Bullish) {
+////                return false;
+////            }
+
+////			if (CurrentStdDevOfAverageATR > ATRMultiplier) {
+////				return false;
+////			}
+
+////			if (!PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bullish)) {
+////				return false;
+////			}
+
+//	        if (rsi[0] > 70 || rsi[0] < 50) {
+//	            return false;
+//	        }
 
 			return true;
 		}
@@ -406,46 +420,54 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (trendStrength.StrengthOfTrend[0] == 0 || trendStrength.StrengthOfTrend[0] > 1) {
+			if (marketDirection.Direction[1] == TrendDirection.Bearish) {
 				return false;
 			}
 
-			if (trendStrength.Direction[0] != TrendDirection.Bearish) {
+			if (entryEvaluator.matched[0] < 0.5) {
 				return false;
 			}
 
-			if (legs.BarsAgoStarts[0] > 4) {
-				return false;
-			}
-
-//			if (legs.LegDirectionAtBar(0) != TrendDirection.Bearish) {
+//			if (trendStrength.StrengthOfTrend[0] == 0 || trendStrength.StrengthOfTrend[0] > 1) {
 //				return false;
 //			}
 
-//			if (legs.BarsAgoStarts[0] < 10) {
+//			if (trendStrength.Direction[0] != TrendDirection.Bearish) {
 //				return false;
 //			}
 
-//			int threshold = highAtr ? 5 : 15;
-//			if (PA.GetBuySellPressure(0, legs.BarsAgoStarts[0]) > 5) {
+//			if (legs.BarsAgoStarts[0] > 4) {
 //				return false;
 //			}
 
-//			if (PA.GetStrongTrendDirection(0, 20) != TrendDirection.Bearish) {
-//                return false;
-//            }
+////			if (legs.LegDirectionAtBar(0) != TrendDirection.Bearish) {
+////				return false;
+////			}
 
-//			if (CurrentStdDevOfAverageATR > ATRMultiplier) {
-//				return false;
-//			}
+////			if (legs.BarsAgoStarts[0] < 10) {
+////				return false;
+////			}
 
-//			if (!PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bearish)) {
-//				return false;
-//			}
+////			int threshold = highAtr ? 5 : 15;
+////			if (PA.GetBuySellPressure(0, legs.BarsAgoStarts[0]) > 5) {
+////				return false;
+////			}
 
-			if (rsi[0] > 50 || rsi[0] < 30) {
-	            return false;
-	        }
+////			if (PA.GetStrongTrendDirection(0, 20) != TrendDirection.Bearish) {
+////                return false;
+////            }
+
+////			if (CurrentStdDevOfAverageATR > ATRMultiplier) {
+////				return false;
+////			}
+
+////			if (!PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bearish)) {
+////				return false;
+////			}
+
+//			if (rsi[0] > 50 || rsi[0] < 30) {
+//	            return false;
+//	        }
 
 			return true;
 		}

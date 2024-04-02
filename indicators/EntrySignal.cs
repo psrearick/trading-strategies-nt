@@ -198,7 +198,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			GreatestLoss	= Direction == TrendDirection.Bullish ? CloseEntry - LowestLow : HighestHigh - CloseEntry;
 			ProfitMultiples	= GreatestProfit / StopDistance;
 
-
 			IsSuccessful = (ProfitMultiples > 1);
 
 			if ((CurrentBar - EntryBar) > window) {

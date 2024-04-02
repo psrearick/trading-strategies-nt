@@ -42,6 +42,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
     	private List<string> significantCorrelations = new List<string>();
 		public Series<Dictionary<string, double>> criteria;
 		public Series<double> matched;
+		public Series<double> profitMultiples;
 		#endregion
 
 		#region OnStateChange()
@@ -80,8 +81,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			if (State == State.DataLoaded) {
 				stdDevAtr	= StdDev(atr, 20);
 				avgAtr		= SMA(atr, 20);
-				criteria 	= new Series<Dictionary<string, double>>(this, MaximumBarsLookBack.Infinite);
-				matched		= new Series<double>(this, MaximumBarsLookBack.Infinite);
+				criteria 	= new Series<Dictionary<string, double>>(this, MaximumBarsLookBack.TwoHundredFiftySix);
+				matched		= new Series<double>(this, MaximumBarsLookBack.TwoHundredFiftySix);
+				profitMultiples		= new Series<double>(this, MaximumBarsLookBack.TwoHundredFiftySix);
 			}
 			#endregion
 		}
@@ -115,6 +117,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			criteria[0] = new Dictionary<string, double>(criteria[1]);
 			if (significantCorrelations.Count > 0) {
 				criteria[0] = new Dictionary<string, double>(correlations.Where(c => Math.Abs(c.Value) > 0.5).ToDictionary(i => i.Key, i => i.Value));
+
+//				successful = entries.Where(e => e.IsSuccessful).Select(e => e.ProfitMultiples).ToList();
+//				profitMultiples[0] = successful.Count > 0 ? successful.Average() : 1;
 			}
 
 			EvaluateCriteria(0);
