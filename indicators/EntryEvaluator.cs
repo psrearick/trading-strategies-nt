@@ -215,9 +215,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	    public TrendDirection SlowEMADirection;
 	    public double DistanceFromFastEMA;
 	    public double DistanceFromSlowEMA;
+
 		public bool IsEMADiverging;
 		public bool IsEMAConverging;
 		public bool IsWithTrendEMA;
+		public bool IsWithTrendFastEMA;
+		public bool IsWithTrendSlowEMA;
+		public bool LeadsFastEMAByMoreThanATR;
 
 		public double BuySellPressure;
 		public bool IsWithTrendPressure;
@@ -354,16 +358,22 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			IsWithTrendEMA = false;
 
 			if (Direction == TrendDirection.Bullish) {
-				IsEMADiverging = pa.IsEMABullishDivergence(0, 1);
-				IsEMAConverging = pa.IsEMABullishConvergence(0, 1);
-				IsWithTrendEMA = pa.IsEMABullish(0);
+				IsEMADiverging				= pa.IsEMABullishDivergence(0, 1);
+				IsEMAConverging 			= pa.IsEMABullishConvergence(0, 1);
+				IsWithTrendEMA 				= pa.IsEMABullish(0);
+				LeadsFastEMAByMoreThanATR	= Low > (EmaFast + Atr);
 			}
 
 			if (Direction == TrendDirection.Bearish) {
-				IsEMADiverging = pa.IsEMABearishDivergence(0, 1);;
-				IsEMAConverging = pa.IsEMABearishConvergence(0, 1);;
-				IsWithTrendEMA = pa.IsEMABearish(0);
+				IsEMADiverging 				= pa.IsEMABearishDivergence(0, 1);;
+				IsEMAConverging 			= pa.IsEMABearishConvergence(0, 1);;
+				IsWithTrendEMA 				= pa.IsEMABearish(0);
+				LeadsFastEMAByMoreThanATR	= High < (EmaFast = Atr);
 			}
+
+
+			IsWithTrendFastEMA = FastEMADirection == Direction;
+			IsWithTrendSlowEMA = SlowEMADirection == Direction;
 		}
 		#endregion
 	}
