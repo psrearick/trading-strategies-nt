@@ -29,12 +29,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region Variables
 		private PriceActionUtils PA;
 		private Utils Utls;
-		private Legs LegShort;
-		private Legs LegLong;
-		private Series<TrendDirection> Direction;
-		private Series<TrendDirection> Breakouts;
-		private Series<TrendDirection> TightChannels;
-		private Series<TrendDirection> BroadChannels;
+		public Legs LegShort;
+		public Legs LegLong;
+		public Series<TrendDirection> Direction;
+		public Series<TrendDirection> Breakouts;
+		public Series<TrendDirection> TightChannels;
+		public Series<TrendDirection> BroadChannels;
+		public Series<MarketCycleStage> Stage;
 		private Brush brushUp0;
 		private Brush brushUp1;
 		private Brush brushUp2;
@@ -138,6 +139,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				Breakouts 			= new Series<TrendDirection>(this, MaximumBarsLookBack.Infinite);
 				TightChannels 		= new Series<TrendDirection>(this, MaximumBarsLookBack.Infinite);
 				BroadChannels 		= new Series<TrendDirection>(this, MaximumBarsLookBack.Infinite);
+				Stage 				= new Series<MarketCycleStage>(this, MaximumBarsLookBack.Infinite);
 			}
 			#endregion
 		}
@@ -151,6 +153,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			PA.Update();
 
 			if (!IsWarmedUp()) {
+				Stage[0] = MarketCycleStage.TradingRange;
 				Direction[0] = TrendDirection.Flat;
 				return;
 			}
@@ -204,6 +207,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		{
 			BackBrush = null;
 			for (int i = 0; i < WindowSize; i++) {
+				Stage[0] = Breakouts[i] != TrendDirection.Flat ? MarketCycleStage.Breakout
+					: TightChannels[i] != TrendDirection.Flat ? MarketCycleStage.TightChannel
+					: BroadChannels[i] != TrendDirection.Flat ? MarketCycleStage.BroadChannel
+					: MarketCycleStage.TradingRange;
+
 				BackBrushes[i] =
 					TightChannels[i] == TrendDirection.Bullish ? brushUp1
 					: TightChannels[i] == TrendDirection.Bearish ? brushDown1
@@ -534,12 +542,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		#region Properties
 		[NinjaScriptProperty]
-		[Range(6, int.MaxValue)]
+		[Range(1, int.MaxValue)]
 		[Display(Name="Short Period", Description="Short Period", Order=0, GroupName="Parameters")]
 		public int ShortPeriod
 		{ get; set; }
+
 		[NinjaScriptProperty]
-		[Range(6, int.MaxValue)]
+		[Range(1, int.MaxValue)]
 		[Display(Name="Long Period", Description="Long Period", Order=1, GroupName="Parameters")]
 		public int LongPeriod
 		{ get; set; }
