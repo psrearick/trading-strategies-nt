@@ -527,7 +527,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		#region EvaluateRSIInRange()
 		private bool EvaluateRSIInRange(int barsAgo, bool positive) {
-//					IsRSIInRange = md.Direction[barsAgo] == TrendDirection.Bullish ? (Rsi > 50 && Rsi < 70) : (Rsi > 30 && Rsi < 50);
+			bool IsRSIInRange = md.Direction[barsAgo] == TrendDirection.Bullish ? (rsi[barsAgo] > 50 && rsi[barsAgo] < 70) : (rsi[barsAgo] > 30 && rsi[barsAgo] < 50);
 
 			return positive ? IsRSIInRange : !IsRSIInRange;
 		}
@@ -535,7 +535,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		#region EvaluateAboveAverageATR()
 		private bool EvaluateAboveAverageATR(int barsAgo, bool positive) {
-//			IsAboveAverageATR			= Atr > AvgAtr;
+			bool IsAboveAverageATR = atr[barsAgo] > avgAtr[barsAgo];
 
 			return positive ? IsAboveAverageATR : !IsAboveAverageATR;
 		}
@@ -543,21 +543,20 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		#region EvaluateBelowAverageATR()
 		private bool EvaluateBelowAverageATR(int barsAgo, bool positive) {
-//					IsBelowAverageATR			= Atr < AvgAtr;
+			bool IsBelowAverageATR = atr[barsAgo] < avgAtr[barsAgo];
 
-			return positive ? IsTightChannel : !IsTightChannel;
+			return positive ? IsBelowAverageATR : !IsBelowAverageATR;
 		}
 		#endregion
 
 		#region EvaluateAboveAverageATRByAStdDev()
 		private bool EvaluateAboveAverageATRByAStdDev(int barsAgo, bool positive) {
 
-//					IsAboveAverageATRByAStdDev	= (Atr - AvgAtr) > StdDevAtr;
+			bool IsAboveAverageATRByAStdDev	= (atr[barsAgo] - avgAtr[barsAgo]) > stdDevAtr[barsAgo];
 
 			return positive ? IsAboveAverageATRByAStdDev : !IsAboveAverageATRByAStdDev;
 		}
 		#endregion
-
 	}
 }
 
