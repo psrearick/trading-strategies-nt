@@ -27,7 +27,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	public class EntryEvaluator : Indicator
 	{
 		#region Variables
-		private Utils utils = new Utils();
 		private PriceActionUtils pa;
 		public MarketDirection md;
 		private RSI rsi;

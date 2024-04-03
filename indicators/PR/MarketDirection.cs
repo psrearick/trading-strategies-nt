@@ -46,7 +46,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private int WindowSize = 81;
 
 		private List<TrendDirection> legDirections		= new List<TrendDirection>();
-		private List<int> legIndexes					= new List<int>(); // Absolute References
+		private List<int> legIndexes					= new List<int>();
 		private List<int> legLengths 					= new List<int>();
 		private	List<double> legChanges 				= new List<double>();
 
@@ -194,6 +194,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		{
 			int currentTrendLength = LegShort.BarsAgoStarts[0];
 
+			Breakouts[0] = TrendDirection.Flat;
 			if (PA.IsBreakoutTrend(0, currentTrendLength)) {
 				for (int i = 0; i < currentTrendLength; i++) {
 					Breakouts[i] = Utls.DirectionFromInt((int) LegShort[0]);

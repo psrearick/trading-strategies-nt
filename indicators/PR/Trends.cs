@@ -37,6 +37,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private int BarsInTrend = 0;
 		private double BreakoutExtreme = 0;
 
+		private PriceActionUtils PA;
+
 		public Series<double> TrendValues;
 		public Series<double> TrendStarts;
 		public Series<double> LegValues;
@@ -64,6 +66,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				//See Help Guide for additional information.
 				IsSuspendedWhileInactive					= true;
 				AddPlot(Brushes.DarkCyan, "Trend Direction");
+				AddPlot(Brushes.Red, "Legs In Swing");
 			}
 			#endregion
 
@@ -71,6 +74,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			else if (State == State.Configure)
 			{
 				SwingIdentifier = Swings();
+				PA = PriceActionUtils();
 			}
 			#endregion
 
@@ -121,6 +125,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			setHistoricalValues();
 
 			Value[0] = getTrendValue();
+
+			setLegsInSwing();
 		}
 		#endregion
 
@@ -248,6 +254,63 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			BreakoutExtreme = MAX(High, BarsInBearTrend + 1)[0];
 			Trend = TrendDirection.Bearish;
 			BarsInTrend = BarsInBearTrend;
+		}
+		#endregion
+
+		#region GetLegsInSwing()
+		public int GetLegsInSwing()
+		{
+			return (int) Values[1][0];
+		}
+		#endregion
+
+		#region setLegsInSwing()
+		public void setLegsInSwing()
+		{
+			int swingStartBarsAgo = Math.Max(CurrentBar - (int) SwingStarts[0], 1);
+
+			int legs = 0;
+			double currentLeg = 0;
+			for (int i = 0; i < swingStartBarsAgo; i++) {
+				if (LegValues[i] != currentLeg) {
+					currentLeg = LegValues[i];
+
+					if (currentLeg == SwingValues[0]) {
+						legs++;
+					}
+				}
+			}
+
+			Values[1][0] = legs;
+		}
+		#endregion
+
+		#region PullbacksInLeg()
+		public int PullbacksInLeg()
+		{
+			if (LegValues[0] > 0) {
+				return PA.NumberOfBullPullbacks(0, CurrentBar - (int) LegStarts[0]);
+			}
+
+			return PA.NumberOfBearPullbacks(0, CurrentBar - (int) LegStarts[0]);
+		}
+		#endregion
+
+		#region AveragePullbackLength()
+		public double AveragePullbackLength()
+		{
+			if (LegValues[0] > 0) {
+				return PA.AverageBarsInBullTrendPullback(0, CurrentBar - (int) LegStarts[0]);
+			}
+
+			return PA.AverageBarsInBearTrendPullback(0, CurrentBar - (int) LegStarts[0]);
+		}
+		#endregion
+
+		#region isBreakout()
+		public bool isBreakout()
+		{
+			return PullbacksInLeg() <= 1 && AveragePullbackLength() <= 2 && (CurrentBar - (int) LegStarts[0]) >= 4;
 		}
 		#endregion
 	}

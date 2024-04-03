@@ -51,7 +51,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			return direction > 0 ? TrendDirection.Bullish : direction < 0 ? TrendDirection.Bearish : TrendDirection.Flat;
 		}
 
-		public void PrintMessage(string message,
+		public void PrintMessage(string message = "",
 		        [CallerMemberName] string memberName = "",
 		        [CallerFilePath] string sourceFilePath = "",
 		        [CallerLineNumber] int sourceLineNumber = 0)

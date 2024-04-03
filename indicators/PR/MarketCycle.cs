@@ -67,7 +67,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				DrawOnPricePanel							= true;
 				PaintPriceMarkers							= false;
 				IsSuspendedWhileInactive					= false;
-				IsOverlay									= true;
+				IsOverlay									= false;
 				IsAutoScale									= true;
 
 				AddPlot(Brushes.DarkCyan, "Market Direction");
@@ -164,42 +164,27 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int trend = (int) TrendIdentifier[0];
 			Value[0] = TrendIdentifier[0];
 
-			int i = 0;
-
-
-//			for (int i = 0; i < TrendIdentifier.GetBarsInTrend(); i++) {
-				BackBrushes[i] =
-					trend == -9 ? brushDown9 :
-					trend == -8 ? brushDown8 :
-					trend == -7 ? brushDown7 :
-					trend == -6 ? brushDown6 :
-					trend == -5 ? brushDown5 :
-					trend == -4 ? brushDown4 :
-					trend == -3 ? brushDown3 :
-					trend == -2 ? brushDown2 :
-					trend == -1 ? brushDown1 :
-					trend == 0 ? brush0 :
-					trend == 1 ? brushUp1 :
-					trend == 2 ? brushUp2 :
-					trend == 3 ? brushUp3 :
-					trend == 4 ? brushUp4 :
-					trend == 5 ? brushUp5 :
-					trend == 6 ? brushUp6 :
-					trend == 7 ? brushUp7 :
-					trend == 8 ? brushUp8 :
-					trend == 9 ? brushUp9 :
-					null;
-
-
-
-//				if (trend == -1) {
-//					BackBrushes[i] = brushDown20;
-//				}
-
-//				if (trend == 1) {
-//					BackBrushes[i] = brushUp20;
-//				}
-//			}
+			BackBrush =
+				trend == -9 ? brushDown9 :
+				trend == -8 ? brushDown8 :
+				trend == -7 ? brushDown7 :
+				trend == -6 ? brushDown6 :
+				trend == -5 ? brushDown5 :
+				trend == -4 ? brushDown4 :
+				trend == -3 ? brushDown3 :
+				trend == -2 ? brushDown2 :
+				trend == -1 ? brushDown1 :
+				trend == 0 ? brush0 :
+				trend == 1 ? brushUp1 :
+				trend == 2 ? brushUp2 :
+				trend == 3 ? brushUp3 :
+				trend == 4 ? brushUp4 :
+				trend == 5 ? brushUp5 :
+				trend == 6 ? brushUp6 :
+				trend == 7 ? brushUp7 :
+				trend == 8 ? brushUp8 :
+				trend == 9 ? brushUp9 :
+				null;
 		}
 		#endregion
 	}

@@ -320,10 +320,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-//			if (marketDirection.Direction[1] == TrendDirection.Bullish) {
-//				return false;
-//			}
-
 			if (entryEvaluator.matched[0] < 0.5) {
 				return false;
 			}
@@ -346,10 +342,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (marketDirection.Direction[0] != TrendDirection.Bearish) {
 				return false;
 			}
-
-//			if (marketDirection.Direction[1] == TrendDirection.Bearish) {
-//				return false;
-//			}
 
 			if (entryEvaluator.matched[0] < 0.5) {
 				return false;

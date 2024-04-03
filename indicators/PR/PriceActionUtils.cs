@@ -261,7 +261,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int barsAgoHigh = 0;
 			double high = High[0];
 
-			for (int i = barsAgo; i < barsAgo + period; i++) {
+			for (int i = barsAgo; i < (barsAgo + period); i++) {
 				if (High[i] >= high) {
 					high = High[i];
 					barsAgoHigh = i;
@@ -278,7 +278,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int barsAgoLow = 0;
 			double low = Low[0];
 
-			for (int i = barsAgo; i < barsAgo + period; i++) {
+			for (int i = barsAgo; i < (barsAgo + period); i++) {
 				if (Low[i] <= low) {
 					low = Low[i];
 					barsAgoLow = i;

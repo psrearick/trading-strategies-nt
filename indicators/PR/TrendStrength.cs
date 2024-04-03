@@ -36,9 +36,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private Brush brushDown2;
 		private Brush brushDown3;
 		private Brush brushDown4;
-		private Series<TrendDirection> Direction;
-		private Series<int> StrengthOfTrend;
-		private int Period = 12;
+		public Series<TrendDirection> Direction;
+		public Series<int> StrengthOfTrend;
+		private int Period = 16;
 		#endregion
 
 		#region OnStateChange()
