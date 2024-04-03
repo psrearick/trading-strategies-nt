@@ -30,6 +30,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	{
 		#region Variables
 		private PriceActionUtils PA;
+		private PriceActionPatterns PAPatterns;
 		private Legs legs;
 		private MarketDirection marketDirection;
 		private EntryEvaluator entryEvaluator;
@@ -39,6 +40,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private int choppinessThresholdLow	= 40;
 		private int choppinessThresholdHigh	= 60;
 		private List<double> chopHistory = new List<double>();
+		private Series<int> barsSinceDoubleTop;
+		private Series<int> barsSinceDoubleBottom;
 		private bool reset = false;
 		private int day = 0;
 
@@ -87,6 +90,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			else if (State == State.Configure)
 			{
 				PA 						= PriceActionUtils();
+				PAPatterns				= PriceActionPatterns();
 				entryEvaluator			= EntryEvaluator(Period, Window);
 //				marketDirection 		= entryEvaluator.md;
 //				legs 					= marketDirection.LegLong;
@@ -96,8 +100,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 			#region State.DataLoaded
 			if (State == State.DataLoaded) {
 //				tradesExporter			= TradesExporter(Name, Instrument.MasterInstrument.Name);
-				marketDirection = entryEvaluator.md;
-				legs = marketDirection.LegLong;
+				marketDirection 		= entryEvaluator.md;
+				legs 					= marketDirection.LegLong;
+				barsSinceDoubleTop		= new Series<int>(this);
+				barsSinceDoubleBottom	= new Series<int>(this);
 			}
 			#endregion
 		}
@@ -106,9 +112,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
+			PAPatterns.Update();
+
 			if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1) {
 				return;
             }
+
+			barsSinceDoubleBottom[0] = barsSinceDoubleBottom[1] + 1;
+			if (PAPatterns.IsDoubleBottom(0, 30, 3)) {
+				barsSinceDoubleBottom[0] = 0;
+			}
+
+
+			barsSinceDoubleTop[0] = barsSinceDoubleTop[1] + 1;
+			if (PAPatterns.IsDoubleTop(0, 30, 3)) {
+				barsSinceDoubleTop[0] = 0;
+			}
 
 
 
@@ -138,9 +157,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 					return true;
 				}
 
-				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bearish)) {
+				if (barsSinceDoubleTop[0] > 0 && barsSinceDoubleTop[0] < 10 && legs.LegDirectionAtBar(0) == TrendDirection.Bearish) {
 					return true;
 				}
+
+//				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bearish)) {
+//					return true;
+//				}
 
 //				if (MAX(High, 8)[0] < MAX(High, legs.BarsAgoStarts[0])[0]) {
 //					return true;
@@ -159,9 +182,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 					return true;
 				}
 
-				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bullish)) {
+				if (barsSinceDoubleBottom[0] > 0 && barsSinceDoubleBottom[0] < 10 && legs.LegDirectionAtBar(0) == TrendDirection.Bullish) {
 					return true;
 				}
+
+//				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bullish)) {
+//					return true;
+//				}
 
 //				if (MIN(Low, 8)[0] > MIN(Low, legs.BarsAgoStarts[0])[0]) {
 //					return true;
@@ -382,7 +409,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 //		[Display(Name="High Target Multiplier", Description="High Target Multiplier", Order=5, GroupName="Parameters")]
 //		public double HighATRMultiplier
 //		{ get; set; }
-	
+
 		[NinjaScriptProperty]
 		[Display(Name="Export Trades", Description="Export Trades", Order=6, GroupName="Parameters")]
 		public bool TradesExporterActivated
