@@ -205,13 +205,19 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			if (md.Direction[0] == TrendDirection.Bullish && md.LegLong.BarsAgoStarts[0] <= 5) {
-				AddEntry(TrendDirection.Bullish);
+			if (md.LegLong.BarsAgoStarts[0] < 4) {
+				return;
 			}
 
-			if (md.Direction[0] == TrendDirection.Bearish && md.LegLong.BarsAgoStarts[0] <= 5) {
-				AddEntry(TrendDirection.Bearish);
+			if (md.LegLong.BarsAgoStarts[0] > 8) {
+				return;
 			}
+
+			if (md.Direction[0] == TrendDirection.Flat) {
+				return;
+			}
+
+			AddEntry(md.Direction[0]);
 		}
 		#endregion
 

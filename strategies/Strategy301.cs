@@ -82,7 +82,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				Quantity 									= 1;
 				ATRMultiplier								= 1;
 				QuantityMultiplier							= 2;
-				Window										= 100;
+				Window										= 20;
 			}
 			#endregion
 
@@ -161,9 +161,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 					return true;
 				}
 
-//				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bearish)) {
-//					return true;
-//				}
+				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bearish)) {
+					return true;
+				}
 
 //				if (MAX(High, 8)[0] < MAX(High, legs.BarsAgoStarts[0])[0]) {
 //					return true;
@@ -186,9 +186,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 					return true;
 				}
 
-//				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bullish)) {
-//					return true;
-//				}
+				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bullish)) {
+					return true;
+				}
 
 //				if (MIN(Low, 8)[0] > MIN(Low, legs.BarsAgoStarts[0])[0]) {
 //					return true;
@@ -324,12 +324,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 //				return false;
 //			}
 
-			if (entryEvaluator.matched[0] <= 0.5) {
+			if (entryEvaluator.matched[0] < 0.5) {
 				return false;
 			}
 
+			if (legs.BarsAgoStarts[0] < 4) {
+				return false;
+			}
 
-			if (legs.BarsAgoStarts[0] > 3) {
+			if (legs.BarsAgoStarts[0] > 8) {
 				return false;
 			}
 
@@ -348,11 +351,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 //				return false;
 //			}
 
-			if (entryEvaluator.matched[0] <= 0.5) {
+			if (entryEvaluator.matched[0] < 0.5) {
 				return false;
 			}
 
-			if (legs.BarsAgoStarts[0] > 3) {
+			if (legs.BarsAgoStarts[0] < 4) {
+				return false;
+			}
+
+			if (legs.BarsAgoStarts[0] > 8) {
 				return false;
 			}
 
