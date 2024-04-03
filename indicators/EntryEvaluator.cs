@@ -36,12 +36,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private SMA avgAtr;
 		private EMA emaFast;
 		private EMA emaSlow;
-		private int window = 20;
-		private List<EntrySignal> entries = new List<EntrySignal>(20);
+//		private int window = 100;
+		private List<EntrySignal> entries = new List<EntrySignal>(100);
 		private Dictionary<string, double> correlations = new Dictionary<string, double>();
 		private Dictionary<string, double> significantCorrelations = new Dictionary<string, double>();
 		public Series<double> matched;
 		private int nextEntryIndex = 0;
+		public bool Skip = false;
 		#endregion
 
 		#region OnStateChange()
@@ -61,6 +62,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				PaintPriceMarkers							= true;
 				ScaleJustification							= NinjaTrader.Gui.Chart.ScaleJustification.Right;
 				IsSuspendedWhileInactive					= true;
+				Period										= 10;
+				Window										= 100;
 			}
 			#endregion
 
@@ -68,7 +71,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			else if (State == State.Configure)
 			{
 				pa 						= PriceActionUtils();
-				md						= MarketDirection(10, 20);
+				md						= MarketDirection(Period, Period * 2);
 				atr						= ATR(14);
 				rsi						= RSI(14, 3);
 				emaFast					= EMA(9);
@@ -82,7 +85,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				avgAtr		= SMA(atr, 20);
 				matched		= new Series<double>(this, MaximumBarsLookBack.TwoHundredFiftySix);
 
-				for (int i = 0; i < window; i++) {
+				for (int i = 0; i < Window; i++) {
 					entries.Add(EntrySignal(i + 1));
 				}
 			}
@@ -100,6 +103,18 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			LookForEntryBar();
 			UpdateEntryStatus();
+
+//			if (!Skip) {
+//			LookForEntryBar();
+//			UpdateEntryStatus();
+//			} else {
+//				foreach (var entry in entries) {
+//		            entry.IsClosed = true;
+//		        }
+//			}
+
+
+//			UpdateEntryStatus();
 
 			if (CurrentBar % 10 == 0) {
 	            CalculateCorrelations();
@@ -139,7 +154,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			correlations["IsBelowAverageATR"] = correlationCoefficient(closedEntries.Select(e => e.IsBelowAverageATR ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
 			correlations["IsAboveAverageATRByAStdDev"] = correlationCoefficient(closedEntries.Select(e => e.IsAboveAverageATRByAStdDev ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
 
-	        significantCorrelations = correlations.Where(c => Math.Abs(c.Value) > 0.5).ToDictionary(i => i.Key, i => i.Value);
+//			Dictionary<string, double> updatedCorrelations = correlations.Where(c => Math.Abs(c.Value) > 0.5).ToDictionary(i => i.Key, i => i.Value);
+
+//			if (updatedCorrelations.Count > 0) {
+//				significantCorrelations = updatedCorrelations;
+//			}
+			significantCorrelations = correlations.Where(c => Math.Abs(c.Value) > 0.5).ToDictionary(i => i.Key, i => i.Value);
+
 		}
 		#endregion
 
@@ -209,7 +230,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			EntrySignal entry = entries[nextEntryIndex];
 			nextEntryIndex++;
 
-			if (nextEntryIndex == window) {
+			if (nextEntryIndex == Window) {
 				nextEntryIndex = 0;
 			}
 
@@ -539,6 +560,20 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			return positive ? IsAboveAverageATRByAStdDev : !IsAboveAverageATRByAStdDev;
 		}
 		#endregion
+
+		#region Properties
+		[NinjaScriptProperty]
+		[Range(1, int.MaxValue)]
+		[Display(Name="Period", Description="Period", Order=0, GroupName="Parameters")]
+		public int Period
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Range(1, 100)]
+		[Display(Name="Window", Description="Window", Order=1, GroupName="Parameters")]
+		public int Window
+		{ get; set; }
+		#endregion
 	}
 }
 
@@ -549,18 +584,18 @@ namespace NinjaTrader.NinjaScript.Indicators
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
 		private PR.EntryEvaluator[] cacheEntryEvaluator;
-		public PR.EntryEvaluator EntryEvaluator()
+		public PR.EntryEvaluator EntryEvaluator(int period, int window)
 		{
-			return EntryEvaluator(Input);
+			return EntryEvaluator(Input, period, window);
 		}
 
-		public PR.EntryEvaluator EntryEvaluator(ISeries<double> input)
+		public PR.EntryEvaluator EntryEvaluator(ISeries<double> input, int period, int window)
 		{
 			if (cacheEntryEvaluator != null)
 				for (int idx = 0; idx < cacheEntryEvaluator.Length; idx++)
-					if (cacheEntryEvaluator[idx] != null &&  cacheEntryEvaluator[idx].EqualsInput(input))
+					if (cacheEntryEvaluator[idx] != null && cacheEntryEvaluator[idx].Period == period && cacheEntryEvaluator[idx].Window == window && cacheEntryEvaluator[idx].EqualsInput(input))
 						return cacheEntryEvaluator[idx];
-			return CacheIndicator<PR.EntryEvaluator>(new PR.EntryEvaluator(), input, ref cacheEntryEvaluator);
+			return CacheIndicator<PR.EntryEvaluator>(new PR.EntryEvaluator(){ Period = period, Window = window }, input, ref cacheEntryEvaluator);
 		}
 	}
 }
@@ -569,14 +604,14 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.PR.EntryEvaluator EntryEvaluator()
+		public Indicators.PR.EntryEvaluator EntryEvaluator(int period, int window)
 		{
-			return indicator.EntryEvaluator(Input);
+			return indicator.EntryEvaluator(Input, period, window);
 		}
 
-		public Indicators.PR.EntryEvaluator EntryEvaluator(ISeries<double> input )
+		public Indicators.PR.EntryEvaluator EntryEvaluator(ISeries<double> input , int period, int window)
 		{
-			return indicator.EntryEvaluator(input);
+			return indicator.EntryEvaluator(input, period, window);
 		}
 	}
 }
@@ -585,14 +620,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.PR.EntryEvaluator EntryEvaluator()
+		public Indicators.PR.EntryEvaluator EntryEvaluator(int period, int window)
 		{
-			return indicator.EntryEvaluator(Input);
+			return indicator.EntryEvaluator(Input, period, window);
 		}
 
-		public Indicators.PR.EntryEvaluator EntryEvaluator(ISeries<double> input )
+		public Indicators.PR.EntryEvaluator EntryEvaluator(ISeries<double> input , int period, int window)
 		{
-			return indicator.EntryEvaluator(input);
+			return indicator.EntryEvaluator(input, period, window);
 		}
 	}
 }

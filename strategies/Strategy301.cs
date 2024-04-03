@@ -79,6 +79,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				Quantity 									= 1;
 				ATRMultiplier								= 1;
 				QuantityMultiplier							= 2;
+				Window										= 100;
 			}
 			#endregion
 
@@ -86,7 +87,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			else if (State == State.Configure)
 			{
 				PA 						= PriceActionUtils();
-				entryEvaluator			= EntryEvaluator(Period);
+				entryEvaluator			= EntryEvaluator(Period, Window);
 //				marketDirection 		= entryEvaluator.md;
 //				legs 					= marketDirection.LegLong;
 			}
@@ -108,6 +109,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1) {
 				return;
             }
+
+
+
+//			entryEvaluator.Skip = !isValidTradeTime();
 
 			exitPositions();
 
@@ -350,14 +355,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
-		[Display(Name="Quantity Multiplier", Description="Quantity Multiplier", Order=2, GroupName="Parameters")]
+		[Display(Name="Quantity Multiplier", Description="Quantity Multiplier", Order=3, GroupName="Parameters")]
 		public int QuantityMultiplier
 		{ get; set; }
 
 		[NinjaScriptProperty]
 		[Range(double.MinValue, double.MaxValue)]
-		[Display(Name="ATR Multiplier", Description="ATR Multiplier", Order=3, GroupName="Parameters")]
+		[Display(Name="Target Multiplier", Description="Target Multiplier", Order=4, GroupName="Parameters")]
 		public double ATRMultiplier
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Range(1, 100)]
+		[Display(Name="Window", Description="Window", Order=5, GroupName="Parameters")]
+		public int Window
 		{ get; set; }
 
 //		[NinjaScriptProperty]
@@ -371,7 +382,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 //		[Display(Name="High Target Multiplier", Description="High Target Multiplier", Order=5, GroupName="Parameters")]
 //		public double HighATRMultiplier
 //		{ get; set; }
-
+	
 		[NinjaScriptProperty]
 		[Display(Name="Export Trades", Description="Export Trades", Order=6, GroupName="Parameters")]
 		public bool TradesExporterActivated
