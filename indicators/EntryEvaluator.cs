@@ -29,7 +29,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region Variables
 		private Utils utils = new Utils();
 		private PriceActionUtils pa;
-		private MarketDirection md;
+		public MarketDirection md;
 		private RSI rsi;
 		private ATR atr;
 		private StdDev stdDevAtr;
@@ -41,6 +41,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private Dictionary<string, double> correlations = new Dictionary<string, double>();
 		private Dictionary<string, double> significantCorrelations = new Dictionary<string, double>();
 		public Series<double> matched;
+		private int nextEntryIndex = 0;
 		#endregion
 
 		#region OnStateChange()
@@ -79,9 +80,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			if (State == State.DataLoaded) {
 				stdDevAtr	= StdDev(atr, 20);
 				avgAtr		= SMA(atr, 20);
-//				criteria 	= new Series<Dictionary<string, double>>(this, MaximumBarsLookBack.TwoHundredFiftySix);
 				matched		= new Series<double>(this, MaximumBarsLookBack.TwoHundredFiftySix);
-//				profitMultiples		= new Series<double>(this, MaximumBarsLookBack.TwoHundredFiftySix);
+
+				for (int i = 0; i < window; i++) {
+					entries.Add(EntrySignal(i + 1));
+				}
 			}
 			#endregion
 		}
@@ -181,24 +184,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-//			if (md.Direction[0] == TrendDirection.Bullish && md.Direction[1] != TrendDirection.Bullish) {
 			if (md.Direction[0] == TrendDirection.Bullish && md.LegLong.BarsAgoStarts[0] <= 5) {
-				EntrySignal entry 		= EntrySignal(CurrentBar);
-				entry.Direction = TrendDirection.Bullish;
-
-				AddEntry(entry);
-
-				return;
+				AddEntry(TrendDirection.Bullish);
 			}
 
-//			if (md.Direction[0] == TrendDirection.Bearish && md.Direction[1] != TrendDirection.Bearish) {
 			if (md.Direction[0] == TrendDirection.Bearish && md.LegLong.BarsAgoStarts[0] <= 5) {
-				EntrySignal entry 		= EntrySignal(CurrentBar);
-				entry.Direction = TrendDirection.Bearish;
-
-				AddEntry(entry);
-
-				return;
+				AddEntry(TrendDirection.Bearish);
 			}
 		}
 		#endregion
@@ -213,12 +204,19 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region AddEntry()
-		private void AddEntry(EntrySignal entry)
+		private void AddEntry(TrendDirection direction)
 		{
+			EntrySignal entry = entries[nextEntryIndex];
+			nextEntryIndex++;
+
+			if (nextEntryIndex == window) {
+				nextEntryIndex = 0;
+			}
+
+			entry.Direction = direction;
 			entry.PreviousSwing	= entry.Direction == TrendDirection.Bearish
 				? pa.BarsAgoHigh(0, md.LegLong.BarsAgoStarts[0])
 				: pa.BarsAgoLow(0, md.LegLong.BarsAgoStarts[0]);
-
 
 			entry.EntryBar		= CurrentBar;
 			entry.Rsi 			= rsi[0];
@@ -233,13 +231,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			entry.CloseEntry 	= Close[0];
 			entry.TrendType		= md.Stage[0];
 
+			entry.IsClosed = false;
+			entry.IsSuccessful = false;
+
 			entry.CalculateAdditionalValues();
-
-			if (entries.Count == window) {
-                entries.RemoveAt(0);
-            }
-
-			entries.Add(entry);
 		}
 		#endregion
 

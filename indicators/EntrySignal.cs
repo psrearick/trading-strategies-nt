@@ -34,6 +34,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		private PriceActionUtils pa;
 
+		public TrendDirection CurrentDirection = TrendDirection.Flat;
+
 		public TrendDirection Direction;
 		public MarketCycleStage TrendType;
 
@@ -205,6 +207,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			if (GreatestLoss > StopDistance) {
+				IsClosed = true;
+			}
+
+			if (CurrentDirection != TrendDirection.Flat && CurrentDirection != Direction) {
 				IsClosed = true;
 			}
 	    }
