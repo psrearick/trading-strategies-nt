@@ -27,6 +27,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	public class EntryEvaluator : Indicator
 	{
 		#region Variables
+//		private Utils utils = new Utils();
+
 		public PriceActionUtils pa;
 		public MarketDirection md;
 		public PriceActionPatterns paPatterns;
@@ -124,7 +126,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			LookForEntryBar();
 			UpdateEntryStatus();
 
-			if (CurrentBar % frequency == 10) {
+			if (CurrentBar % frequency == 0) {
 	            CalculateCorrelations();
 	        }
 
@@ -395,6 +397,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region GetEntryByID()
+		public EntrySignal GetEntryByID(int id)
+		{
+			return activeEntries[id];
+		}
+		#endregion
+
 		#region CloseEntryByID()
 		public void CloseEntryByID(int id)
 		{
@@ -423,12 +432,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			entry.CloseEntry 		= Close[0];
 			entry.TrendType			= md.Stage[0];
 
-			entry.IsClosed = false;
-			entry.IsSuccessful = false;
-
+			entry.IsClosed 			= false;
+			entry.IsSuccessful 		= false;
 			entry.entryEvaluator		= this;
 
 			entry.CalculateAdditionalValues();
+			entry.Update();
 
 			return entry;
 		}
@@ -471,6 +480,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			return (double) matchedCount / (double) significantExits;
+		}
+
+		public double EvaluateExitCriteria(int entryID) {
+			return EvaluateExitCriteria(GetEntryByID(entryID));
 		}
 		#endregion
 

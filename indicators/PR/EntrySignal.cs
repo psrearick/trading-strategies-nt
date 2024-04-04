@@ -157,7 +157,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private void UpdateStopLoss()
 		{
 			if (Direction == TrendDirection.Bullish) {
-				double swingLow = MIN(Low, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0];
+				double swingLow = entryEvaluator.md.LegLong.BarsAgoStarts[0] > 0 ? MIN(Low, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0] : Low[0];
 
 				if (swingLow > StopLoss && entryEvaluator.md.LegLong[0] > 0) {
 					StopLoss = swingLow;
@@ -165,7 +165,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			if (Direction == TrendDirection.Bearish) {
-				double swingHigh = MAX(High, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0];
+				double swingHigh = entryEvaluator.md.LegLong.BarsAgoStarts[0] > 0 ? MAX(High, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0] : High[0];
 
 				if ((swingHigh < StopLoss || StopLoss == 0) && entryEvaluator.md.LegLong[0] < 0) {
 					StopLoss = swingHigh;
@@ -299,13 +299,17 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region EvaluateExitConditions()
-		private void EvaluateExitConditions()
+		public void EvaluateExitConditions()
 		{
 			DistanceMoved = Direction == TrendDirection.Bullish ? Close[0] - CloseEntry : CloseEntry - Close[0];
-
+			int barsAgo = entryEvaluator.md.LegLong.BarsAgoStarts[0];
 			int previousSwing = Direction == TrendDirection.Bearish
-				? pa.BarsAgoHigh(0, entryEvaluator.md.LegLong.BarsAgoStarts[0])
-				: pa.BarsAgoLow(0, entryEvaluator.md.LegLong.BarsAgoStarts[0]);
+				? entryEvaluator.pa.BarsAgoHigh(0, barsAgo)
+				: entryEvaluator.pa.BarsAgoLow(0, barsAgo);
+
+			if (previousSwing == 0) {
+				return;
+			}
 
 			#region TrendDirectionChanged
 			if (TrendDirectionChanged == 0) {
@@ -442,48 +446,54 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			#region NoNewExtreme8
 			if (NoNewExtreme8 == 0) {
-				if (Direction == TrendDirection.Bullish
-					&& MAX(High, 8)[0] < MAX(High, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0])
-				{
-					NoNewExtreme8 = DistanceMoved;
-				}
+				if (barsAgo > 0) {
+					if (Direction == TrendDirection.Bullish
+						&& MAX(High, 8)[0] < MAX(High, barsAgo)[0])
+					{
+						NoNewExtreme8 = DistanceMoved;
+					}
 
-				if (Direction == TrendDirection.Bearish
-					&& MIN(Low, 8)[0] > MIN(Low, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0])
-				{
-					NoNewExtreme8 = DistanceMoved;
+					if (Direction == TrendDirection.Bearish
+						&& MIN(Low, 8)[0] > MIN(Low, barsAgo)[0])
+					{
+						NoNewExtreme8 = DistanceMoved;
+					}
 				}
 			}
 			#endregion
 
 			#region NoNewExtreme10
 			if (NoNewExtreme10 == 0) {
-				if (Direction == TrendDirection.Bullish
-					&& MAX(High, 10)[0] < MAX(High, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0])
-				{
-					NoNewExtreme10 = DistanceMoved;
-				}
+				if (barsAgo > 0) {
+					if (Direction == TrendDirection.Bullish
+						&& MAX(High, 10)[0] < MAX(High, barsAgo)[0])
+					{
+						NoNewExtreme10 = DistanceMoved;
+					}
 
-				if (Direction == TrendDirection.Bearish
-					&& MIN(Low, 10)[0] > MIN(Low, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0])
-				{
-					NoNewExtreme10 = DistanceMoved;
+					if (Direction == TrendDirection.Bearish
+						&& MIN(Low, 10)[0] > MIN(Low, barsAgo)[0])
+					{
+						NoNewExtreme10 = DistanceMoved;
+					}
 				}
 			}
 			#endregion
 
 			#region NoNewExtreme12
 			if (NoNewExtreme12 == 0) {
-				if (Direction == TrendDirection.Bullish
-					&& MAX(High, 12)[0] < MAX(High, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0])
-				{
-					NoNewExtreme12 = DistanceMoved;
-				}
+				if (barsAgo > 0) {
+					if (Direction == TrendDirection.Bullish
+						&& MAX(High, 12)[0] < MAX(High, barsAgo)[0])
+					{
+						NoNewExtreme12 = DistanceMoved;
+					}
 
-				if (Direction == TrendDirection.Bearish
-					&& MIN(Low, 12)[0] > MIN(Low, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0])
-				{
-					NoNewExtreme12 = DistanceMoved;
+					if (Direction == TrendDirection.Bearish
+						&& MIN(Low, 12)[0] > MIN(Low, barsAgo)[0])
+					{
+						NoNewExtreme12 = DistanceMoved;
+					}
 				}
 			}
 			#endregion
