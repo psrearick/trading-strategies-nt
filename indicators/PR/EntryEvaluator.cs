@@ -36,12 +36,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private EMA emaFast;
 		private EMA emaSlow;
 //		private int window = 100;
-		private List<EntrySignal> entries = new List<EntrySignal>(100);
+		private List<EntrySignal> entries = new List<EntrySignal>(200);
 		private Dictionary<string, double> correlations = new Dictionary<string, double>();
 		private Dictionary<string, double> significantCorrelations = new Dictionary<string, double>();
 		public Series<double> matched;
 		private int nextEntryIndex = 0;
 		public bool Skip = false;
+		private int frequency;
 		#endregion
 
 		#region OnStateChange()
@@ -87,6 +88,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				for (int i = 0; i < Window; i++) {
 					entries.Add(EntrySignal(i + 1));
 				}
+
+				frequency	= (int) Math.Max(10, (int) Math.Floor((double) Window / 10));
 			}
 			#endregion
 		}
@@ -95,7 +98,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			if (CurrentBar < 100) {
+			if (CurrentBar < 200) {
 				matched[0]	= 0;
 				return;
 			}
@@ -103,19 +106,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			LookForEntryBar();
 			UpdateEntryStatus();
 
-//			if (!Skip) {
-//			LookForEntryBar();
-//			UpdateEntryStatus();
-//			} else {
-//				foreach (var entry in entries) {
-//		            entry.IsClosed = true;
-//		        }
-//			}
-
-
-//			UpdateEntryStatus();
-
-			if (CurrentBar % 10 == 0) {
+			if (CurrentBar % frequency == 0) {
 	            CalculateCorrelations();
 	        }
 
@@ -153,15 +144,33 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			correlations["IsBelowAverageATR"] = correlationCoefficient(closedEntries.Select(e => e.IsBelowAverageATR ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
 			correlations["IsAboveAverageATRByAStdDev"] = correlationCoefficient(closedEntries.Select(e => e.IsAboveAverageATRByAStdDev ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
 
-//			Dictionary<string, double> updatedCorrelations = correlations.Where(c => Math.Abs(c.Value) > 0.5).ToDictionary(i => i.Key, i => i.Value);
+			// Remove any NaN values from the correlations dictionary
+		    correlations = correlations.Where(c => !double.IsNaN(c.Value)).ToDictionary(i => i.Key, i => i.Value);
 
-//			if (updatedCorrelations.Count > 0) {
-//				significantCorrelations = updatedCorrelations;
-//			}
-			significantCorrelations = correlations.Where(c => Math.Abs(c.Value) > 0.5).ToDictionary(i => i.Key, i => i.Value);
+			if (correlations.Count > 0) {
+				// Calculate the mean and standard deviation of the correlation coefficients
+			    double mean = correlations.Values.Average();
+			    double stdDev = StandardDeviation(correlations.Values);
 
+			    // Determine the significance threshold based on the standard deviation
+		    	double threshold = 1; // Adjust the multiplier as needed
+		    	double significanceThreshold = mean + threshold * stdDev;
+
+		    	// Filter significant correlations based on the dynamic threshold
+		    	significantCorrelations = correlations.Where(c => Math.Abs(c.Value) > significanceThreshold).ToDictionary(i => i.Key, i => i.Value);
+			} else {
+		        significantCorrelations.Clear();
+		    }
 		}
 		#endregion
+
+		private double StandardDeviation(IEnumerable<double> values)
+		{
+		    double avg = values.Average();
+		    double sum = values.Sum(d => Math.Pow(d - avg, 2));
+		    double denominator = values.Count() - 1;
+		    return Math.Sqrt(sum / denominator);
+		}
 
 		#region correlationCoefficient()
 		private double correlationCoefficient(double []X, double []Y)
@@ -574,7 +583,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		{ get; set; }
 
 		[NinjaScriptProperty]
-		[Range(1, 100)]
+		[Range(1, 200)]
 		[Display(Name="Window", Description="Window", Order=1, GroupName="Parameters")]
 		public int Window
 		{ get; set; }

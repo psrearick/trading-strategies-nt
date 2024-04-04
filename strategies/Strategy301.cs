@@ -392,7 +392,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{ get; set; }
 
 		[NinjaScriptProperty]
-		[Range(1, 100)]
+		[Range(1, 200)]
 		[Display(Name="Window", Description="Window", Order=5, GroupName="Parameters")]
 		public int Window
 		{ get; set; }
