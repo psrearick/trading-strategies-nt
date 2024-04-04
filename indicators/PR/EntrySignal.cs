@@ -119,6 +119,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public double ATRBelowAverageATR = 0;
 		public double ATRAboveAverageATRByAStdDev = 0;
 		public double ATRBelowAverageATRByAStdDev = 0;
+		public double StrongCounterTrendFollowThrough = 0;
 
 		public double StopLoss = 0;
 
@@ -199,8 +200,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region EvaluateBarTrend()
 		private void EvaluateBarTrend()
 		{
-			IsWithTrendTrendBar 	= pa.IsTrendBar(0) && (Direction == TrendDirection.Bullish ? pa.IsBullishBar(0) : pa.IsBearishBar(0));
-			IsBreakoutBarPattern	= pa.DoesInsideOutsideMatch("ii", 0) || pa.DoesInsideOutsideMatch("ioi", 0);
+			IsWithTrendTrendBar 		= pa.IsTrendBar(0) && (Direction == TrendDirection.Bullish ? pa.IsBullishBar(0) : pa.IsBearishBar(0));
+			IsBreakoutBarPattern		= pa.DoesInsideOutsideMatch("ii", 0) || pa.DoesInsideOutsideMatch("ioi", 0);
 			IsWeakBar				= pa.IsDoji(0) || pa.IsTradingRangeBar(0);
 			IsStrongFollowThrough	= pa.IsStrongFollowThroughBar(0);
 		}
@@ -302,6 +303,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		{
 			DistanceMoved = Direction == TrendDirection.Bullish ? Close[0] - CloseEntry : CloseEntry - Close[0];
 
+			int previousSwing = Direction == TrendDirection.Bearish
+				? pa.BarsAgoHigh(0, entryEvaluator.md.LegLong.BarsAgoStarts[0])
+				: pa.BarsAgoLow(0, entryEvaluator.md.LegLong.BarsAgoStarts[0]);
+
+			#region TrendDirectionChanged
 			if (TrendDirectionChanged == 0) {
 				if (entryEvaluator.md.Direction[0] != TrendDirection.Flat
 					&& entryEvaluator.md.Direction[0] != Direction)
@@ -309,7 +315,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					TrendDirectionChanged = DistanceMoved;
 				}
 			}
+			#endregion
 
+			#region CounterTrendTightChannel
 			if (CounterTrendTightChannel == 0) {
 				if (entryEvaluator.md.TightChannels[0] != TrendDirection.Flat
 					&& entryEvaluator.md.TightChannels[0] != Direction)
@@ -317,7 +325,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					CounterTrendTightChannel = DistanceMoved;
 				}
 			}
+			#endregion
 
+			#region CounterTrendBroadChannel
 			if (CounterTrendBroadChannel == 0) {
 				if (entryEvaluator.md.BroadChannels[0] != TrendDirection.Flat
 					&& entryEvaluator.md.BroadChannels[0] != Direction)
@@ -325,7 +335,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					CounterTrendBroadChannel = DistanceMoved;
 				}
 			}
+			#endregion
 
+			#region CounterTrendBreakout
 			if (CounterTrendBreakout == 0) {
 				if (entryEvaluator.md.Breakouts[0] != TrendDirection.Flat
 					&& entryEvaluator.md.Breakouts[0] != Direction)
@@ -333,7 +345,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					CounterTrendBreakout = DistanceMoved;
 				}
 			}
+			#endregion
 
+			#region CounterTrendBreakoutTrend
 			if (CounterTrendBreakoutTrend == 0) {
 				if (Direction == TrendDirection.Bullish
 					&& pa.IsBreakoutTrend(0, entryEvaluator.md.LegLong.BarsAgoStarts[0], TrendDirection.Bearish))
@@ -347,7 +361,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					CounterTrendBreakoutTrend = DistanceMoved;
 				}
 			}
+			#endregion
 
+			#region CounterTrendLegLong
 			if (CounterTrendLegLong == 0) {
 				if (entryEvaluator.md.LegLong.LegDirectionAtBar(0) != TrendDirection.Flat
 					&& entryEvaluator.md.LegLong.LegDirectionAtBar(0) != Direction)
@@ -355,7 +371,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					CounterTrendLegLong = DistanceMoved;
 				}
 			}
+			#endregion
 
+			#region CounterTrendLegShort
 			if (CounterTrendLegShort == 0) {
 				if (entryEvaluator.md.LegShort.LegDirectionAtBar(0) != TrendDirection.Flat
 					&& entryEvaluator.md.LegShort.LegDirectionAtBar(0) != Direction)
@@ -363,7 +381,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					CounterTrendLegShort = DistanceMoved;
 				}
 			}
+			#endregion
 
+			#region DoubleTopBottom
 			if (DoubleTopBottom == 0) {
 				if (Direction == TrendDirection.Bullish && entryEvaluator.barsSinceDoubleTop[0] == 0) {
 					DoubleTopBottom = DistanceMoved;
@@ -373,7 +393,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					DoubleTopBottom = DistanceMoved;
 				}
 			}
+			#endregion
 
+			#region CounterTrendLegAfterDoubleTopBottom
 			if (CounterTrendLegAfterDoubleTopBottom == 0) {
 				if (Direction == TrendDirection.Bullish
 					&& entryEvaluator.barsSinceDoubleTop[0] > 0
@@ -388,7 +410,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					CounterTrendLegAfterDoubleTopBottom = DistanceMoved;
 				}
 			}
+			#endregion
 
+			#region TrailingStopBeyondPreviousExtreme
 			if (TrailingStopBeyondPreviousExtreme == 0) {
 				if (Direction == TrendDirection.Bullish && Low[0] < StopLoss)
 				{
@@ -400,7 +424,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					TrailingStopBeyondPreviousExtreme = DistanceMoved;
 				}
 			}
+			#endregion
 
+			#region MovingAverageCrossover
 			if (MovingAverageCrossover == 0) {
 				if (Direction == TrendDirection.Bullish && entryEvaluator.emaFast[0] < entryEvaluator.emaSlow[0])
 				{
@@ -412,7 +438,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					MovingAverageCrossover = DistanceMoved;
 				}
 			}
+			#endregion
 
+			#region NoNewExtreme8
 			if (NoNewExtreme8 == 0) {
 				if (Direction == TrendDirection.Bullish
 					&& MAX(High, 8)[0] < MAX(High, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0])
@@ -426,7 +454,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					NoNewExtreme8 = DistanceMoved;
 				}
 			}
+			#endregion
 
+			#region NoNewExtreme10
 			if (NoNewExtreme10 == 0) {
 				if (Direction == TrendDirection.Bullish
 					&& MAX(High, 10)[0] < MAX(High, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0])
@@ -440,7 +470,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					NoNewExtreme10 = DistanceMoved;
 				}
 			}
+			#endregion
 
+			#region NoNewExtreme12
 			if (NoNewExtreme12 == 0) {
 				if (Direction == TrendDirection.Bullish
 					&& MAX(High, 12)[0] < MAX(High, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0])
@@ -454,12 +486,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					NoNewExtreme12 = DistanceMoved;
 				}
 			}
+			#endregion
 
-			int previousSwing = Direction == TrendDirection.Bearish
-				? pa.BarsAgoHigh(0, entryEvaluator.md.LegLong.BarsAgoStarts[0])
-				: pa.BarsAgoLow(0, entryEvaluator.md.LegLong.BarsAgoStarts[0]);
+			#region BuySellPressure
 			double currentBuySellPressure = pa.GetBuySellPressure(0, PreviousSwing);
 
+			#region CounterTrendPressure
 			if (CounterTrendPressure == 0) {
 				if (Direction == TrendDirection.Bullish && currentBuySellPressure < 25) {
 					CounterTrendPressure = DistanceMoved;
@@ -469,7 +501,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					CounterTrendPressure = DistanceMoved;
 				}
 			}
+			#endregion
 
+			#region CounterTrendStrongPressure
 			if (CounterTrendStrongPressure == 0) {
 				if (Direction == TrendDirection.Bullish && BuySellPressure < 10) {
 					CounterTrendStrongPressure = DistanceMoved;
@@ -479,15 +513,83 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					CounterTrendStrongPressure = DistanceMoved;
 				}
 			}
+			#endregion
+			#endregion
 
+			#region CounterTrendWeakTrend
+			if (CounterTrendWeakTrend == 0) {
+				if (Direction == TrendDirection.Bullish && pa.IsWeakBearishTrend(0, PreviousSwing)) {
+					CounterTrendWeakTrend = DistanceMoved;
+				}
 
-//			public double CounterTrendWeakTrend = 0;
-//			public double CounterTrendStrongTrend = 0;
-//			public double RSIOutOfRange = 0;
-//			public double IsAboveAverageATR = 0;
-//			public double IsBelowAverageATR = 0;
-//			public double IsAboveAverageATRByAStdDev = 0;
-//			public double IsBelowAverageATRByAStdDev = 0;
+				if (Direction == TrendDirection.Bearish && pa.IsWeakBullishTrend(0, PreviousSwing)) {
+					CounterTrendWeakTrend = DistanceMoved;
+				}
+			}
+			#endregion
+
+			#region CounterTrendStrongTrend
+			if (CounterTrendStrongTrend == 0) {
+				if (Direction == TrendDirection.Bullish && pa.IsStrongBearishTrend(0, PreviousSwing)) {
+					CounterTrendStrongTrend = DistanceMoved;
+				}
+
+				if (Direction == TrendDirection.Bearish && pa.IsStrongBullishTrend(0, PreviousSwing)) {
+					CounterTrendStrongTrend = DistanceMoved;
+				}
+			}
+			#endregion
+
+			#region RSIOutOfRange
+			if (RSIOutOfRange == 0) {
+				if (Direction == TrendDirection.Bullish && entryEvaluator.rsi[0] < 30) {
+					RSIOutOfRange = DistanceMoved;
+				}
+
+				if (Direction == TrendDirection.Bearish && entryEvaluator.rsi[0] > 70) {
+					RSIOutOfRange = DistanceMoved;
+				}
+			}
+			#endregion
+
+			#region ATRAboveAverageATR
+			if (ATRAboveAverageATR == 0 && entryEvaluator.atr[0] > entryEvaluator.avgAtr[0]) {
+				ATRAboveAverageATR = DistanceMoved;
+			}
+			#endregion
+
+			#region ATRBelowAverageATR
+			if (ATRBelowAverageATR == 0 && entryEvaluator.atr[0] < entryEvaluator.avgAtr[0]) {
+				ATRBelowAverageATR = DistanceMoved;
+			}
+			#endregion
+
+			#region ATRAboveAverageATRByAStdDev
+			if (ATRAboveAverageATRByAStdDev == 0
+					&& (entryEvaluator.atr[0] - entryEvaluator.avgAtr[0]) > entryEvaluator.stdDevAtr[0]) {
+				ATRAboveAverageATRByAStdDev = DistanceMoved;
+			}
+			#endregion
+
+			#region ATRBelowAverageATRByAStdDev
+			if (ATRBelowAverageATRByAStdDev == 0
+					&& (entryEvaluator.avgAtr[0] - entryEvaluator.atr[0]) > entryEvaluator.stdDevAtr[0]) {
+				ATRBelowAverageATRByAStdDev = DistanceMoved;
+			}
+			#endregion
+
+			#region StrongCounterTrendFollowThrough
+			if (StrongCounterTrendFollowThrough == 0) {
+				if (Direction == TrendDirection.Bullish && pa.IsBearishBar(0) && pa.IsStrongFollowThroughBar(0)) {
+					StrongCounterTrendFollowThrough = DistanceMoved;
+				}
+
+				if (Direction == TrendDirection.Bearish && pa.IsBullishBar(0) && pa.IsStrongFollowThroughBar(0)) {
+					StrongCounterTrendFollowThrough = DistanceMoved;
+				}
+			}
+			#endregion
+
 		}
 		#endregion
 

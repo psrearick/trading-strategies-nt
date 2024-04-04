@@ -36,12 +36,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public SMA avgAtr;
 		public EMA emaFast;
 		public EMA emaSlow;
-		private Series<int> barsSinceDoubleTop;
-		private Series<int> barsSinceDoubleBottom;
-//		private int window = 100;
+		public Series<int> barsSinceDoubleTop;
+		public Series<int> barsSinceDoubleBottom;
+		private List<EntrySignal> activeEntries = new List<EntrySignal>();
 		private List<EntrySignal> entries = new List<EntrySignal>(200);
 		private Dictionary<string, double> correlations = new Dictionary<string, double>();
 		private Dictionary<string, double> significantCorrelations = new Dictionary<string, double>();
+		private Dictionary<string, double> exitCorrelations = new Dictionary<string, double>();
+		private Dictionary<string, double> significantExitCorrelations = new Dictionary<string, double>();
 		public Series<double> matched;
 		private int nextEntryIndex = 0;
 		public double successRate;
@@ -122,7 +124,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			LookForEntryBar();
 			UpdateEntryStatus();
 
-			if (CurrentBar % frequency == 0) {
+			if (CurrentBar % frequency == 10) {
 	            CalculateCorrelations();
 	        }
 
@@ -132,11 +134,111 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region CalculateExitCorrelations()
+		private void CalculateExitCorrelations()
+		{
+			exitCorrelations.Clear();
+			List<EntrySignal> openEntries = entries.Where(e => !e.IsClosed).ToList();
+
+			exitCorrelations["TrendDirectionChanged"] = openEntries
+				.Where(e => e.TrendDirectionChanged > 0)
+				.Select(e => e.TrendDirectionChanged).Average();
+			exitCorrelations["CounterTrendTightChannel"] = openEntries
+				.Where(e => e.CounterTrendTightChannel > 0)
+				.Select(e => e.CounterTrendTightChannel).Average();
+			exitCorrelations["CounterTrendBroadChannel"] = openEntries
+				.Where(e => e.CounterTrendBroadChannel > 0)
+				.Select(e => e.CounterTrendBroadChannel).Average();
+			exitCorrelations["CounterTrendBreakout"] = openEntries
+				.Where(e => e.CounterTrendBreakout > 0)
+				.Select(e => e.CounterTrendBreakout).Average();
+			exitCorrelations["CounterTrendBreakoutTrend"] = openEntries
+				.Where(e => e.CounterTrendBreakoutTrend > 0)
+				.Select(e => e.CounterTrendBreakoutTrend).Average();
+			exitCorrelations["CounterTrendLegLong"] = openEntries
+				.Where(e => e.CounterTrendLegLong > 0)
+				.Select(e => e.CounterTrendLegLong).Average();
+			exitCorrelations["CounterTrendLegShort"] = openEntries
+				.Where(e => e.CounterTrendLegShort > 0)
+				.Select(e => e.CounterTrendLegShort).Average();
+			exitCorrelations["CounterTrendLegAfterDoubleTopBottom"] = openEntries
+				.Where(e => e.CounterTrendLegAfterDoubleTopBottom > 0)
+				.Select(e => e.CounterTrendLegAfterDoubleTopBottom).Average();
+			exitCorrelations["TrailingStopBeyondPreviousExtreme"] = openEntries
+				.Where(e => e.TrailingStopBeyondPreviousExtreme > 0)
+				.Select(e => e.TrailingStopBeyondPreviousExtreme).Average();
+			exitCorrelations["MovingAverageCrossover"] = openEntries
+				.Where(e => e.MovingAverageCrossover > 0)
+				.Select(e => e.MovingAverageCrossover).Average();
+			exitCorrelations["DoubleTopBottom"] = openEntries
+				.Where(e => e.DoubleTopBottom > 0)
+				.Select(e => e.DoubleTopBottom).Average();
+			exitCorrelations["NoNewExtreme8"] = openEntries
+				.Where(e => e.NoNewExtreme8 > 0)
+				.Select(e => e.NoNewExtreme8).Average();
+			exitCorrelations["NoNewExtreme10"] = openEntries
+				.Where(e => e.NoNewExtreme10 > 0)
+				.Select(e => e.NoNewExtreme10).Average();
+			exitCorrelations["NoNewExtreme12"] = openEntries
+				.Where(e => e.NoNewExtreme12 > 0)
+				.Select(e => e.NoNewExtreme12).Average();
+			exitCorrelations["CounterTrendPressure"] = openEntries
+				.Where(e => e.CounterTrendPressure > 0)
+				.Select(e => e.CounterTrendPressure).Average();
+			exitCorrelations["CounterTrendStrongPressure"] = openEntries
+				.Where(e => e.CounterTrendStrongPressure > 0)
+				.Select(e => e.CounterTrendStrongPressure).Average();
+			exitCorrelations["CounterTrendWeakTrend"] = openEntries
+				.Where(e => e.CounterTrendWeakTrend > 0)
+				.Select(e => e.CounterTrendWeakTrend).Average();
+			exitCorrelations["CounterTrendStrongTrend"] = openEntries
+				.Where(e => e.CounterTrendStrongTrend > 0)
+				.Select(e => e.CounterTrendStrongTrend).Average();
+			exitCorrelations["RSIOutOfRange"] = openEntries
+				.Where(e => e.RSIOutOfRange > 0)
+				.Select(e => e.RSIOutOfRange).Average();
+			exitCorrelations["ATRAboveAverageATR"] = openEntries
+				.Where(e => e.ATRAboveAverageATR > 0)
+				.Select(e => e.ATRAboveAverageATR).Average();
+			exitCorrelations["ATRBelowAverageATR"] = openEntries
+				.Where(e => e.ATRBelowAverageATR > 0)
+				.Select(e => e.ATRBelowAverageATR).Average();
+			exitCorrelations["ATRAboveAverageATRByAStdDev"] = openEntries
+				.Where(e => e.ATRAboveAverageATRByAStdDev > 0)
+				.Select(e => e.ATRAboveAverageATRByAStdDev).Average();
+			exitCorrelations["ATRBelowAverageATRByAStdDev"] = openEntries
+				.Where(e => e.ATRBelowAverageATRByAStdDev > 0)
+				.Select(e => e.ATRBelowAverageATRByAStdDev).Average();
+			exitCorrelations["StrongCounterTrendFollowThrough"] = openEntries
+				.Where(e => e.StrongCounterTrendFollowThrough > 0)
+				.Select(e => e.StrongCounterTrendFollowThrough).Average();
+
+
+			// Remove any NaN values from the correlations dictionary
+		    exitCorrelations = exitCorrelations.Where(c => !double.IsNaN(c.Value)).ToDictionary(i => i.Key, i => i.Value);
+
+			if (exitCorrelations.Count > 0) {
+				// Calculate the mean and standard deviation of the correlation coefficients
+			    double mean = exitCorrelations.Values.Average();
+			    double stdDev = StandardDeviation(exitCorrelations.Values);
+
+			    // Determine the significance threshold based on the standard deviation
+		    		double threshold = 1; // Adjust the multiplier as needed
+		   	 	double significanceThreshold = mean + threshold * stdDev;
+
+		    		// Filter significant correlations based on the dynamic threshold
+		    		significantExitCorrelations = exitCorrelations.Where(c => Math.Abs(c.Value) > significanceThreshold).ToDictionary(i => i.Key, i => i.Value);
+			} else {
+		        significantExitCorrelations.Clear();
+		    }
+		}
+		#endregion
+
 		#region CalculateCorrelations()
 		private void CalculateCorrelations()
 		{
 			correlations.Clear();
-			List<EntrySignal> closedEntries = entries.Where(e => e.IsClosed || e.IsSuccessful).Select(e => e).ToList();
+			List<EntrySignal> closedEntries = entries.Where(e => e.IsClosed || e.IsSuccessful).ToList();
 
 	        correlations["RSI"] = correlationCoefficient(closedEntries.Select(e => e.Rsi).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
 	        correlations["ATR"] = correlationCoefficient(closedEntries.Select(e => e.Atr).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
@@ -245,7 +347,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			AddEntry(md.Direction[0]);
+			AddEntry();
 		}
 		#endregion
 
@@ -259,7 +361,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region AddEntry()
-		private void AddEntry(TrendDirection direction)
+		private void AddEntry()
 		{
 			EntrySignal entry = entries[nextEntryIndex];
 			nextEntryIndex++;
@@ -268,7 +370,35 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				nextEntryIndex = 0;
 			}
 
-			entry.Direction = direction;
+			InitializeEntry(entry);
+		}
+		#endregion
+
+		#region GetNewEntryID()
+		public int GetNewEntryID()
+		{
+			if (activeEntries.Count > 0) {
+				for (int i = 0; i < activeEntries.Count; i++) {
+					if (activeEntries[i].IsClosed) {
+						InitializeEntry(activeEntries[i]);
+						return i;
+					}
+				}
+			}
+
+			EntrySignal entry = EntrySignal(CurrentBar);
+			InitializeEntry(entry);
+
+			activeEntries.Add(entry);
+
+			return activeEntries.Count - 1;
+		}
+		#endregion
+
+		#region InitializeEntry()
+		public EntrySignal InitializeEntry(EntrySignal entry)
+		{
+			entry.Direction = md.Direction[0];
 			entry.PreviousSwing	= entry.Direction == TrendDirection.Bearish
 				? pa.BarsAgoHigh(0, md.LegLong.BarsAgoStarts[0])
 				: pa.BarsAgoLow(0, md.LegLong.BarsAgoStarts[0]);
@@ -292,6 +422,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			entry.entryEvaluator		= this;
 
 			entry.CalculateAdditionalValues();
+
+			return entry;
+		}
+		#endregion
+
+		#region EvaluateExitCriteria()
+		public bool EvaluateExitCriteria(EntrySignal entry)
+		{
+			return false;
 		}
 		#endregion
 
