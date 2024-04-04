@@ -27,21 +27,24 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	public class EntryEvaluator : Indicator
 	{
 		#region Variables
-		private PriceActionUtils pa;
+		public PriceActionUtils pa;
 		public MarketDirection md;
-		private RSI rsi;
-		private ATR atr;
-		private StdDev stdDevAtr;
-		private SMA avgAtr;
-		private EMA emaFast;
-		private EMA emaSlow;
+		public PriceActionPatterns paPatterns;
+		public RSI rsi;
+		public ATR atr;
+		public StdDev stdDevAtr;
+		public SMA avgAtr;
+		public EMA emaFast;
+		public EMA emaSlow;
+		private Series<int> barsSinceDoubleTop;
+		private Series<int> barsSinceDoubleBottom;
 //		private int window = 100;
 		private List<EntrySignal> entries = new List<EntrySignal>(200);
 		private Dictionary<string, double> correlations = new Dictionary<string, double>();
 		private Dictionary<string, double> significantCorrelations = new Dictionary<string, double>();
 		public Series<double> matched;
 		private int nextEntryIndex = 0;
-		public bool Skip = false;
+		public double successRate;
 		private int frequency;
 		#endregion
 
@@ -71,6 +74,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			else if (State == State.Configure)
 			{
 				pa 						= PriceActionUtils();
+				paPatterns				= PriceActionPatterns();
 				md						= MarketDirection(Period, Period * 2);
 				atr						= ATR(14);
 				rsi						= RSI(14, 3);
@@ -81,9 +85,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			#region State.DataLoaded
 			if (State == State.DataLoaded) {
-				stdDevAtr	= StdDev(atr, 20);
-				avgAtr		= SMA(atr, 20);
-				matched		= new Series<double>(this, MaximumBarsLookBack.TwoHundredFiftySix);
+				barsSinceDoubleTop		= new Series<int>(this);
+				barsSinceDoubleBottom	= new Series<int>(this);
+				stdDevAtr				= StdDev(atr, 20);
+				avgAtr					= SMA(atr, 20);
+				matched					= new Series<double>(this, MaximumBarsLookBack.TwoHundredFiftySix);
 
 				for (int i = 0; i < Window; i++) {
 					entries.Add(EntrySignal(i + 1));
@@ -103,6 +109,16 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
+			barsSinceDoubleBottom[0] = barsSinceDoubleBottom[1] + 1;
+			if (paPatterns.IsDoubleBottom(0, 30, 3)) {
+				barsSinceDoubleBottom[0] = 0;
+			}
+
+			barsSinceDoubleTop[0] = barsSinceDoubleTop[1] + 1;
+			if (paPatterns.IsDoubleTop(0, 30, 3)) {
+				barsSinceDoubleTop[0] = 0;
+			}
+
 			LookForEntryBar();
 			UpdateEntryStatus();
 
@@ -111,6 +127,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	        }
 
 			EvaluateCriteria(0);
+
+			successRate = (double) entries.Count(e => e.IsSuccessful) / Window;
 		}
 		#endregion
 
@@ -153,17 +171,18 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			    double stdDev = StandardDeviation(correlations.Values);
 
 			    // Determine the significance threshold based on the standard deviation
-		    	double threshold = 1; // Adjust the multiplier as needed
-		    	double significanceThreshold = mean + threshold * stdDev;
+		    		double threshold = 1; // Adjust the multiplier as needed
+		   	 	double significanceThreshold = mean + threshold * stdDev;
 
-		    	// Filter significant correlations based on the dynamic threshold
-		    	significantCorrelations = correlations.Where(c => Math.Abs(c.Value) > significanceThreshold).ToDictionary(i => i.Key, i => i.Value);
+		    		// Filter significant correlations based on the dynamic threshold
+		    		significantCorrelations = correlations.Where(c => Math.Abs(c.Value) > significanceThreshold).ToDictionary(i => i.Key, i => i.Value);
 			} else {
 		        significantCorrelations.Clear();
 		    }
 		}
 		#endregion
 
+		#region StandardDeviation()
 		private double StandardDeviation(IEnumerable<double> values)
 		{
 		    double avg = values.Average();
@@ -171,6 +190,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    double denominator = values.Count() - 1;
 		    return Math.Sqrt(sum / denominator);
 		}
+		#endregion
 
 		#region correlationCoefficient()
 		private double correlationCoefficient(double []X, double []Y)
@@ -253,21 +273,23 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				? pa.BarsAgoHigh(0, md.LegLong.BarsAgoStarts[0])
 				: pa.BarsAgoLow(0, md.LegLong.BarsAgoStarts[0]);
 
-			entry.EntryBar		= CurrentBar;
-			entry.Rsi 			= rsi[0];
-			entry.Atr 			= atr[0];
-			entry.StdDevAtr		= stdDevAtr[0];
-			entry.AvgAtr		= avgAtr[0];
-			entry.EmaFast 		= emaFast[0];
-			entry.EmaSlow 		= emaSlow[0];
-			entry.HighEntry		= High[0];
-			entry.LowEntry		= Low[0];
-			entry.OpenEntry 	= Open[0];
-			entry.CloseEntry 	= Close[0];
-			entry.TrendType		= md.Stage[0];
+			entry.EntryBar			= CurrentBar;
+			entry.Rsi 				= rsi[0];
+			entry.Atr 				= atr[0];
+			entry.StdDevAtr			= stdDevAtr[0];
+			entry.AvgAtr				= avgAtr[0];
+			entry.EmaFast 			= emaFast[0];
+			entry.EmaSlow 			= emaSlow[0];
+			entry.HighEntry			= High[0];
+			entry.LowEntry			= Low[0];
+			entry.OpenEntry			= Open[0];
+			entry.CloseEntry 		= Close[0];
+			entry.TrendType			= md.Stage[0];
 
 			entry.IsClosed = false;
 			entry.IsSuccessful = false;
+
+			entry.entryEvaluator		= this;
 
 			entry.CalculateAdditionalValues();
 		}

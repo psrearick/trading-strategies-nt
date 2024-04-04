@@ -36,16 +36,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private EntryEvaluator entryEvaluator;
 		private TradesExporter tradesExporter;
 
-		private double stopLoss 			= 0;
-		private int choppinessThresholdLow	= 40;
-		private int choppinessThresholdHigh	= 60;
-		private List<double> chopHistory = new List<double>();
+		private double stopLoss 				= 0;
 		private Series<int> barsSinceDoubleTop;
 		private Series<int> barsSinceDoubleBottom;
-		private bool reset = false;
-		private int day = 0;
+		private bool reset 					= false;
+		private double successRateThreshold = 0.6;
 
-		private DateTime LastDataDay	= new DateTime(2023, 03, 17);
+		private DateTime LastDataDay		= new DateTime(2023, 03, 17);
 		private DateTime OpenTime		= DateTime.Parse("10:00", System.Globalization.CultureInfo.InvariantCulture);
 		private DateTime CloseTime		= DateTime.Parse("15:30", System.Globalization.CultureInfo.InvariantCulture);
 		private DateTime LastTradeTime	= DateTime.Parse("15:00", System.Globalization.CultureInfo.InvariantCulture);
@@ -58,16 +55,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (State == State.SetDefaults)
 			{
 				Description									= @"";
-				Name										= "Strategy 3.0.1";
+				Name											= "Strategy 3.0.1";
 				Calculate									= Calculate.OnBarClose;
 				EntriesPerDirection							= 1;
 				EntryHandling								= EntryHandling.UniqueEntries;
-				IsExitOnSessionCloseStrategy				= true;
+				IsExitOnSessionCloseStrategy					= true;
 				ExitOnSessionCloseSeconds					= 30;
 				IsFillLimitOnTouch							= false;
 				MaximumBarsLookBack							= MaximumBarsLookBack.TwoHundredFiftySix;
 				OrderFillResolution							= OrderFillResolution.Standard;
-				Slippage									= 0;
+				Slippage										= 0;
 				StartBehavior								= StartBehavior.WaitUntilFlat;
 				TimeInForce									= TimeInForce.Gtc;
 				TraceOrders									= false;
@@ -80,7 +77,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				TimeShift									= -6;
 				Period 										= 10;
 				Quantity 									= 1;
-				ATRMultiplier								= 1;
+				TargetMultiplier								= 1;
 				QuantityMultiplier							= 2;
 				Window										= 20;
 			}
@@ -92,7 +89,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				PA 						= PriceActionUtils();
 				PAPatterns				= PriceActionPatterns();
 				entryEvaluator			= EntryEvaluator(Period, Window);
-//				marketDirection 		= entryEvaluator.md;
+//				marketDirection 			= entryEvaluator.md;
 //				legs 					= marketDirection.LegLong;
 			}
 			#endregion
@@ -100,7 +97,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			#region State.DataLoaded
 			if (State == State.DataLoaded) {
 //				tradesExporter			= TradesExporter(Name, Instrument.MasterInstrument.Name);
-				marketDirection 		= entryEvaluator.md;
+				marketDirection 			= entryEvaluator.md;
 				legs 					= marketDirection.LegLong;
 				barsSinceDoubleTop		= new Series<int>(this);
 				barsSinceDoubleBottom	= new Series<int>(this);
@@ -123,13 +120,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 				barsSinceDoubleBottom[0] = 0;
 			}
 
-
 			barsSinceDoubleTop[0] = barsSinceDoubleTop[1] + 1;
 			if (PAPatterns.IsDoubleTop(0, 30, 3)) {
 				barsSinceDoubleTop[0] = 0;
 			}
-
-
 
 //			entryEvaluator.Skip = !isValidTradeTime();
 
@@ -151,7 +145,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		#region shouldExit()
 		private bool shouldExit() {
-			double currentStopLoss = stopLoss;
 			if (Position.MarketPosition == MarketPosition.Long) {
 				if (marketDirection.Direction[0] == TrendDirection.Bearish) {
 					return true;
@@ -274,7 +267,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 			bool longMatch 	= longPatternMatched();
 			bool shortMatch	= shortPatternMatched();
 
+			double adjustedTargetMultiplier = Math.Max(1, TargetMultiplier * 0.5);
 			int adjustedQuantity = entryEvaluator.matched[0] < 1 ? Quantity : Quantity * QuantityMultiplier;
+
+			if (entryEvaluator.successRate > successRateThreshold) {
+				adjustedTargetMultiplier = TargetMultiplier;
+				adjustedQuantity = adjustedQuantity * QuantityMultiplier;
+			}
 
 			int quantity2 = (int) Math.Floor((double) adjustedQuantity / 2);
 			int quantity1 = adjustedQuantity - quantity2;
@@ -286,10 +285,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 				if (swingLow < Low[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-					SetProfitTarget("LongEntry1", CalculationMode.Ticks, stopLossDistance * ATRMultiplier);
+					SetProfitTarget("LongEntry1", CalculationMode.Ticks, stopLossDistance * adjustedTargetMultiplier);
 					EnterLong(quantity1, "LongEntry1");
 
-					if (quantity2 > 0) {
+					if (quantity2 > 0 && entryEvaluator.successRate > successRateThreshold) {
 						EnterLong(quantity2, "LongEntry2");
 					}
 				}
@@ -302,10 +301,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 				if (swingHigh > High[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-					SetProfitTarget("ShortEntry1", CalculationMode.Ticks, stopLossDistance * ATRMultiplier);
+					SetProfitTarget("ShortEntry1", CalculationMode.Ticks, stopLossDistance * adjustedTargetMultiplier);
 					EnterShort(quantity1, "ShortEntry1");
 
-					if (quantity2 > 0) {
+					if (quantity2 > 0 && entryEvaluator.successRate > successRateThreshold) {
 						EnterShort(quantity2, "ShortEntry2");
 					}
 				}
@@ -320,7 +319,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (entryEvaluator.matched[0] < 0.5) {
+			if (entryEvaluator.matched[0] < (1 - entryEvaluator.successRate)) {
 				return false;
 			}
 
@@ -343,7 +342,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (entryEvaluator.matched[0] < 0.5) {
+			if (entryEvaluator.matched[0] <  (1 - entryEvaluator.successRate)) {
 				return false;
 			}
 
@@ -388,7 +387,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		[NinjaScriptProperty]
 		[Range(double.MinValue, double.MaxValue)]
 		[Display(Name="Target Multiplier", Description="Target Multiplier", Order=4, GroupName="Parameters")]
-		public double ATRMultiplier
+		public double TargetMultiplier
 		{ get; set; }
 
 		[NinjaScriptProperty]

@@ -29,10 +29,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region Variables
 
 		private int window = 81;
-
-		private Utils utils = new Utils();
-
-		private PriceActionUtils pa;
+		public EntryEvaluator entryEvaluator;
+		public PriceActionUtils pa;
 
 		public TrendDirection CurrentDirection = TrendDirection.Flat;
 
@@ -98,6 +96,28 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public bool IsBelowAverageATR;
 		public bool IsAboveAverageATRByAStdDev;
 
+		public double TrendDirectionChanged = 0;
+		public double CounterTrendTightChannel = 0;
+		public double CounterTrendBroadChannel = 0;
+		public double CounterTrendBreakout = 0;
+		public double CounterTrendLegLong = 0;
+		public double CounterTrendLegShort = 0;
+		public double CounterTrendLegAfterDoubleTopBottom = 0;
+		public double TrailingStopBeyondPreviousExtreme = 0;
+		public double MovingAverageCrossover = 0;
+		public double DoubleTopBottom = 0;
+		public double NoNewExtreme8 = 0;
+		public double NoNewExtreme10 = 0;
+		public double NoNewExtreme12 = 0;
+		public double CounterTrendPressure = 0;
+		public double CounterTrendWeakTrend = 0;
+		public double CounterTrendStrongTrend = 0;
+		public double RSIOutOfRange = 0;
+		public double ATRAboveAverageATR = 0;
+		public double ATRBelowAverageATR = 0;
+		public double ATRAboveAverageATRByAStdDev = 0;
+		public double ATRBelowAverageATRByAStdDev = 0;
+
 		#endregion
 
 		#region OnStateChange()
@@ -111,23 +131,27 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				Calculate									= Calculate.OnBarClose;
 			}
 			#endregion
+
+			#region State.Configure
 			else if (State == State.Configure)
 			{
-				pa = PriceActionUtils();
+//				pa = PriceActionUtils();
 			}
+			#endregion
 		}
 		#endregion
 
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			pa.Update();
+			EvaluateExitConditions();
 		}
 		#endregion
 
 		#region CalculateAdditionalValues()
 		public void CalculateAdditionalValues()
 	    {
+			pa = entryEvaluator.pa;
 			CalculateEMAValues();
 			CalculateStopDistance();
 			CalculateBuySellPressure();
@@ -194,10 +218,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			int period 		= CurrentBar - (EntryBar - PreviousSwing);
 			DistanceMoved 	= Direction == TrendDirection.Bullish ? Close[0] - CloseEntry : CloseEntry - Close[0];
-			HighestHigh 	= period > 0 ? pa.HighestHigh(0, period) : High[0];
+			HighestHigh 		= period > 0 ? pa.HighestHigh(0, period) : High[0];
 			LowestLow		= period > 0 ? pa.LowestLow(0, period) : Low[0];
 			GreatestProfit	= Direction == TrendDirection.Bullish ? HighestHigh - CloseEntry : CloseEntry - LowestLow;
-			GreatestLoss	= Direction == TrendDirection.Bullish ? CloseEntry - LowestLow : HighestHigh - CloseEntry;
+			GreatestLoss		= Direction == TrendDirection.Bullish ? CloseEntry - LowestLow : HighestHigh - CloseEntry;
 			ProfitMultiples	= GreatestProfit / StopDistance;
 
 			IsSuccessful = (ProfitMultiples > 1);
@@ -245,6 +269,82 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			IsWithTrendFastEMA = FastEMADirection == Direction;
 			IsWithTrendSlowEMA = SlowEMADirection == Direction;
+		}
+		#endregion
+
+		#region EvaluateExitConditions()
+		private void EvaluateExitConditions()
+		{
+			DistanceMoved = Direction == TrendDirection.Bullish ? Close[0] - CloseEntry : CloseEntry - Close[0];
+
+			if (TrendDirectionChanged == 0) {
+				if (entryEvaluator.md.Direction[0] != TrendDirection.Flat
+					&& entryEvaluator.md.Direction[0] != Direction)
+				{
+					TrendDirectionChanged = DistanceMoved;
+				}
+			}
+
+			if (CounterTrendTightChannel == 0) {
+				if (entryEvaluator.md.TightChannels[0] != TrendDirection.Flat
+					&& entryEvaluator.md.TightChannels[0] != Direction)
+				{
+					CounterTrendTightChannel = DistanceMoved;
+				}
+			}
+
+			if (CounterTrendBroadChannel == 0) {
+				if (entryEvaluator.md.BroadChannels[0] != TrendDirection.Flat
+					&& entryEvaluator.md.BroadChannels[0] != Direction)
+				{
+					CounterTrendBroadChannel = DistanceMoved;
+				}
+			}
+
+			if (CounterTrendBreakout == 0) {
+				if (entryEvaluator.md.Breakouts[0] != TrendDirection.Flat
+					&& entryEvaluator.md.Breakouts[0] != Direction)
+				{
+					CounterTrendBreakout = DistanceMoved;
+				}
+			}
+
+			if (CounterTrendLegLong == 0) {
+				if (entryEvaluator.md.LegLong.LegDirectionAtBar(0) != TrendDirection.Flat
+					&& entryEvaluator.md.LegLong.LegDirectionAtBar(0) != Direction)
+				{
+					CounterTrendLegLong = DistanceMoved;
+				}
+			}
+
+			if (CounterTrendLegShort == 0) {
+				if (entryEvaluator.md.LegShort.LegDirectionAtBar(0) != TrendDirection.Flat
+					&& entryEvaluator.md.LegShort.LegDirectionAtBar(0) != Direction)
+				{
+					CounterTrendLegShort = DistanceMoved;
+				}
+			}
+
+			if (DoubleTopBottom == 0) {
+
+			}
+
+
+//			public double DoubleTopBottom = 0;
+//			public double CounterTrendLegAfterDoubleTopBottom = 0;
+//			public double TrailingStopBeyondPreviousExtreme = 0;
+//			public double MovingAverageCrossover = 0;
+//			public double NoNewExtreme8 = 0;
+//			public double NoNewExtreme10 = 0;
+//			public double NoNewExtreme12 = 0;
+//			public double CounterTrendPressure = 0;
+//			public double CounterTrendWeakTrend = 0;
+//			public double CounterTrendStrongTrend = 0;
+//			public double RSIOutOfRange = 0;
+//			public double IsAboveAverageATR = 0;
+//			public double IsBelowAverageATR = 0;
+//			public double IsAboveAverageATRByAStdDev = 0;
+//			public double IsBelowAverageATRByAStdDev = 0;
 		}
 		#endregion
 

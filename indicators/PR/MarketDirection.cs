@@ -46,9 +46,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private int WindowSize = 81;
 
 		private List<TrendDirection> legDirections		= new List<TrendDirection>();
-		private List<int> legIndexes					= new List<int>();
+		private List<int> legIndexes						= new List<int>();
 		private List<int> legLengths 					= new List<int>();
-		private	List<double> legChanges 				= new List<double>();
+		private	List<double> legChanges 					= new List<double>();
 
 		private List<TrendDirection> channelDirections 	= new List<TrendDirection>();
 		private List<double> channelDirectionStdDevs 	= new List<double>();
@@ -56,23 +56,23 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private List<int> channelDirectionLengths 		= new List<int>();
 
 		private int numberOfTrendDirectionalLegsInChannel 				= 0;
-		private int numberOfCounterDirectionalLegsInChannel 			= 0;
-		private	int numberOfDirectionalLegsInChannel					= 0;
+		private int numberOfCounterDirectionalLegsInChannel 				= 0;
+		private	int numberOfDirectionalLegsInChannel						= 0;
 		private int numberOfConsecutiveCounterDirectionalLegsInChannel	= 0;
 
 		private TrendDirection previousDirectionalLegDirection 	= TrendDirection.Flat;
-		private double previousDirectionalLegChange 			= 0;
+		private double previousDirectionalLegChange 				= 0;
 		private int previousDirectionalLegLength 				= 0;
 
-		private TrendDirection previousLegDirection 	= TrendDirection.Flat;
+		private TrendDirection previousLegDirection 		= TrendDirection.Flat;
 		private int previousLegLength 					= 0;
 		private double previousLegChange 				= 0;
 		private	TrendDirection currentChannelDirection 	= TrendDirection.Flat;
 		private	int currentChannelLength 				= 0;
-		private	double currentChannelChange 			= 0;
+		private	double currentChannelChange 				= 0;
 		private	TrendDirection currentLegDirection 		= TrendDirection.Flat;
 		private	int currentLegLength 					= 0;
-		private	double currentLegChange 				= 0;
+		private	double currentLegChange 					= 0;
 		#endregion
 
 		#region OnStateChange()
