@@ -36,7 +36,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private EntryEvaluator entryEvaluator;
 		private TradesExporter tradesExporter;
 
-		private int entryID;
+//		private int entryID;
+		private EntrySignal entry;
 
 		private double stopLoss 				= 0;
 		private Series<int> barsSinceDoubleTop;
@@ -91,6 +92,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				PA 						= PriceActionUtils();
 				PAPatterns				= PriceActionPatterns();
 				entryEvaluator			= EntryEvaluator(Period, Window);
+				entry					= EntrySignal(1);
 //				marketDirection 			= entryEvaluator.md;
 //				legs 					= marketDirection.LegLong;
 			}
@@ -112,6 +114,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		protected override void OnBarUpdate()
 		{
 			PAPatterns.Update();
+
+			if (Position.MarketPosition != MarketPosition.Flat) {
+				entry.Update();
+			}
 
 			if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1) {
 				return;
@@ -147,10 +153,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		#region shouldExit()
 		private bool shouldExit() {
-
 			if (Position.MarketPosition != MarketPosition.Flat) {
-				Print(entryEvaluator.EvaluateExitCriteria(entryID));
-				if (entryEvaluator.EvaluateExitCriteria(entryID) > 0.5) {
+				if (entryEvaluator.EvaluateExitCriteria(entry) > 0) {
 					return true;
 				}
 			}
@@ -216,12 +220,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 			}
 
 			if (Position.MarketPosition == MarketPosition.Long) {
-				entryEvaluator.CloseEntryByID(entryID);
 				ExitLong();
 			}
 
 			if (Position.MarketPosition == MarketPosition.Short) {
-				entryEvaluator.CloseEntryByID(entryID);
 				ExitShort();
 			}
         }
@@ -283,21 +285,24 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return;
 			}
 
-			entryID = entryEvaluator.GetNewEntryID();
+			entryEvaluator.InitializeEntry(entry);
 
-			double adjustedTargetMultiplier = TargetMultiplier;
+			int quantity1	= entryEvaluator.matched[0] < 1 ? Quantity : Quantity * QuantityMultiplier;
+//			entryID = entryEvaluator.GetNewEntryID();
+
+//			double adjustedTargetMultiplier = TargetMultiplier;
 //			double adjustedTargetMultiplier = Math.Max(1, TargetMultiplier * 0.5);
-			int adjustedQuantity = entryEvaluator.matched[0] < 1 ? Quantity : Quantity * QuantityMultiplier;
+//			int adjustedQuantity = entryEvaluator.matched[0] < 1 ? Quantity : Quantity * QuantityMultiplier;
 
-			Print("entry matched: " + entryEvaluator.matched[0].ToString());
+//			Print("entry matched: " + entryEvaluator.matched[0].ToString());
 
 //			if (entryEvaluator.successRate > successRateThreshold) {
 //				adjustedTargetMultiplier = TargetMultiplier;
 //				adjustedQuantity = adjustedQuantity * QuantityMultiplier;
 //			}
 
-			int quantity2 = (int) Math.Floor((double) adjustedQuantity / 2);
-			int quantity1 = adjustedQuantity - quantity2;
+//			int quantity2 = (int) Math.Floor((double) adjustedQuantity / 2);
+//			int quantity1 = adjustedQuantity - quantity2;
 
 			if (longMatch) {
 				double swingLow = legs.BarsAgoStarts[0] > 0 ? Math.Min(MIN(Low, legs.BarsAgoStarts[0])[0], MIN(Low, 4)[0]) : Low[0];
@@ -306,16 +311,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 				if (swingLow < Low[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-					SetProfitTarget("LongEntry1", CalculationMode.Ticks, stopLossDistance * adjustedTargetMultiplier);
+//					SetProfitTarget("LongEntry1", CalculationMode.Ticks, stopLossDistance * adjustedTargetMultiplier);
 					EnterLong(quantity1, "LongEntry1");
 
 //					if (quantity2 > 0 && entryEvaluator.successRate > successRateThreshold) {
 //						EnterLong(quantity2, "LongEntry2");
 //					}
 
-					if (quantity2 > 0) {
-						EnterLong(quantity2, "LongEntry2");
-					}
+//					if (quantity2 > 0) {
+//						EnterLong(quantity2, "LongEntry2");
+//					}
 				}
 			}
 
@@ -326,12 +331,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 				if (swingHigh > High[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-					SetProfitTarget("ShortEntry1", CalculationMode.Ticks, stopLossDistance * adjustedTargetMultiplier);
+//					SetProfitTarget("ShortEntry1", CalculationMode.Ticks, stopLossDistance * adjustedTargetMultiplier);
 					EnterShort(quantity1, "ShortEntry1");
 
-					if (quantity2 > 0) {
-						EnterShort(quantity2, "ShortEntry2");
-					}
+//					if (quantity2 > 0) {
+//						EnterShort(quantity2, "ShortEntry2");
+//					}
 
 //					if (quantity2 > 0 && entryEvaluator.successRate > successRateThreshold) {
 //						EnterShort(quantity2, "ShortEntry2");
@@ -444,7 +449,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 //		[Display(Name="High Target Multiplier", Description="High Target Multiplier", Order=5, GroupName="Parameters")]
 //		public double HighATRMultiplier
 //		{ get; set; }
-	
+
 		[NinjaScriptProperty]
 		[Display(Name="Export Trades", Description="Export Trades", Order=6, GroupName="Parameters")]
 		public bool TradesExporterActivated

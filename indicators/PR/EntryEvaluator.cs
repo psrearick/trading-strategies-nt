@@ -40,11 +40,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public EMA emaSlow;
 		public Series<int> barsSinceDoubleTop;
 		public Series<int> barsSinceDoubleBottom;
-		private List<EntrySignal> activeEntries = new List<EntrySignal>();
 		private List<EntrySignal> entries = new List<EntrySignal>(200);
 		private Dictionary<string, double> correlations = new Dictionary<string, double>();
 		private Dictionary<string, double> significantCorrelations = new Dictionary<string, double>();
-		private Dictionary<string, double> exitCorrelations = new Dictionary<string, double>();
+		private Dictionary<string, double?> exitCorrelations = new Dictionary<string, double?>();
+		private Dictionary<string, double> filteredExitCorrelations = new Dictionary<string, double>();
 		private Dictionary<string, double> significantExitCorrelations = new Dictionary<string, double>();
 		public Series<double> matched;
 		private int nextEntryIndex = 0;
@@ -128,6 +128,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			if (CurrentBar % frequency == 0) {
 	            CalculateCorrelations();
+				CalculateExitCorrelations();
 	        }
 
 			EvaluateCriteria(0);
@@ -140,96 +141,83 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private void CalculateExitCorrelations()
 		{
 			exitCorrelations.Clear();
+
+			if (entries.Count == 0) {
+				significantExitCorrelations.Clear();
+				return;
+			}
+
 			List<EntrySignal> openEntries = entries.Where(e => !e.IsClosed).ToList();
 
+			if (openEntries.Count == 0) {
+				significantExitCorrelations.Clear();
+				return;
+			}
+
 			exitCorrelations["TrendDirectionChanged"] = openEntries
-				.Where(e => e.TrendDirectionChanged > 0)
-				.Select(e => e.TrendDirectionChanged).Average();
+				.Where(e => e.TrendDirectionChanged > 0).Average(e => (double?)e.TrendDirectionChanged);
 			exitCorrelations["CounterTrendTightChannel"] = openEntries
-				.Where(e => e.CounterTrendTightChannel > 0)
-				.Select(e => e.CounterTrendTightChannel).Average();
+				.Where(e => e.CounterTrendTightChannel > 0).Average(e => (double?)e.CounterTrendTightChannel);
 			exitCorrelations["CounterTrendBroadChannel"] = openEntries
-				.Where(e => e.CounterTrendBroadChannel > 0)
-				.Select(e => e.CounterTrendBroadChannel).Average();
+				.Where(e => e.CounterTrendBroadChannel > 0).Average(e => (double?)e.CounterTrendBroadChannel);
 			exitCorrelations["CounterTrendBreakout"] = openEntries
-				.Where(e => e.CounterTrendBreakout > 0)
-				.Select(e => e.CounterTrendBreakout).Average();
+				.Where(e => e.CounterTrendBreakout > 0).Average(e => (double?)e.CounterTrendBreakout);
 			exitCorrelations["CounterTrendBreakoutTrend"] = openEntries
-				.Where(e => e.CounterTrendBreakoutTrend > 0)
-				.Select(e => e.CounterTrendBreakoutTrend).Average();
+				.Where(e => e.CounterTrendBreakoutTrend > 0).Average(e => (double?)e.CounterTrendBreakoutTrend);
 			exitCorrelations["CounterTrendLegLong"] = openEntries
-				.Where(e => e.CounterTrendLegLong > 0)
-				.Select(e => e.CounterTrendLegLong).Average();
+				.Where(e => e.CounterTrendLegLong > 0).Average(e => (double?)e.CounterTrendLegLong);
 			exitCorrelations["CounterTrendLegShort"] = openEntries
-				.Where(e => e.CounterTrendLegShort > 0)
-				.Select(e => e.CounterTrendLegShort).Average();
+				.Where(e => e.CounterTrendLegShort > 0).Average(e => (double?)e.CounterTrendLegShort);
 			exitCorrelations["CounterTrendLegAfterDoubleTopBottom"] = openEntries
-				.Where(e => e.CounterTrendLegAfterDoubleTopBottom > 0)
-				.Select(e => e.CounterTrendLegAfterDoubleTopBottom).Average();
+				.Where(e => e.CounterTrendLegAfterDoubleTopBottom > 0).Average(e => (double?)e.CounterTrendLegAfterDoubleTopBottom);
 			exitCorrelations["TrailingStopBeyondPreviousExtreme"] = openEntries
-				.Where(e => e.TrailingStopBeyondPreviousExtreme > 0)
-				.Select(e => e.TrailingStopBeyondPreviousExtreme).Average();
+				.Where(e => e.TrailingStopBeyondPreviousExtreme > 0).Average(e => (double?)e.TrailingStopBeyondPreviousExtreme);
 			exitCorrelations["MovingAverageCrossover"] = openEntries
-				.Where(e => e.MovingAverageCrossover > 0)
-				.Select(e => e.MovingAverageCrossover).Average();
+				.Where(e => e.MovingAverageCrossover > 0).Average(e => (double?)e.MovingAverageCrossover);
 			exitCorrelations["DoubleTopBottom"] = openEntries
-				.Where(e => e.DoubleTopBottom > 0)
-				.Select(e => e.DoubleTopBottom).Average();
+				.Where(e => e.DoubleTopBottom > 0).Average(e => (double?)e.DoubleTopBottom);
 			exitCorrelations["NoNewExtreme8"] = openEntries
-				.Where(e => e.NoNewExtreme8 > 0)
-				.Select(e => e.NoNewExtreme8).Average();
+				.Where(e => e.NoNewExtreme8 > 0).Average(e => (double?)e.NoNewExtreme8);
 			exitCorrelations["NoNewExtreme10"] = openEntries
-				.Where(e => e.NoNewExtreme10 > 0)
-				.Select(e => e.NoNewExtreme10).Average();
+				.Where(e => e.NoNewExtreme10 > 0).Average(e => (double?)e.NoNewExtreme10);
 			exitCorrelations["NoNewExtreme12"] = openEntries
-				.Where(e => e.NoNewExtreme12 > 0)
-				.Select(e => e.NoNewExtreme12).Average();
+				.Where(e => e.NoNewExtreme12 > 0).Average(e => (double?)e.NoNewExtreme12);
 			exitCorrelations["CounterTrendPressure"] = openEntries
-				.Where(e => e.CounterTrendPressure > 0)
-				.Select(e => e.CounterTrendPressure).Average();
+				.Where(e => e.CounterTrendPressure > 0).Average(e => (double?)e.CounterTrendPressure);
 			exitCorrelations["CounterTrendStrongPressure"] = openEntries
-				.Where(e => e.CounterTrendStrongPressure > 0)
-				.Select(e => e.CounterTrendStrongPressure).Average();
+				.Where(e => e.CounterTrendStrongPressure > 0).Average(e => (double?)e.CounterTrendStrongPressure);
 			exitCorrelations["CounterTrendWeakTrend"] = openEntries
-				.Where(e => e.CounterTrendWeakTrend > 0)
-				.Select(e => e.CounterTrendWeakTrend).Average();
+				.Where(e => e.CounterTrendWeakTrend > 0).Average(e => (double?)e.CounterTrendWeakTrend);
 			exitCorrelations["CounterTrendStrongTrend"] = openEntries
-				.Where(e => e.CounterTrendStrongTrend > 0)
-				.Select(e => e.CounterTrendStrongTrend).Average();
+				.Where(e => e.CounterTrendStrongTrend > 0).Average(e => (double?)e.CounterTrendStrongTrend);
 			exitCorrelations["RSIOutOfRange"] = openEntries
-				.Where(e => e.RSIOutOfRange > 0)
-				.Select(e => e.RSIOutOfRange).Average();
+				.Where(e => e.RSIOutOfRange > 0).Average(e => (double?)e.RSIOutOfRange);
 			exitCorrelations["ATRAboveAverageATR"] = openEntries
-				.Where(e => e.ATRAboveAverageATR > 0)
-				.Select(e => e.ATRAboveAverageATR).Average();
+				.Where(e => e.ATRAboveAverageATR > 0).Average(e => (double?)e.ATRAboveAverageATR);
 			exitCorrelations["ATRBelowAverageATR"] = openEntries
-				.Where(e => e.ATRBelowAverageATR > 0)
-				.Select(e => e.ATRBelowAverageATR).Average();
+				.Where(e => e.ATRBelowAverageATR > 0).Average(e => (double?)e.ATRBelowAverageATR);
 			exitCorrelations["ATRAboveAverageATRByAStdDev"] = openEntries
-				.Where(e => e.ATRAboveAverageATRByAStdDev > 0)
-				.Select(e => e.ATRAboveAverageATRByAStdDev).Average();
+				.Where(e => e.ATRAboveAverageATRByAStdDev > 0).Average(e => (double?)e.ATRAboveAverageATRByAStdDev);
 			exitCorrelations["ATRBelowAverageATRByAStdDev"] = openEntries
-				.Where(e => e.ATRBelowAverageATRByAStdDev > 0)
-				.Select(e => e.ATRBelowAverageATRByAStdDev).Average();
+				.Where(e => e.ATRBelowAverageATRByAStdDev > 0).Average(e => (double?)e.ATRBelowAverageATRByAStdDev);
 			exitCorrelations["StrongCounterTrendFollowThrough"] = openEntries
-				.Where(e => e.StrongCounterTrendFollowThrough > 0)
-				.Select(e => e.StrongCounterTrendFollowThrough).Average();
+				.Where(e => e.StrongCounterTrendFollowThrough > 0).Average(e => (double?)e.StrongCounterTrendFollowThrough);
+			exitCorrelations["ProfitTarget1"] = openEntries.Where(e => e.ProfitTarget1 > 0).Average(e => (double?)e.ProfitTarget1);
+			exitCorrelations["ProfitTarget2"] = openEntries.Where(e => e.ProfitTarget2 > 0).Average(e => (double?)e.ProfitTarget2);
+			exitCorrelations["ProfitTarget3"] = openEntries.Where(e => e.ProfitTarget3 > 0).Average(e => (double?)e.ProfitTarget3);
+			exitCorrelations["ProfitTarget4"] = openEntries.Where(e => e.ProfitTarget4 > 0).Average(e => (double?)e.ProfitTarget4);
+			exitCorrelations["ProfitTarget5"] = openEntries.Where(e => e.ProfitTarget5 > 0).Average(e => (double?)e.ProfitTarget5);
 
+		    filteredExitCorrelations = exitCorrelations.Where(c => (c.Value.HasValue && !double.IsNaN((double)c.Value))).ToDictionary(i => i.Key, i => (double)i.Value);
 
-			// Remove any NaN values from the correlations dictionary
-		    exitCorrelations = exitCorrelations.Where(c => !double.IsNaN(c.Value)).ToDictionary(i => i.Key, i => i.Value);
+			if (filteredExitCorrelations.Count > 0) {
+			    double mean = filteredExitCorrelations.Values.Average();
+			    double stdDev = StandardDeviation(filteredExitCorrelations.Values);
 
-			if (exitCorrelations.Count > 0) {
-				// Calculate the mean and standard deviation of the correlation coefficients
-			    double mean = exitCorrelations.Values.Average();
-			    double stdDev = StandardDeviation(exitCorrelations.Values);
-
-			    // Determine the significance threshold based on the standard deviation
-		    		double threshold = 1; // Adjust the multiplier as needed
+		    		double threshold = 1;
 		   	 	double significanceThreshold = mean + threshold * stdDev;
 
-		    		// Filter significant correlations based on the dynamic threshold
-		    		significantExitCorrelations = exitCorrelations.Where(c => Math.Abs(c.Value) > significanceThreshold).ToDictionary(i => i.Key, i => i.Value);
+		    		significantExitCorrelations = filteredExitCorrelations.Where(c => Math.Abs(c.Value) > significanceThreshold).ToDictionary(i => i.Key, i => i.Value);
 			} else {
 		        significantExitCorrelations.Clear();
 		    }
@@ -376,38 +364,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region GetNewEntryID()
-		public int GetNewEntryID()
+		#region GetNewEntry()
+		public EntrySignal GetNewEntry()
 		{
-			if (activeEntries.Count > 0) {
-				for (int i = 0; i < activeEntries.Count; i++) {
-					if (activeEntries[i].IsClosed) {
-						InitializeEntry(activeEntries[i]);
-						return i;
-					}
-				}
-			}
-
 			EntrySignal entry = EntrySignal(CurrentBar);
-			InitializeEntry(entry);
-
-			activeEntries.Add(entry);
-
-			return activeEntries.Count - 1;
-		}
-		#endregion
-
-		#region GetEntryByID()
-		public EntrySignal GetEntryByID(int id)
-		{
-			return activeEntries[id];
-		}
-		#endregion
-
-		#region CloseEntryByID()
-		public void CloseEntryByID(int id)
-		{
-			activeEntries[id].IsClosed = true;
+			return InitializeEntry(entry);
 		}
 		#endregion
 
@@ -477,14 +438,19 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				if (criterion.Key == "ATRAboveAverageATRByAStdDev") matchedCount += entry.ATRAboveAverageATRByAStdDev > 0 ? 1 : 0;
 				if (criterion.Key == "ATRBelowAverageATRByAStdDev") matchedCount += entry.ATRBelowAverageATRByAStdDev > 0 ? 1 : 0;
 				if (criterion.Key == "StrongCounterTrendFollowThrough") matchedCount += entry.StrongCounterTrendFollowThrough > 0 ? 1 : 0;
+				if (criterion.Key == "ProfitTarget1") matchedCount += entry.ProfitTarget1 > 0 ? 1 : 0;
+				if (criterion.Key == "ProfitTarget2") matchedCount += entry.ProfitTarget2 > 0 ? 1 : 0;
+				if (criterion.Key == "ProfitTarget3") matchedCount += entry.ProfitTarget3 > 0 ? 1 : 0;
+				if (criterion.Key == "ProfitTarget4") matchedCount += entry.ProfitTarget4 > 0 ? 1 : 0;
+				if (criterion.Key == "ProfitTarget5") matchedCount += entry.ProfitTarget5 > 0 ? 1 : 0;
 			}
 
 			return (double) matchedCount / (double) significantExits;
 		}
 
-		public double EvaluateExitCriteria(int entryID) {
-			return EvaluateExitCriteria(GetEntryByID(entryID));
-		}
+//		public double EvaluateExitCriteria(int entryID) {
+//			return EvaluateExitCriteria(GetEntryByID(entryID));
+//		}
 		#endregion
 
 		#region EvaluateCriteria()

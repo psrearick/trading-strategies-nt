@@ -120,6 +120,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public double ATRAboveAverageATRByAStdDev = 0;
 		public double ATRBelowAverageATRByAStdDev = 0;
 		public double StrongCounterTrendFollowThrough = 0;
+		public double ProfitTarget1 = 0;
+		public double ProfitTarget2 = 0;
+		public double ProfitTarget3 = 0;
+		public double ProfitTarget4 = 0;
+		public double ProfitTarget5 = 0;
 
 		public double StopLoss = 0;
 
@@ -428,6 +433,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 					TrailingStopBeyondPreviousExtreme = DistanceMoved;
 				}
 			}
+			#endregion
+
+			#region ProfitTargetExits
+			double multiple = DistanceMoved / StopDistance;
+			if (ProfitTarget1 == 0 && multiple >= 1) ProfitTarget1 = DistanceMoved;
+			if (ProfitTarget2 == 0 && multiple >= 2) ProfitTarget2 = DistanceMoved;
+			if (ProfitTarget3 == 0 && multiple >= 3) ProfitTarget3 = DistanceMoved;
+			if (ProfitTarget4 == 0 && multiple >= 4) ProfitTarget4 = DistanceMoved;
+			if (ProfitTarget5 == 0 && multiple >= 5) ProfitTarget5 = DistanceMoved;
 			#endregion
 
 			#region MovingAverageCrossover
