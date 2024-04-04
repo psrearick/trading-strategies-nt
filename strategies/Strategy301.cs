@@ -30,18 +30,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 	{
 		#region Variables
 		private PriceActionUtils PA;
-		private PriceActionPatterns PAPatterns;
 		private Legs legs;
 		private MarketDirection marketDirection;
 		private EntryEvaluator entryEvaluator;
 		private TradesExporter tradesExporter;
 
-//		private int entryID;
 		private EntrySignal entry;
 
 		private double stopLoss 				= 0;
-		private Series<int> barsSinceDoubleTop;
-		private Series<int> barsSinceDoubleBottom;
 		private bool reset 					= false;
 		private double successRateThreshold = 0.6;
 
@@ -90,11 +86,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			else if (State == State.Configure)
 			{
 				PA 						= PriceActionUtils();
-				PAPatterns				= PriceActionPatterns();
 				entryEvaluator			= EntryEvaluator(Period, Window);
 				entry					= EntrySignal(1);
-//				marketDirection 			= entryEvaluator.md;
-//				legs 					= marketDirection.LegLong;
 			}
 			#endregion
 
@@ -103,8 +96,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 //				tradesExporter			= TradesExporter(Name, Instrument.MasterInstrument.Name);
 				marketDirection 			= entryEvaluator.md;
 				legs 					= marketDirection.LegLong;
-				barsSinceDoubleTop		= new Series<int>(this);
-				barsSinceDoubleBottom	= new Series<int>(this);
 			}
 			#endregion
 		}
@@ -113,8 +104,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			PAPatterns.Update();
-
 			if (Position.MarketPosition != MarketPosition.Flat) {
 				entry.Update();
 			}
@@ -122,18 +111,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1) {
 				return;
             }
-
-			barsSinceDoubleBottom[0] = barsSinceDoubleBottom[1] + 1;
-			if (PAPatterns.IsDoubleBottom(0, 30, 3)) {
-				barsSinceDoubleBottom[0] = 0;
-			}
-
-			barsSinceDoubleTop[0] = barsSinceDoubleTop[1] + 1;
-			if (PAPatterns.IsDoubleTop(0, 30, 3)) {
-				barsSinceDoubleTop[0] = 0;
-			}
-
-//			entryEvaluator.Skip = !isValidTradeTime();
 
 			exitPositions();
 
@@ -154,60 +131,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region shouldExit()
 		private bool shouldExit() {
 			if (Position.MarketPosition != MarketPosition.Flat) {
-				if (entryEvaluator.EvaluateExitCriteria(entry) > 0) {
+				if (entryEvaluator.EvaluateExitCriteria(entry) > 0.5) {
 					return true;
 				}
 			}
-
-//			if (Position.MarketPosition == MarketPosition.Long) {
-//				if (marketDirection.Direction[0] == TrendDirection.Bearish) {
-//					return true;
-//				}
-
-//				if (barsSinceDoubleTop[0] > 0 && barsSinceDoubleTop[0] < 10 && legs.LegDirectionAtBar(0) == TrendDirection.Bearish) {
-//					return true;
-//				}
-
-//				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bearish)) {
-//					return true;
-//				}
-
-////				if (MAX(High, 8)[0] < MAX(High, legs.BarsAgoStarts[0])[0]) {
-////					return true;
-////				}
-
-//				double swingLow = MIN(Low, legs.BarsAgoStarts[0])[0];
-
-//				if (swingLow > stopLoss && legs[0] > 0) {
-//					stopLoss = swingLow;
-//					SetStopLoss(CalculationMode.Price, stopLoss);
-//				}
-//			}
-
-//			if (Position.MarketPosition == MarketPosition.Short) {
-//				if (marketDirection.Direction[0] == TrendDirection.Bullish) {
-//					return true;
-//				}
-
-//				if (barsSinceDoubleBottom[0] > 0 && barsSinceDoubleBottom[0] < 10 && legs.LegDirectionAtBar(0) == TrendDirection.Bullish) {
-//					return true;
-//				}
-
-//				if (PA.IsBreakoutTrend(0, legs.BarsAgoStarts[0], TrendDirection.Bullish)) {
-//					return true;
-//				}
-
-////				if (MIN(Low, 8)[0] > MIN(Low, legs.BarsAgoStarts[0])[0]) {
-////					return true;
-////				}
-
-//				double swingHigh = MAX(High, legs.BarsAgoStarts[0])[0];
-
-//				if (swingHigh < stopLoss && legs[0] < 0) {
-//					stopLoss = swingHigh;
-//					SetStopLoss(CalculationMode.Price, stopLoss);
-//				}
-//			}
 
 			return false;
 		}
@@ -288,21 +215,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			entryEvaluator.InitializeEntry(entry);
 
 			int quantity1	= entryEvaluator.matched[0] < 1 ? Quantity : Quantity * QuantityMultiplier;
-//			entryID = entryEvaluator.GetNewEntryID();
-
-//			double adjustedTargetMultiplier = TargetMultiplier;
-//			double adjustedTargetMultiplier = Math.Max(1, TargetMultiplier * 0.5);
-//			int adjustedQuantity = entryEvaluator.matched[0] < 1 ? Quantity : Quantity * QuantityMultiplier;
-
-//			Print("entry matched: " + entryEvaluator.matched[0].ToString());
-
-//			if (entryEvaluator.successRate > successRateThreshold) {
-//				adjustedTargetMultiplier = TargetMultiplier;
-//				adjustedQuantity = adjustedQuantity * QuantityMultiplier;
-//			}
-
-//			int quantity2 = (int) Math.Floor((double) adjustedQuantity / 2);
-//			int quantity1 = adjustedQuantity - quantity2;
 
 			if (longMatch) {
 				double swingLow = legs.BarsAgoStarts[0] > 0 ? Math.Min(MIN(Low, legs.BarsAgoStarts[0])[0], MIN(Low, 4)[0]) : Low[0];
@@ -313,14 +225,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
 //					SetProfitTarget("LongEntry1", CalculationMode.Ticks, stopLossDistance * adjustedTargetMultiplier);
 					EnterLong(quantity1, "LongEntry1");
-
-//					if (quantity2 > 0 && entryEvaluator.successRate > successRateThreshold) {
-//						EnterLong(quantity2, "LongEntry2");
-//					}
-
-//					if (quantity2 > 0) {
-//						EnterLong(quantity2, "LongEntry2");
-//					}
 				}
 			}
 
@@ -333,14 +237,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
 //					SetProfitTarget("ShortEntry1", CalculationMode.Ticks, stopLossDistance * adjustedTargetMultiplier);
 					EnterShort(quantity1, "ShortEntry1");
-
-//					if (quantity2 > 0) {
-//						EnterShort(quantity2, "ShortEntry2");
-//					}
-
-//					if (quantity2 > 0 && entryEvaluator.successRate > successRateThreshold) {
-//						EnterShort(quantity2, "ShortEntry2");
-//					}
 				}
 			}
 		}
@@ -353,11 +249,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-//			if (entryEvaluator.matched[0] < (1 - entryEvaluator.successRate)) {
-//				return false;
-//			}
-
-			if (entryEvaluator.matched[0] < 0.5) {
+			if (entryEvaluator.matched[0] < (1 - entryEvaluator.successRate)) {
 				return false;
 			}
 
@@ -380,13 +272,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (entryEvaluator.matched[0] <  0.5) {
+			if (entryEvaluator.matched[0] <  (1 - entryEvaluator.successRate)) {
 				return false;
 			}
-
-//			if (entryEvaluator.matched[0] <  (1 - entryEvaluator.successRate)) {
-//				return false;
-//			}
 
 			if (legs.BarsAgoStarts[0] < 4) {
 				return false;
