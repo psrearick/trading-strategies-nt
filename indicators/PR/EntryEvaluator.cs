@@ -395,6 +395,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region CloseEntryByID()
+		public void CloseEntryByID(int id)
+		{
+			activeEntries[id].IsClosed = true;
+		}
+		#endregion
+
 		#region InitializeEntry()
 		public EntrySignal InitializeEntry(EntrySignal entry)
 		{
@@ -428,9 +435,42 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region EvaluateExitCriteria()
-		public bool EvaluateExitCriteria(EntrySignal entry)
+		public double EvaluateExitCriteria(EntrySignal entry)
 		{
-			return false;
+			int significantExits = significantExitCorrelations.Count;
+			if (significantExits == 0) {
+				return -1;
+			}
+
+			int matchedCount = 0;
+
+			foreach (var criterion in significantExitCorrelations) {
+				if (criterion.Key == "TrendDirectionChanged") matchedCount += entry.TrendDirectionChanged > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendTightChannel") matchedCount += entry.CounterTrendTightChannel > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendBroadChannel") matchedCount += entry.CounterTrendBroadChannel > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendBreakout") matchedCount += entry.CounterTrendBreakout > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendBreakoutTrend") matchedCount += entry.CounterTrendBreakoutTrend > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendLegLong") matchedCount += entry.CounterTrendLegLong > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendLegShort") matchedCount += entry.CounterTrendLegShort > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendLegAfterDoubleTopBottom") matchedCount += entry.CounterTrendLegAfterDoubleTopBottom > 0 ? 1 : 0;
+				if (criterion.Key == "TrailingStopBeyondPreviousExtreme") matchedCount += entry.TrailingStopBeyondPreviousExtreme > 0 ? 1 : 0;
+				if (criterion.Key == "MovingAverageCrossover") matchedCount += entry.MovingAverageCrossover > 0 ? 1 : 0;
+				if (criterion.Key == "DoubleTopBottom") matchedCount += entry.DoubleTopBottom > 0 ? 1 : 0;
+				if (criterion.Key == "NoNewExtreme8") matchedCount += entry.NoNewExtreme8 > 0 ? 1 : 0;
+				if (criterion.Key == "NoNewExtreme10") matchedCount += entry.NoNewExtreme10 > 0 ? 1 : 0;
+				if (criterion.Key == "NoNewExtreme12") matchedCount += entry.NoNewExtreme12 > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendPressure") matchedCount += entry.CounterTrendPressure > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendStrongPressure") matchedCount += entry.CounterTrendStrongPressure > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendStrongTrend") matchedCount += entry.CounterTrendStrongTrend > 0 ? 1 : 0;
+				if (criterion.Key == "RSIOutOfRange") matchedCount += entry.RSIOutOfRange > 0 ? 1 : 0;
+				if (criterion.Key == "ATRAboveAverageATR") matchedCount += entry.ATRAboveAverageATR > 0 ? 1 : 0;
+				if (criterion.Key == "ATRBelowAverageATR") matchedCount += entry.ATRBelowAverageATR > 0 ? 1 : 0;
+				if (criterion.Key == "ATRAboveAverageATRByAStdDev") matchedCount += entry.ATRAboveAverageATRByAStdDev > 0 ? 1 : 0;
+				if (criterion.Key == "ATRBelowAverageATRByAStdDev") matchedCount += entry.ATRBelowAverageATRByAStdDev > 0 ? 1 : 0;
+				if (criterion.Key == "StrongCounterTrendFollowThrough") matchedCount += entry.StrongCounterTrendFollowThrough > 0 ? 1 : 0;
+			}
+
+			return (double) matchedCount / (double) significantExits;
 		}
 		#endregion
 
