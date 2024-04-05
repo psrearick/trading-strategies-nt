@@ -84,7 +84,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				Quantity 									= 1;
 //				TargetMultiplier								= 1;
 //				QuantityMultiplier							= 2;
-				Window										= 20;
+				Window										= 10;
 			}
 			#endregion
 
@@ -165,17 +165,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 			entry.Update();
 			entry.UpdateStatus();
 
-			foreach (var criterion in entryCriteria) {
-				if (criterion.Value.Count > 20) {
-					criterion.Value.RemoveAt(0);
-				}
-			}
+//			foreach (var criterion in entryCriteria) {
+//				if (criterion.Value.Count > 20) {
+//					criterion.Value.RemoveAt(0);
+//				}
+//			}
 
-			foreach (var criterion in exitCriteria) {
-				if (criterion.Value.Count > 20) {
-					criterion.Value.RemoveAt(0);
-				}
-			}
+//			foreach (var criterion in exitCriteria) {
+//				if (criterion.Value.Count > 20) {
+//					criterion.Value.RemoveAt(0);
+//				}
+//			}
 
 //			if (Position.MarketPosition == MarketPosition.Flat && tradeDirection != MarketPosition.Flat) {
 //				UpdateTradeOutcomes(entry.IsSuccessful);
@@ -317,12 +317,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 			Random rand = new Random();
        		double randomValue = rand.NextDouble();
 
+			Print(randomValue);
+			Print(probabilityOfTrading);
+			Print("--");
+
         		if (randomValue > probabilityOfTrading) {
 				return;
 			}
-
-
-
 
 			int quantity = Math.Max(1, (int) Math.Round(entryRating * (double) Quantity, 0));
 
@@ -365,14 +366,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 		}
 		#endregion
 
-		#region
+		#region evaluateEntry()
 		private double evaluateEntry()
 		{
 			entry.entryConditions = entryEvaluator.EvaluateCriteria(0);
 
 			double weightedSum = 0;
 		    double totalWeight = 0;
-			double defaultWeight = 0.2;
+			double defaultWeight = 0.5;
 
 		    foreach (var criterion in entryCriteria)
 		    {
