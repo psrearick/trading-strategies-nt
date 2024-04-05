@@ -27,7 +27,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	public class EntryEvaluator : Indicator
 	{
 		#region Variables
-//		private Utils utils = new Utils();
+		private Utils utils = new Utils();
 
 		public PriceActionUtils pa;
 		public MarketDirection md;
@@ -47,6 +47,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private Dictionary<string, double> filteredExitCorrelations = new Dictionary<string, double>();
 		private Dictionary<string, double> significantExitCorrelations = new Dictionary<string, double>();
 		public Series<double> matched;
+		private int WindowSize;
+		private int InitialWindow = 200;
 		private int nextEntryIndex = 0;
 		public double successRate = 0.5;
 		private int frequency;
@@ -59,16 +61,16 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			if (State == State.SetDefaults)
 			{
 				Description									= @"";
-				Name										= "Entry Evaluator";
+				Name											= "Entry Evaluator";
 				Calculate									= Calculate.OnBarClose;
 				IsOverlay									= false;
-				DisplayInDataBox							= true;
-				DrawOnPricePanel							= true;
+				DisplayInDataBox								= true;
+				DrawOnPricePanel								= true;
 				DrawHorizontalGridLines						= true;
 				DrawVerticalGridLines						= true;
 				PaintPriceMarkers							= true;
 				ScaleJustification							= NinjaTrader.Gui.Chart.ScaleJustification.Right;
-				IsSuspendedWhileInactive					= true;
+				IsSuspendedWhileInactive						= true;
 				Period										= 10;
 				Window										= 100;
 			}
@@ -95,11 +97,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				avgAtr					= SMA(atr, 20);
 				matched					= new Series<double>(this, MaximumBarsLookBack.TwoHundredFiftySix);
 
-				for (int i = 0; i < Window; i++) {
+				for (int i = 0; i < InitialWindow; i++) {
 					entries.Add(EntrySignal(i + 1));
 				}
 
-				frequency	= (int) Math.Max(10, (int) Math.Floor((double) Window / 10));
+				frequency	= (int) Math.Max(10, (int) Math.Floor(Window / 10));
 			}
 			#endregion
 		}
@@ -111,6 +113,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			if (CurrentBar < 200) {
 				matched[0]	= 0;
 				return;
+			}
+
+			WindowSize = Math.Min(180, Math.Max(10, (int) Math.Floor((double)Window * atr[0])));
+			if (nextEntryIndex > WindowSize - 1) {
+				nextEntryIndex = 0;
 			}
 
 			barsSinceDoubleBottom[0] = barsSinceDoubleBottom[1] + 1;
@@ -127,13 +134,18 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			UpdateEntryStatus();
 
 			if (CurrentBar % frequency == 0) {
+//				WindowSize = Math.Min(180, Math.Max(10, (int) Math.Floor((double)Window * atr[0])));
+//				if (nextEntryIndex > WindowSize - 1) {
+//					nextEntryIndex = 0;
+//				}
+
 	            CalculateCorrelations();
 				CalculateExitCorrelations();
 	        }
 
 			EvaluateCriteria(0);
 
-			successRate = (double) entries.Count(e => e.IsSuccessful) / Window;
+			successRate = (double) entries.Count(e => e.IsSuccessful) / WindowSize;
 		}
 		#endregion
 
@@ -260,7 +272,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			    double mean = correlations.Values.Average();
 			    double stdDev = StandardDeviation(correlations.Values);
 
-		    		double threshold = 4 - 4 * successRate;
+//		    		double threshold = 4 - 4 * successRate;
+		    		double threshold = atr[0] * successRate;
 		   	 	double significanceThreshold = mean + threshold * stdDev;
 
 		    		significantCorrelations = correlations.Where(c => Math.Abs(c.Value) > significanceThreshold).ToDictionary(i => i.Key, i => i.Value);
@@ -352,7 +365,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			EntrySignal entry = entries[nextEntryIndex];
 			nextEntryIndex++;
 
-			if (nextEntryIndex == Window) {
+			if (nextEntryIndex == WindowSize) {
 				nextEntryIndex = 0;
 			}
 
@@ -376,6 +389,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				? pa.BarsAgoHigh(0, md.LegLong.BarsAgoStarts[0])
 				: pa.BarsAgoLow(0, md.LegLong.BarsAgoStarts[0]);
 
+			entry.init				= true;
 			entry.EntryBar			= CurrentBar;
 			entry.Rsi 				= rsi[0];
 			entry.Atr 				= atr[0];
@@ -761,7 +775,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		[NinjaScriptProperty]
 		[Range(1, 200)]
 		[Display(Name="Window", Description="Window", Order=1, GroupName="Parameters")]
-		public int Window
+		public double Window
 		{ get; set; }
 		#endregion
 	}
@@ -774,12 +788,12 @@ namespace NinjaTrader.NinjaScript.Indicators
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
 		private PR.EntryEvaluator[] cacheEntryEvaluator;
-		public PR.EntryEvaluator EntryEvaluator(int period, int window)
+		public PR.EntryEvaluator EntryEvaluator(int period, double window)
 		{
 			return EntryEvaluator(Input, period, window);
 		}
 
-		public PR.EntryEvaluator EntryEvaluator(ISeries<double> input, int period, int window)
+		public PR.EntryEvaluator EntryEvaluator(ISeries<double> input, int period, double window)
 		{
 			if (cacheEntryEvaluator != null)
 				for (int idx = 0; idx < cacheEntryEvaluator.Length; idx++)
@@ -794,12 +808,12 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.PR.EntryEvaluator EntryEvaluator(int period, int window)
+		public Indicators.PR.EntryEvaluator EntryEvaluator(int period, double window)
 		{
 			return indicator.EntryEvaluator(Input, period, window);
 		}
 
-		public Indicators.PR.EntryEvaluator EntryEvaluator(ISeries<double> input , int period, int window)
+		public Indicators.PR.EntryEvaluator EntryEvaluator(ISeries<double> input , int period, double window)
 		{
 			return indicator.EntryEvaluator(input, period, window);
 		}
@@ -810,12 +824,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.PR.EntryEvaluator EntryEvaluator(int period, int window)
+		public Indicators.PR.EntryEvaluator EntryEvaluator(int period, double window)
 		{
 			return indicator.EntryEvaluator(Input, period, window);
 		}
 
-		public Indicators.PR.EntryEvaluator EntryEvaluator(ISeries<double> input , int period, int window)
+		public Indicators.PR.EntryEvaluator EntryEvaluator(ISeries<double> input , int period, double window)
 		{
 			return indicator.EntryEvaluator(input, period, window);
 		}

@@ -27,8 +27,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	public class EntrySignal : Indicator
 	{
 		#region Variables
+		private Utils utils = new Utils();
 
 		private int window = 81;
+		public bool init = false;
 		public EntryEvaluator entryEvaluator;
 		public PriceActionUtils pa;
 
@@ -145,7 +147,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			#region State.Configure
 			else if (State == State.Configure)
 			{
-//				pa = PriceActionUtils();
+				pa = PriceActionUtils();
 			}
 			#endregion
 		}
@@ -154,7 +156,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			EvaluateExitConditions();
+			if (init) {
+				EvaluateExitConditions();
+			}
 		}
 		#endregion
 
@@ -182,7 +186,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region CalculateAdditionalValues()
 		public void CalculateAdditionalValues()
 	    {
-			pa = entryEvaluator.pa;
+//			pa = entryEvaluator.pa;
 			CalculateEMAValues();
 			CalculateStopDistance();
 			CalculateBuySellPressure();
@@ -265,9 +269,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				IsClosed = true;
 			}
 
-			if (CurrentDirection != TrendDirection.Flat && CurrentDirection != Direction) {
-				IsClosed = true;
-			}
+//			if (CurrentDirection != TrendDirection.Flat && CurrentDirection != Direction) {
+//				IsClosed = true;
+//			}
 	    }
 		#endregion
 
@@ -613,7 +617,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				}
 			}
 			#endregion
-
 		}
 		#endregion
 

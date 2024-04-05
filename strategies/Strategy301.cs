@@ -32,9 +32,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private Legs legs;
 		private MarketDirection marketDirection;
 		private EntryEvaluator entryEvaluator;
-		private TradesExporter tradesExporter;
-
+//		private TradesExporter tradesExporter;
 		private EntrySignal entry;
+		private double previousSuccessRate;
+		private double successRate;
+		private List<bool> tradeOutcomes 		= new List<bool>();
+		private int rollingWindowSize 			= 50;
+		private MarketPosition tradeDirection	= MarketPosition.Flat;
+		private double successRateThreshold 		= 0.6;
 
 		private DateTime LastDataDay		= new DateTime(2023, 03, 17);
 		private DateTime OpenTime		= DateTime.Parse("10:00", System.Globalization.CultureInfo.InvariantCulture);
@@ -98,9 +103,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			if (Position.MarketPosition != MarketPosition.Flat) {
+//			if (Position.MarketPosition != MarketPosition.Flat) {
 				entry.Update();
+//			}
+
+			if (Position.MarketPosition == MarketPosition.Flat && tradeDirection != MarketPosition.Flat) {
+				UpdateTradeOutcomes(entry.IsSuccessful);
+				previousSuccessRate = successRate;
+				successRate 			= CalculateSuccessRate();
+				AdjustStrategy();
 			}
+
+			tradeDirection = Position.MarketPosition;
 
 			if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1) {
 				return;
@@ -112,7 +126,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		}
 		#endregion
 
-//		#region OnExecutionUpdate()
+		#region OnExecutionUpdate()
 //		protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
 //		{
 //			if (TradesExporterActivated && SystemPerformance.AllTrades.Count > 0)
@@ -120,7 +134,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 //				tradesExporter.OnNewTrade(SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1]);
 //			}
 //		}
-//		#endregion
+		#endregion
 
 		#region shouldExit()
 		private bool shouldExit() {
@@ -214,7 +228,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 				if (swingLow < Low[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-					if (entryEvaluator.successRate < 0.6) {
+					if (entryEvaluator.successRate < successRateThreshold) {
 						SetProfitTarget("LongEntry1", CalculationMode.Ticks, stopLossDistance * 0.5);
 					}
 
@@ -228,7 +242,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 				if (swingHigh > High[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-					if (entryEvaluator.successRate < 0.6) {
+					if (entryEvaluator.successRate < successRateThreshold) {
 						SetProfitTarget("ShortEntry1", CalculationMode.Ticks, stopLossDistance * 0.5);
 					}
 					EnterShort(quantity, "ShortEntry1");
@@ -260,6 +274,45 @@ namespace NinjaTrader.NinjaScript.Strategies
 		}
 		#endregion
 
+		#region UpdateTradeOutcomes()
+		private void UpdateTradeOutcomes(bool isSuccessful)
+		{
+		    tradeOutcomes.Add(isSuccessful);
+		    if (tradeOutcomes.Count > rollingWindowSize)
+		    {
+		        tradeOutcomes.RemoveAt(0);
+		    }
+		}
+		#endregion
+
+		#region CalculateSuccessRate()
+		private double CalculateSuccessRate()
+		{
+		    if (tradeOutcomes.Count == 0)
+		    {
+		        return 0.0;
+		    }
+		    int successfulTrades = tradeOutcomes.Count(outcome => outcome);
+		    return (double)successfulTrades / tradeOutcomes.Count;
+		}
+		#endregion
+
+		#region AdjustStrategy()
+		private void AdjustStrategy()
+		{
+			if (successRate > previousSuccessRate) {
+				successRateThreshold += 0.05;
+//				entryEvaluator.Window -= 0.25;
+			} else {
+				successRateThreshold -= 0.05;
+//				entryEvaluator.Window += 0.25;
+			}
+
+			successRateThreshold = Math.Max(0, Math.Min(1, successRateThreshold));
+//			entryEvaluator.Window = Math.Max(1, entryEvaluator.Window);
+		}
+		#endregion
+
 		#region Properties
 
 		[NinjaScriptProperty]
@@ -280,40 +333,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 		public int Quantity
 		{ get; set; }
 
-//		[NinjaScriptProperty]
-//		[Range(1, int.MaxValue)]
-//		[Display(Name="Quantity Multiplier", Description="Quantity Multiplier", Order=3, GroupName="Parameters")]
-//		public int QuantityMultiplier
-//		{ get; set; }
-
-//		[NinjaScriptProperty]
-//		[Range(double.MinValue, double.MaxValue)]
-//		[Display(Name="Target Multiplier", Description="Target Multiplier", Order=4, GroupName="Parameters")]
-//		public double TargetMultiplier
-//		{ get; set; }
-
 		[NinjaScriptProperty]
 		[Range(1, 200)]
-		[Display(Name="Window", Description="Window", Order=5, GroupName="Parameters")]
-		public int Window
+		[Display(Name="Window", Description="Window", Order=3, GroupName="Parameters")]
+		public double Window
 		{ get; set; }
 
 //		[NinjaScriptProperty]
-//		[Range(0.25, double.MaxValue)]
-//		[Display(Name="Low Target Multiplier", Description="Low Target Multiplier", Order=4, GroupName="Parameters")]
-//		public double LowATRMultiplier
+//		[Display(Name="Export Trades", Description="Export Trades", Order=6, GroupName="Parameters")]
+//		public bool TradesExporterActivated
 //		{ get; set; }
-
-//		[NinjaScriptProperty]
-//		[Range(0.25, double.MaxValue)]
-//		[Display(Name="High Target Multiplier", Description="High Target Multiplier", Order=5, GroupName="Parameters")]
-//		public double HighATRMultiplier
-//		{ get; set; }
-
-		[NinjaScriptProperty]
-		[Display(Name="Export Trades", Description="Export Trades", Order=6, GroupName="Parameters")]
-		public bool TradesExporterActivated
-		{ get; set; }
 
 		#endregion
 	}
