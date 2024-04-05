@@ -231,7 +231,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			if (filteredExitCorrelations.Count > 0) {
 			    double mean = filteredExitCorrelations.Values.Average();
-			    double stdDev = StandardDeviation(filteredExitCorrelations.Values);
+			    double stdDev = utils.StandardDeviation(filteredExitCorrelations.Values);
 
 		    		double threshold = successRate;
 		   	 	double significanceThreshold = mean + threshold * stdDev;
@@ -277,7 +277,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			if (correlations.Count > 0) {
 			    double mean = correlations.Values.Average();
-			    double stdDev = StandardDeviation(correlations.Values);
+			    double stdDev = utils.StandardDeviation(correlations.Values);
 
 		    		double threshold = 4 - 4 * successRate;
 //		    		double threshold = atr[0] * successRate;
@@ -287,16 +287,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			} else {
 		        significantCorrelations.Clear();
 		    }
-		}
-		#endregion
-
-		#region StandardDeviation()
-		private double StandardDeviation(IEnumerable<double> values)
-		{
-		    double avg = values.Average();
-		    double sum = values.Sum(d => Math.Pow(d - avg, 2));
-		    double denominator = values.Count() - 1;
-		    return Math.Sqrt(sum / denominator);
 		}
 		#endregion
 

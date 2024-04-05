@@ -75,6 +75,16 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		{
 			PrintMessage(message.ToString(), memberName, sourceFilePath, sourceLineNumber);
 		}
+
+		#region StandardDeviation()
+		public double StandardDeviation(IEnumerable<double> values)
+		{
+		    double avg = values.Average();
+		    double sum = values.Sum(d => Math.Pow(d - avg, 2));
+		    double denominator = values.Count() - 1;
+		    return Math.Sqrt(sum / denominator);
+		}
+		#endregion
 	}
 }
 

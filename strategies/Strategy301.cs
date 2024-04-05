@@ -29,6 +29,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 	public class Strategy301 : Strategy
 	{
 		#region Variables
+		private Utils utils = new Utils();
 		private Legs legs;
 		private MarketDirection marketDirection;
 		private EntryEvaluator entryEvaluator;
@@ -36,10 +37,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private EntrySignal entry;
 		private double previousSuccessRate;
 		private double successRate;
+		private List<double> successRates 		= new List<double>();
 		private List<bool> tradeOutcomes 		= new List<bool>();
 		private int rollingWindowSize 			= 50;
 		private MarketPosition tradeDirection	= MarketPosition.Flat;
-		private double successRateThreshold 		= 0.6;
+		private double successRateThreshold 		= 0.05;
 
 		private DateTime LastDataDay		= new DateTime(2023, 03, 17);
 		private DateTime OpenTime		= DateTime.Parse("10:00", System.Globalization.CultureInfo.InvariantCulture);
@@ -103,14 +105,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-//			if (Position.MarketPosition != MarketPosition.Flat) {
-				entry.Update();
-//			}
+			entry.Update();
+			entry.UpdateStatus();
 
 			if (Position.MarketPosition == MarketPosition.Flat && tradeDirection != MarketPosition.Flat) {
 				UpdateTradeOutcomes(entry.IsSuccessful);
 				previousSuccessRate = successRate;
-				successRate 			= CalculateSuccessRate();
+				UpdateSuccessRates();
 				AdjustStrategy();
 			}
 
@@ -219,16 +220,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			entryEvaluator.InitializeEntry(entry);
 
-			int quantity = Math.Max(1, (int) Math.Round(successRate * entryEvaluator.matched[0] * (double) Quantity, 0));
+			int quantity = Math.Max(1, (int) Math.Round(entryEvaluator.matched[0] * (double) Quantity, 0));
 
 			if (marketDirection.Direction[0] == TrendDirection.Bullish) {
 				double swingLow = legs.BarsAgoStarts[0] > 0 ? Math.Min(MIN(Low, legs.BarsAgoStarts[0])[0], MIN(Low, 4)[0]) : Low[0];
 				double stopLossDistance = 4 * (Close[0] - swingLow) + 1;
+				double profitDistance = (0.75 * successRate + 0.25) * stopLossDistance;
 
 				if (swingLow < Low[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
 					if (successRate < successRateThreshold) {
-						SetProfitTarget("LongEntry1", CalculationMode.Ticks, stopLossDistance * successRate);
+						SetProfitTarget("LongEntry1", CalculationMode.Ticks, profitDistance);
 					}
 
 					EnterLong(quantity, "LongEntry1");
@@ -238,11 +240,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (marketDirection.Direction[0] == TrendDirection.Bearish) {
 				double swingHigh = legs.BarsAgoStarts[0] > 0 ? Math.Max(MAX(High, legs.BarsAgoStarts[0])[0], MAX(High, 4)[0]) : High[0];
 				double stopLossDistance = 4 * (swingHigh - Close[0]) + 1;
+				double profitDistance = (0.75 * successRate + 0.25) * stopLossDistance;
 
 				if (swingHigh > High[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
 					if (successRate < successRateThreshold) {
-						SetProfitTarget("ShortEntry1", CalculationMode.Ticks, stopLossDistance * successRate);
+						SetProfitTarget("ShortEntry1", CalculationMode.Ticks, profitDistance);
 					}
 					EnterShort(quantity, "ShortEntry1");
 				}
@@ -257,11 +260,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-//			if (entryEvaluator.matched[0] < (1 - successRate)) {
-//				return false;
-//			}
-
-			if (entryEvaluator.matched[0] < successRate) {
+			if (entryEvaluator.matched[0] < (1 - successRate)) {
 				return false;
 			}
 
@@ -281,9 +280,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private void UpdateTradeOutcomes(bool isSuccessful)
 		{
 		    tradeOutcomes.Add(isSuccessful);
-		    if (tradeOutcomes.Count > rollingWindowSize)
-		    {
+
+		    if (tradeOutcomes.Count > rollingWindowSize) {
 		        tradeOutcomes.RemoveAt(0);
+		    }
+		}
+		#endregion
+
+		#region UpdateSuccessRates()
+		private void UpdateSuccessRates()
+		{
+			successRate = CalculateSuccessRate();
+			successRates.Add(successRate);
+
+		    if (successRates.Count > 10) {
+		        successRates.RemoveAt(0);
 		    }
 		}
 		#endregion
@@ -291,28 +302,38 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region CalculateSuccessRate()
 		private double CalculateSuccessRate()
 		{
-		    if (tradeOutcomes.Count == 0)
-		    {
+		    if (tradeOutcomes.Count == 0) {
 		        return 0.0;
 		    }
+
 		    int successfulTrades = tradeOutcomes.Count(outcome => outcome);
-		    return (double)successfulTrades / tradeOutcomes.Count;
+
+		    return (double) successfulTrades / (double) tradeOutcomes.Count;
 		}
 		#endregion
 
 		#region AdjustStrategy()
 		private void AdjustStrategy()
 		{
-			if (successRate > previousSuccessRate) {
-				successRateThreshold += 0.1;
-				entryEvaluator.Window -= 1;
-			} else {
-				successRateThreshold -= 0.1;
-				entryEvaluator.Window += 1;
-			}
 
-			successRateThreshold = Math.Max(0, Math.Min(1, successRateThreshold));
-			entryEvaluator.Window = Math.Max(1, entryEvaluator.Window);
+			double successRateStdDev 	= utils.StandardDeviation(successRates);
+			double successRateAvg		= successRates.Average();
+			double successRateStep		= successRateAvg * 0.01;
+			double successRateMultiple	= ((successRates[successRates.Count - 1] - successRateAvg) / successRateStdDev - 1) / 0.5;
+			successRateThreshold 		= successRateAvg + successRateStep * successRateMultiple;
+
+			if (successRate < successRateAvg) {
+				double windowAdjustmentSize	= Window * 0.02;
+				double atrMultiple 			= (entryEvaluator.atr[0] - entryEvaluator.avgAtr[0]) / entryEvaluator.stdDevAtr[0];
+				double windowAdjustment 		= windowAdjustmentSize * atrMultiple;
+				double WindowMin 			= Window / 2;
+				double WindowMax	 			= Window * 1.5;
+				double windowAdjusted 		= Math.Max(WindowMin, Math.Min(WindowMax, entryEvaluator.Window + windowAdjustment));
+
+				if (Math.Abs(atrMultiple) > 1) {
+					entryEvaluator.Window = Math.Max(1, windowAdjusted);
+				}
+			}
 		}
 		#endregion
 
