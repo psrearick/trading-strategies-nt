@@ -97,9 +97,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				avgAtr					= SMA(atr, 20);
 				matched					= new Series<double>(this, MaximumBarsLookBack.TwoHundredFiftySix);
 
-				for (int i = 0; i < InitialWindow; i++) {
-					entries.Add(EntrySignal(i + 1));
-				}
+//				for (int i = 0; i < InitialWindow; i++) {
+//					entries.Add(EntrySignal(i + 1));
+//				}
 
 				frequency	= (int) Math.Max(10, (int) Math.Floor(Window / 10));
 			}
@@ -120,6 +120,17 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				nextEntryIndex = 0;
 			}
 
+			int enabledCount = entries.Where(e => e.IsEnabled).Count();
+			if (enabledCount > WindowSize) {
+				int toDisable = WindowSize - enabledCount;
+
+				for (int i = 0; i < toDisable; i++) {
+					int positionToDisable = nextEntryIndex + i;
+					if (positionToDisable > WindowSize - 1) positionToDisable -= WindowSize;
+					entries[positionToDisable].IsEnabled = true;
+				}
+			}
+
 			barsSinceDoubleBottom[0] = barsSinceDoubleBottom[1] + 1;
 			if (paPatterns.IsDoubleBottom(0, 30, 3)) {
 				barsSinceDoubleBottom[0] = 0;
@@ -134,10 +145,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			UpdateEntryStatus();
 
 			if (CurrentBar % frequency == 0) {
-//				WindowSize = Math.Min(180, Math.Max(10, (int) Math.Floor((double)Window * atr[0])));
-//				if (nextEntryIndex > WindowSize - 1) {
-//					nextEntryIndex = 0;
-//				}
 
 	            CalculateCorrelations();
 				CalculateExitCorrelations();
@@ -145,7 +152,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			EvaluateCriteria(0);
 
-			successRate = (double) entries.Count(e => e.IsSuccessful) / WindowSize;
+			successRate = (double) entries.Count(e => e.IsEnabled && e.IsSuccessful) / entries.Where(e => e.IsEnabled).Count();
 		}
 		#endregion
 
@@ -159,7 +166,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			List<EntrySignal> openEntries = entries.Where(e => !e.IsClosed).ToList();
+			List<EntrySignal> openEntries = entries.Where(e => !e.IsClosed && e.IsEnabled).ToList();
 
 			if (openEntries.Count == 0) {
 				significantExitCorrelations.Clear();
@@ -240,7 +247,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private void CalculateCorrelations()
 		{
 			correlations.Clear();
-			List<EntrySignal> closedEntries = entries.Where(e => e.IsClosed || e.IsSuccessful).ToList();
+			List<EntrySignal> closedEntries = entries.Where(e => e.IsEnabled && (e.IsClosed || e.IsSuccessful)).ToList();
 
 	        correlations["RSI"] = correlationCoefficient(closedEntries.Select(e => e.Rsi).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
 	        correlations["ATR"] = correlationCoefficient(closedEntries.Select(e => e.Atr).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
@@ -272,8 +279,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			    double mean = correlations.Values.Average();
 			    double stdDev = StandardDeviation(correlations.Values);
 
-//		    		double threshold = 4 - 4 * successRate;
-		    		double threshold = atr[0] * successRate;
+		    		double threshold = 4 - 4 * successRate;
+//		    		double threshold = atr[0] * successRate;
 		   	 	double significanceThreshold = mean + threshold * stdDev;
 
 		    		significantCorrelations = correlations.Where(c => Math.Abs(c.Value) > significanceThreshold).ToDictionary(i => i.Key, i => i.Value);
@@ -362,6 +369,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region AddEntry()
 		private void AddEntry()
 		{
+			if (nextEntryIndex >= entries.Count) {
+				entries.Add(EntrySignal(CurrentBar));
+			}
+
 			EntrySignal entry = entries[nextEntryIndex];
 			nextEntryIndex++;
 
@@ -389,6 +400,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				? pa.BarsAgoHigh(0, md.LegLong.BarsAgoStarts[0])
 				: pa.BarsAgoLow(0, md.LegLong.BarsAgoStarts[0]);
 
+			entry.IsEnabled			= true;
 			entry.init				= true;
 			entry.EntryBar			= CurrentBar;
 			entry.Rsi 				= rsi[0];
@@ -457,10 +469,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			return (double) matchedCount / (double) significantExits;
 		}
-
-//		public double EvaluateExitCriteria(int entryID) {
-//			return EvaluateExitCriteria(GetEntryByID(entryID));
-//		}
 		#endregion
 
 		#region EvaluateCriteria()

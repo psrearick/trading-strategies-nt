@@ -43,6 +43,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public int PreviousSwing;
 		public double PreviousSwingValue;
 
+		public bool IsEnabled = true;
 		public bool IsClosed;
 		public bool IsSuccessful;
 		public double StopDistance;

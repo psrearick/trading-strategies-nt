@@ -139,7 +139,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region shouldExit()
 		private bool shouldExit() {
 			if (Position.MarketPosition != MarketPosition.Flat) {
-				if (entryEvaluator.EvaluateExitCriteria(entry) > entryEvaluator.successRate) {
+				if (entryEvaluator.EvaluateExitCriteria(entry) > successRate) {
 					return true;
 				}
 			}
@@ -219,8 +219,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			entryEvaluator.InitializeEntry(entry);
 
-
-			int quantity = Math.Max(1, (int) Math.Round(entryEvaluator.successRate * entryEvaluator.matched[0] * (double)Quantity, 0));
+			int quantity = Math.Max(1, (int) Math.Round(successRate * entryEvaluator.matched[0] * (double) Quantity, 0));
 
 			if (marketDirection.Direction[0] == TrendDirection.Bullish) {
 				double swingLow = legs.BarsAgoStarts[0] > 0 ? Math.Min(MIN(Low, legs.BarsAgoStarts[0])[0], MIN(Low, 4)[0]) : Low[0];
@@ -228,22 +227,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 				if (swingLow < Low[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-					if (entryEvaluator.successRate < successRateThreshold) {
-						SetProfitTarget("LongEntry1", CalculationMode.Ticks, stopLossDistance * 0.5);
+					if (successRate < successRateThreshold) {
+						SetProfitTarget("LongEntry1", CalculationMode.Ticks, stopLossDistance * successRate);
 					}
 
 					EnterLong(quantity, "LongEntry1");
 				}
 			}
 
-			if (marketDirection.Direction[0] == TrendDirection.Bullish) {
+			if (marketDirection.Direction[0] == TrendDirection.Bearish) {
 				double swingHigh = legs.BarsAgoStarts[0] > 0 ? Math.Max(MAX(High, legs.BarsAgoStarts[0])[0], MAX(High, 4)[0]) : High[0];
 				double stopLossDistance = 4 * (swingHigh - Close[0]) + 1;
 
 				if (swingHigh > High[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-					if (entryEvaluator.successRate < successRateThreshold) {
-						SetProfitTarget("ShortEntry1", CalculationMode.Ticks, stopLossDistance * 0.5);
+					if (successRate < successRateThreshold) {
+						SetProfitTarget("ShortEntry1", CalculationMode.Ticks, stopLossDistance * successRate);
 					}
 					EnterShort(quantity, "ShortEntry1");
 				}
@@ -258,7 +257,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (entryEvaluator.matched[0] < (1 - entryEvaluator.successRate)) {
+//			if (entryEvaluator.matched[0] < (1 - successRate)) {
+//				return false;
+//			}
+
+			if (entryEvaluator.matched[0] < successRate) {
 				return false;
 			}
 
@@ -301,15 +304,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private void AdjustStrategy()
 		{
 			if (successRate > previousSuccessRate) {
-				successRateThreshold += 0.05;
-//				entryEvaluator.Window -= 0.25;
+				successRateThreshold += 0.1;
+				entryEvaluator.Window -= 1;
 			} else {
-				successRateThreshold -= 0.05;
-//				entryEvaluator.Window += 0.25;
+				successRateThreshold -= 0.1;
+				entryEvaluator.Window += 1;
 			}
 
 			successRateThreshold = Math.Max(0, Math.Min(1, successRateThreshold));
-//			entryEvaluator.Window = Math.Max(1, entryEvaluator.Window);
+			entryEvaluator.Window = Math.Max(1, entryEvaluator.Window);
 		}
 		#endregion
 
