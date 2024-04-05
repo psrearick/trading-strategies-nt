@@ -48,7 +48,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private Dictionary<string, double> significantExitCorrelations = new Dictionary<string, double>();
 		public Series<double> matched;
 		private int nextEntryIndex = 0;
-		public double successRate;
+		public double successRate = 0.5;
 		private int frequency;
 		#endregion
 
@@ -214,7 +214,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			    double mean = filteredExitCorrelations.Values.Average();
 			    double stdDev = StandardDeviation(filteredExitCorrelations.Values);
 
-		    		double threshold = 1;
+		    		double threshold = successRate;
 		   	 	double significanceThreshold = mean + threshold * stdDev;
 
 		    		significantExitCorrelations = filteredExitCorrelations.Where(c => Math.Abs(c.Value) > significanceThreshold).ToDictionary(i => i.Key, i => i.Value);
@@ -254,19 +254,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			correlations["IsBelowAverageATR"] = correlationCoefficient(closedEntries.Select(e => e.IsBelowAverageATR ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
 			correlations["IsAboveAverageATRByAStdDev"] = correlationCoefficient(closedEntries.Select(e => e.IsAboveAverageATRByAStdDev ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
 
-			// Remove any NaN values from the correlations dictionary
 		    correlations = correlations.Where(c => !double.IsNaN(c.Value)).ToDictionary(i => i.Key, i => i.Value);
 
 			if (correlations.Count > 0) {
-				// Calculate the mean and standard deviation of the correlation coefficients
 			    double mean = correlations.Values.Average();
 			    double stdDev = StandardDeviation(correlations.Values);
 
-			    // Determine the significance threshold based on the standard deviation
-		    		double threshold = 1; // Adjust the multiplier as needed
+		    		double threshold = 4 - 4 * successRate;
 		   	 	double significanceThreshold = mean + threshold * stdDev;
 
-		    		// Filter significant correlations based on the dynamic threshold
 		    		significantCorrelations = correlations.Where(c => Math.Abs(c.Value) > significanceThreshold).ToDictionary(i => i.Key, i => i.Value);
 			} else {
 		        significantCorrelations.Clear();
