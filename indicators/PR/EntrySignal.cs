@@ -39,9 +39,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public TrendDirection Direction;
 		public MarketCycleStage TrendType;
 
+		public Dictionary<string, int> entryConditions = new Dictionary<string, int>();
+		public Dictionary<string, int> exitConditions = new Dictionary<string, int>();
+
 		public int EntryBar;
 		public int PreviousSwing;
 		public double PreviousSwingValue;
+
+		public double StopLossUsed;
+		public double ProfitTargetUsed;
 
 		public bool IsEnabled = true;
 		public bool IsClosed;
@@ -260,7 +266,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			GreatestLoss		= Direction == TrendDirection.Bullish ? CloseEntry - LowestLow : HighestHigh - CloseEntry;
 			ProfitMultiples	= GreatestProfit / StopDistance;
 
-			IsSuccessful = (ProfitMultiples > 1);
+			IsSuccessful = (ProfitMultiples >= 1);
 
 			if ((CurrentBar - EntryBar) > window) {
 				IsClosed = true;

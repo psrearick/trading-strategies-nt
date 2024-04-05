@@ -34,6 +34,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private MarketDirection marketDirection;
 		private EntryEvaluator entryEvaluator;
 //		private TradesExporter tradesExporter;
+		private ISet<int> tradesTracking = new HashSet<int>();
 		private EntrySignal entry;
 		private double previousSuccessRate;
 		private double successRate;
@@ -42,6 +43,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private int rollingWindowSize 			= 50;
 		private MarketPosition tradeDirection	= MarketPosition.Flat;
 		private double successRateThreshold 		= 0.05;
+
+		private Dictionary<string, List<double>> entryCriteria = new Dictionary<string, List<double>>();
+		private Dictionary<string, List<double>> exitCriteria = new Dictionary<string, List<double>>();
 
 		private DateTime LastDataDay		= new DateTime(2023, 03, 17);
 		private DateTime OpenTime		= DateTime.Parse("10:00", System.Globalization.CultureInfo.InvariantCulture);
@@ -89,6 +93,59 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 				entryEvaluator			= EntryEvaluator(Period, Window);
 				entry					= EntrySignal(1);
+
+				exitCriteria["TrendDirectionChanged"] = new List<double>();
+				exitCriteria["CounterTrendTightChannel"] = new List<double>();
+				exitCriteria["CounterTrendBroadChannel"] = new List<double>();
+				exitCriteria["CounterTrendBreakout"] = new List<double>();
+				exitCriteria["CounterTrendBreakoutTrend"] = new List<double>();
+				exitCriteria["CounterTrendLegLong"] = new List<double>();
+				exitCriteria["CounterTrendLegShort"] = new List<double>();
+				exitCriteria["CounterTrendLegAfterDoubleTopBottom"] = new List<double>();
+				exitCriteria["TrailingStopBeyondPreviousExtreme"] = new List<double>();
+				exitCriteria["MovingAverageCrossover"] = new List<double>();
+				exitCriteria["DoubleTopBottom"] = new List<double>();
+				exitCriteria["NoNewExtreme8"] = new List<double>();
+				exitCriteria["NoNewExtreme10"] = new List<double>();
+				exitCriteria["NoNewExtreme12"] = new List<double>();
+				exitCriteria["CounterTrendPressure"] = new List<double>();
+				exitCriteria["CounterTrendStrongPressure"] = new List<double>();
+				exitCriteria["CounterTrendStrongTrend"] = new List<double>();
+				exitCriteria["RSIOutOfRange"] = new List<double>();
+				exitCriteria["ATRAboveAverageATR"] = new List<double>();
+				exitCriteria["ATRBelowAverageATR"] = new List<double>();
+				exitCriteria["ATRAboveAverageATRByAStdDev"] = new List<double>();
+				exitCriteria["ATRBelowAverageATRByAStdDev"] = new List<double>();
+				exitCriteria["StrongCounterTrendFollowThrough"] = new List<double>();
+				exitCriteria["ProfitTarget1"] = new List<double>();
+				exitCriteria["ProfitTarget2"] = new List<double>();
+				exitCriteria["ProfitTarget3"] = new List<double>();
+				exitCriteria["ProfitTarget4"] = new List<double>();
+				exitCriteria["ProfitTarget5"] = new List<double>();
+
+				entryCriteria["RSI"] = new List<double>();
+		        entryCriteria["ATR"] = new List<double>();
+		        entryCriteria["IsEMADiverging"] = new List<double>();
+		        entryCriteria["IsEMAConverging"] = new List<double>();
+				entryCriteria["IsWithTrendEMA"] = new List<double>();
+				entryCriteria["IsWithTrendFastEMA"] = new List<double>();
+				entryCriteria["IsWithTrendSlowEMA"] = new List<double>();
+				entryCriteria["LeadsFastEMAByMoreThanATR"] = new List<double>();
+				entryCriteria["IsWithTrendPressure"] = new List<double>();
+				entryCriteria["IsStrongWithTrendPressure"] = new List<double>();
+				entryCriteria["IsWithTrendTrendBar"] = new List<double>();
+				entryCriteria["IsBreakoutBarPattern"] = new List<double>();
+				entryCriteria["IsWeakBar"] = new List<double>();
+				entryCriteria["IsStrongFollowThrough"] = new List<double>();
+				entryCriteria["IsBreakout"] = new List<double>();
+				entryCriteria["IsBroadChannel"] = new List<double>();
+				entryCriteria["IsTightChannel"] = new List<double>();
+		        entryCriteria["IsWeakTrend"] = new List<double>();
+				entryCriteria["IsStrongTrend"] = new List<double>();
+				entryCriteria["IsRSIInRange"] = new List<double>();
+				entryCriteria["IsAboveAverageATR"] = new List<double>();
+				entryCriteria["IsBelowAverageATR"] = new List<double>();
+				entryCriteria["IsAboveAverageATRByAStdDev"] = new List<double>();
 			}
 			#endregion
 
@@ -108,12 +165,24 @@ namespace NinjaTrader.NinjaScript.Strategies
 			entry.Update();
 			entry.UpdateStatus();
 
-			if (Position.MarketPosition == MarketPosition.Flat && tradeDirection != MarketPosition.Flat) {
-				UpdateTradeOutcomes(entry.IsSuccessful);
-				previousSuccessRate = successRate;
-				UpdateSuccessRates();
-				AdjustStrategy();
+			foreach (var criterion in entryCriteria) {
+				if (criterion.Value.Count > 20) {
+					criterion.Value.RemoveAt(0);
+				}
 			}
+
+			foreach (var criterion in exitCriteria) {
+				if (criterion.Value.Count > 20) {
+					criterion.Value.RemoveAt(0);
+				}
+			}
+
+//			if (Position.MarketPosition == MarketPosition.Flat && tradeDirection != MarketPosition.Flat) {
+//				UpdateTradeOutcomes(entry.IsSuccessful);
+//				previousSuccessRate = successRate;
+//				UpdateSuccessRates();
+//				AdjustStrategy();
+//			}
 
 			tradeDirection = Position.MarketPosition;
 
@@ -128,13 +197,35 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#endregion
 
 		#region OnExecutionUpdate()
-//		protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
-//		{
-//			if (TradesExporterActivated && SystemPerformance.AllTrades.Count > 0)
-//			{
-//				tradesExporter.OnNewTrade(SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1]);
-//			}
-//		}
+		protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
+		{
+			if (SystemPerformance.AllTrades.Count > 0)
+			{
+				Trade trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
+				OnNewTrade(trade);
+
+//				if (TradesExporterActivated)
+//				{
+//					tradesExporter.OnNewTrade(trade);
+//				}
+			}
+		}
+		#endregion
+
+		#region OnNewTrade()
+		private void OnNewTrade(Trade trade)
+		{
+			if (tradesTracking.Contains(trade.TradeNumber)) {
+				return;
+			}
+
+			tradesTracking.Add(trade.TradeNumber);
+
+			UpdateTradeOutcomes(entry.IsSuccessful);
+			previousSuccessRate = successRate;
+			UpdateSuccessRates();
+			AdjustStrategy();
+		}
 		#endregion
 
 		#region shouldExit()
@@ -220,12 +311,30 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			entryEvaluator.InitializeEntry(entry);
 
-			int quantity = Math.Max(1, (int) Math.Round(entryEvaluator.matched[0] * (double) Quantity, 0));
+			double entryRating = evaluateEntry();
+
+			double probabilityOfTrading = entryRating;
+			Random rand = new Random();
+       		double randomValue = rand.NextDouble();
+
+        		if (randomValue > probabilityOfTrading) {
+				return;
+			}
+
+
+
+
+			int quantity = Math.Max(1, (int) Math.Round(entryRating * (double) Quantity, 0));
+
+//			int quantity = Math.Max(1, (int) Math.Round(entryEvaluator.matched[0] * (double) Quantity, 0));
 
 			if (marketDirection.Direction[0] == TrendDirection.Bullish) {
 				double swingLow = legs.BarsAgoStarts[0] > 0 ? Math.Min(MIN(Low, legs.BarsAgoStarts[0])[0], MIN(Low, 4)[0]) : Low[0];
 				double stopLossDistance = 4 * (Close[0] - swingLow) + 1;
 				double profitDistance = (0.75 * successRate + 0.25) * stopLossDistance;
+
+				entry.StopLossUsed = stopLossDistance;
+				entry.ProfitTargetUsed = profitDistance;
 
 				if (swingLow < Low[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
@@ -242,6 +351,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				double stopLossDistance = 4 * (swingHigh - Close[0]) + 1;
 				double profitDistance = (0.75 * successRate + 0.25) * stopLossDistance;
 
+				entry.StopLossUsed = stopLossDistance;
+				entry.ProfitTargetUsed = profitDistance;
+
 				if (swingHigh > High[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
 					if (successRate < successRateThreshold) {
@@ -253,6 +365,42 @@ namespace NinjaTrader.NinjaScript.Strategies
 		}
 		#endregion
 
+		#region
+		private double evaluateEntry()
+		{
+			entry.entryConditions = entryEvaluator.EvaluateCriteria(0);
+
+			double weightedSum = 0;
+		    double totalWeight = 0;
+			double defaultWeight = 0.2;
+
+		    foreach (var criterion in entryCriteria)
+		    {
+		        List<double> historicalPerformance = criterion.Value;
+		        double averagePerformance = historicalPerformance.Count > 0 ? historicalPerformance.Average() : 0;
+				double weight = historicalPerformance.Count > 0 ? Math.Max(0, averagePerformance) : defaultWeight;
+
+		        if (entry.entryConditions.ContainsKey(criterion.Key) && entry.entryConditions[criterion.Key] == 1)
+		        {
+		            weightedSum += weight;
+		        }
+
+		        totalWeight += weight;
+		    }
+
+		    if (totalWeight > 0)
+		    {
+		        double normalizedWeight = weightedSum / totalWeight;
+		        return Math.Min(1, Math.Max(0, normalizedWeight));
+		    }
+		    else
+		   	{
+		        return 0;
+		    }
+
+		}
+		#endregion
+
 		#region entryPatternMatched()
 		private bool entryPatternMatched()
 		{
@@ -260,7 +408,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-			if (entryEvaluator.matched[0] < (1 - successRate)) {
+			if (entryEvaluator.matched[0] == 0) {
 				return false;
 			}
 
@@ -315,25 +463,70 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region AdjustStrategy()
 		private void AdjustStrategy()
 		{
-
 			double successRateStdDev 	= utils.StandardDeviation(successRates);
 			double successRateAvg		= successRates.Average();
 			double successRateStep		= successRateAvg * 0.01;
 			double successRateMultiple	= ((successRates[successRates.Count - 1] - successRateAvg) / successRateStdDev - 1) / 0.5;
-			successRateThreshold 		= successRateAvg + successRateStep * successRateMultiple;
+			successRateThreshold 		= successRateAvg;// + successRateStep * successRateMultiple;
 
-			if (successRate < successRateAvg) {
-				double windowAdjustmentSize	= Window * 0.02;
-				double atrMultiple 			= (entryEvaluator.atr[0] - entryEvaluator.avgAtr[0]) / entryEvaluator.stdDevAtr[0];
-				double windowAdjustment 		= windowAdjustmentSize * atrMultiple;
-				double WindowMin 			= Window / 2;
-				double WindowMax	 			= Window * 1.5;
-				double windowAdjusted 		= Math.Max(WindowMin, Math.Min(WindowMax, entryEvaluator.Window + windowAdjustment));
+//			double windowMin 			= Window * 0.75;
+//			double windowMax	 			= Window * 1.25;
 
-				if (Math.Abs(atrMultiple) > 1) {
-					entryEvaluator.Window = Math.Max(1, windowAdjusted);
-				}
+//			if (successRate < successRateAvg) {
+////				Print("Below");
+//				entryEvaluator.Window = entryEvaluator.Window == windowMin ? Window : windowMax;
+//			} else {
+////				Print("Above");
+//				entryEvaluator.Window = entryEvaluator.Window == windowMax ? Window : windowMin;
+//			}
+//			Print(entryEvaluator.Window);
+//			Print("==========");
+
+
+//			double windowAdjustmentSize	= Window * 0.02;
+//			double atrMultiple 			= (entryEvaluator.atr[0] - entryEvaluator.avgAtr[0]) / entryEvaluator.stdDevAtr[0];
+//			double windowAdjustment 		= windowAdjustmentSize * atrMultiple;
+//			double WindowMin 			= Window * 0.75;
+//			double WindowMax	 			= Window * 1.25;
+//			double windowAdjusted 		= Math.Max(WindowMin, Math.Min(WindowMax, entryEvaluator.Window + windowAdjustment));
+
+//			if (successRate < successRateAvg) {
+
+//				if (Math.Abs(atrMultiple) > 1) {
+//					entryEvaluator.Window = Math.Max(1, windowAdjusted);
+//				}
+//			}
+
+//			Print(Time[0]);
+//			Print(windowAdjustment);
+//			Print(successRateThreshold);
+//			Print(entryEvaluator.Window);
+
+//			Print(entry.StopLossUsed);
+//			Print(entry.ProfitTargetUsed);
+//			Print(entry.Atr);
+//			Print(entry.IsSuccessful);
+//			Print(entry.DistanceMoved > 0);
+//			Print("==========");
+
+//			Print(entry.StopLossUsed + "," + entry.ProfitTargetUsed + "," + entry.Atr + "," + entry.IsSuccessful + "," + (entry.DistanceMoved > 0) + "," + entry.DistanceMoved);
+			foreach (var criterion in entry.entryConditions) {
+				entryCriteria[criterion.Key].Add(entry.DistanceMoved);
 			}
+
+			foreach (var criterion in entry.exitConditions) {
+				exitCriteria[criterion.Key].Add(entry.DistanceMoved);
+			}
+
+//			Print("==========");
+//			Print("Entry");
+//			foreach (var criterion in entryCriteria) {
+//				Print(criterion.Key + "," + String.Join(",", criterion.Value));
+//			}
+//			Print("Exit");
+//			foreach (var criterion in exitCriteria) {
+//				Print(criterion.Key + "," + String.Join(",", criterion.Value));
+//			}
 		}
 		#endregion
 

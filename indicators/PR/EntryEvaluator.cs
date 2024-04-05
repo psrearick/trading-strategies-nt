@@ -247,46 +247,55 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private void CalculateCorrelations()
 		{
 			correlations.Clear();
-			List<EntrySignal> closedEntries = entries.Where(e => e.IsEnabled && (e.IsClosed || e.IsSuccessful)).ToList();
 
-	        correlations["RSI"] = correlationCoefficient(closedEntries.Select(e => e.Rsi).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-	        correlations["ATR"] = correlationCoefficient(closedEntries.Select(e => e.Atr).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-	        correlations["IsEMADiverging"] = correlationCoefficient(closedEntries.Select(e => e.IsEMADiverging ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-	        correlations["IsEMAConverging"] = correlationCoefficient(closedEntries.Select(e => e.IsEMAConverging ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsWithTrendEMA"] = correlationCoefficient(closedEntries.Select(e => e.IsWithTrendEMA ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsWithTrendFastEMA"] = correlationCoefficient(closedEntries.Select(e => e.IsWithTrendFastEMA ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsWithTrendSlowEMA"] = correlationCoefficient(closedEntries.Select(e => e.IsWithTrendSlowEMA ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["LeadsFastEMAByMoreThanATR"] = correlationCoefficient(closedEntries.Select(e => e.LeadsFastEMAByMoreThanATR ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsWithTrendPressure"] = correlationCoefficient(closedEntries.Select(e => e.IsWithTrendPressure ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsStrongWithTrendPressure"] = correlationCoefficient(closedEntries.Select(e => e.IsStrongWithTrendPressure ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsWithTrendTrendBar"] = correlationCoefficient(closedEntries.Select(e => e.IsWithTrendTrendBar ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsBreakoutBarPattern"] = correlationCoefficient(closedEntries.Select(e => e.IsBreakoutBarPattern ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsWeakBar"] = correlationCoefficient(closedEntries.Select(e => e.IsWeakBar ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsStrongFollowThrough"] = correlationCoefficient(closedEntries.Select(e => e.IsStrongFollowThrough ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsBreakout"] = correlationCoefficient(closedEntries.Select(e => e.IsBreakout ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsBroadChannel"] = correlationCoefficient(closedEntries.Select(e => e.IsBroadChannel ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsTightChannel"] = correlationCoefficient(closedEntries.Select(e => e.IsTightChannel ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-	        correlations["IsWeakTrend"] = correlationCoefficient(closedEntries.Select(e => e.IsWeakTrend ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsStrongTrend"] = correlationCoefficient(closedEntries.Select(e => e.IsStrongTrend ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsRSIInRange"] = correlationCoefficient(closedEntries.Select(e => e.IsRSIInRange ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsAboveAverageATR"] = correlationCoefficient(closedEntries.Select(e => e.IsAboveAverageATR ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsBelowAverageATR"] = correlationCoefficient(closedEntries.Select(e => e.IsBelowAverageATR ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-			correlations["IsAboveAverageATRByAStdDev"] = correlationCoefficient(closedEntries.Select(e => e.IsAboveAverageATRByAStdDev ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
-
-		    correlations = correlations.Where(c => !double.IsNaN(c.Value)).ToDictionary(i => i.Key, i => i.Value);
+		    correlations = GetEntryCorrelations();
 
 			if (correlations.Count > 0) {
 			    double mean = correlations.Values.Average();
 			    double stdDev = utils.StandardDeviation(correlations.Values);
 
 		    		double threshold = 4 - 4 * successRate;
-//		    		double threshold = atr[0] * successRate;
+
 		   	 	double significanceThreshold = mean + threshold * stdDev;
 
 		    		significantCorrelations = correlations.Where(c => Math.Abs(c.Value) > significanceThreshold).ToDictionary(i => i.Key, i => i.Value);
 			} else {
 		        significantCorrelations.Clear();
 		    }
+		}
+		#endregion
+
+		#region GetEntryCorrelations()
+		public Dictionary<string, double> GetEntryCorrelations()
+		{
+			List<EntrySignal> closedEntries = entries.Where(e => e.IsEnabled && (e.IsClosed || e.IsSuccessful)).ToList();
+
+			Dictionary<string, double> entryCorrelations = new Dictionary<string, double>();
+	        entryCorrelations["RSI"] = correlationCoefficient(closedEntries.Select(e => e.Rsi).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+	        entryCorrelations["ATR"] = correlationCoefficient(closedEntries.Select(e => e.Atr).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+	        entryCorrelations["IsEMADiverging"] = correlationCoefficient(closedEntries.Select(e => e.IsEMADiverging ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+	        entryCorrelations["IsEMAConverging"] = correlationCoefficient(closedEntries.Select(e => e.IsEMAConverging ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsWithTrendEMA"] = correlationCoefficient(closedEntries.Select(e => e.IsWithTrendEMA ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsWithTrendFastEMA"] = correlationCoefficient(closedEntries.Select(e => e.IsWithTrendFastEMA ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsWithTrendSlowEMA"] = correlationCoefficient(closedEntries.Select(e => e.IsWithTrendSlowEMA ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["LeadsFastEMAByMoreThanATR"] = correlationCoefficient(closedEntries.Select(e => e.LeadsFastEMAByMoreThanATR ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsWithTrendPressure"] = correlationCoefficient(closedEntries.Select(e => e.IsWithTrendPressure ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsStrongWithTrendPressure"] = correlationCoefficient(closedEntries.Select(e => e.IsStrongWithTrendPressure ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsWithTrendTrendBar"] = correlationCoefficient(closedEntries.Select(e => e.IsWithTrendTrendBar ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsBreakoutBarPattern"] = correlationCoefficient(closedEntries.Select(e => e.IsBreakoutBarPattern ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsWeakBar"] = correlationCoefficient(closedEntries.Select(e => e.IsWeakBar ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsStrongFollowThrough"] = correlationCoefficient(closedEntries.Select(e => e.IsStrongFollowThrough ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsBreakout"] = correlationCoefficient(closedEntries.Select(e => e.IsBreakout ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsBroadChannel"] = correlationCoefficient(closedEntries.Select(e => e.IsBroadChannel ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsTightChannel"] = correlationCoefficient(closedEntries.Select(e => e.IsTightChannel ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+	        entryCorrelations["IsWeakTrend"] = correlationCoefficient(closedEntries.Select(e => e.IsWeakTrend ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsStrongTrend"] = correlationCoefficient(closedEntries.Select(e => e.IsStrongTrend ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsRSIInRange"] = correlationCoefficient(closedEntries.Select(e => e.IsRSIInRange ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsAboveAverageATR"] = correlationCoefficient(closedEntries.Select(e => e.IsAboveAverageATR ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsBelowAverageATR"] = correlationCoefficient(closedEntries.Select(e => e.IsBelowAverageATR ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+			entryCorrelations["IsAboveAverageATRByAStdDev"] = correlationCoefficient(closedEntries.Select(e => e.IsAboveAverageATRByAStdDev ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
+
+			return entryCorrelations.Where(c => !double.IsNaN(c.Value)).ToDictionary(i => i.Key, i => i.Value);
 		}
 		#endregion
 
@@ -420,136 +429,136 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public double EvaluateExitCriteria(EntrySignal entry)
 		{
 			int significantExits = significantExitCorrelations.Count;
+			Dictionary<string, int> criteria = new Dictionary<string, int>();
+
 			if (significantExits == 0) {
 				return -1;
 			}
 
-			int matchedCount = 0;
-
 			foreach (var criterion in significantExitCorrelations) {
-				if (criterion.Key == "TrendDirectionChanged") matchedCount += entry.TrendDirectionChanged > 0 ? 1 : 0;
-				if (criterion.Key == "CounterTrendTightChannel") matchedCount += entry.CounterTrendTightChannel > 0 ? 1 : 0;
-				if (criterion.Key == "CounterTrendBroadChannel") matchedCount += entry.CounterTrendBroadChannel > 0 ? 1 : 0;
-				if (criterion.Key == "CounterTrendBreakout") matchedCount += entry.CounterTrendBreakout > 0 ? 1 : 0;
-				if (criterion.Key == "CounterTrendBreakoutTrend") matchedCount += entry.CounterTrendBreakoutTrend > 0 ? 1 : 0;
-				if (criterion.Key == "CounterTrendLegLong") matchedCount += entry.CounterTrendLegLong > 0 ? 1 : 0;
-				if (criterion.Key == "CounterTrendLegShort") matchedCount += entry.CounterTrendLegShort > 0 ? 1 : 0;
-				if (criterion.Key == "CounterTrendLegAfterDoubleTopBottom") matchedCount += entry.CounterTrendLegAfterDoubleTopBottom > 0 ? 1 : 0;
-				if (criterion.Key == "TrailingStopBeyondPreviousExtreme") matchedCount += entry.TrailingStopBeyondPreviousExtreme > 0 ? 1 : 0;
-				if (criterion.Key == "MovingAverageCrossover") matchedCount += entry.MovingAverageCrossover > 0 ? 1 : 0;
-				if (criterion.Key == "DoubleTopBottom") matchedCount += entry.DoubleTopBottom > 0 ? 1 : 0;
-				if (criterion.Key == "NoNewExtreme8") matchedCount += entry.NoNewExtreme8 > 0 ? 1 : 0;
-				if (criterion.Key == "NoNewExtreme10") matchedCount += entry.NoNewExtreme10 > 0 ? 1 : 0;
-				if (criterion.Key == "NoNewExtreme12") matchedCount += entry.NoNewExtreme12 > 0 ? 1 : 0;
-				if (criterion.Key == "CounterTrendPressure") matchedCount += entry.CounterTrendPressure > 0 ? 1 : 0;
-				if (criterion.Key == "CounterTrendStrongPressure") matchedCount += entry.CounterTrendStrongPressure > 0 ? 1 : 0;
-				if (criterion.Key == "CounterTrendStrongTrend") matchedCount += entry.CounterTrendStrongTrend > 0 ? 1 : 0;
-				if (criterion.Key == "RSIOutOfRange") matchedCount += entry.RSIOutOfRange > 0 ? 1 : 0;
-				if (criterion.Key == "ATRAboveAverageATR") matchedCount += entry.ATRAboveAverageATR > 0 ? 1 : 0;
-				if (criterion.Key == "ATRBelowAverageATR") matchedCount += entry.ATRBelowAverageATR > 0 ? 1 : 0;
-				if (criterion.Key == "ATRAboveAverageATRByAStdDev") matchedCount += entry.ATRAboveAverageATRByAStdDev > 0 ? 1 : 0;
-				if (criterion.Key == "ATRBelowAverageATRByAStdDev") matchedCount += entry.ATRBelowAverageATRByAStdDev > 0 ? 1 : 0;
-				if (criterion.Key == "StrongCounterTrendFollowThrough") matchedCount += entry.StrongCounterTrendFollowThrough > 0 ? 1 : 0;
-				if (criterion.Key == "ProfitTarget1") matchedCount += entry.ProfitTarget1 > 0 ? 1 : 0;
-				if (criterion.Key == "ProfitTarget2") matchedCount += entry.ProfitTarget2 > 0 ? 1 : 0;
-				if (criterion.Key == "ProfitTarget3") matchedCount += entry.ProfitTarget3 > 0 ? 1 : 0;
-				if (criterion.Key == "ProfitTarget4") matchedCount += entry.ProfitTarget4 > 0 ? 1 : 0;
-				if (criterion.Key == "ProfitTarget5") matchedCount += entry.ProfitTarget5 > 0 ? 1 : 0;
+				if (criterion.Key == "TrendDirectionChanged") criteria[criterion.Key] = entry.TrendDirectionChanged > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendTightChannel") criteria[criterion.Key] = entry.CounterTrendTightChannel > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendBroadChannel") criteria[criterion.Key] = entry.CounterTrendBroadChannel > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendBreakout") criteria[criterion.Key] = entry.CounterTrendBreakout > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendBreakoutTrend") criteria[criterion.Key] = entry.CounterTrendBreakoutTrend > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendLegLong") criteria[criterion.Key] = entry.CounterTrendLegLong > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendLegShort") criteria[criterion.Key] = entry.CounterTrendLegShort > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendLegAfterDoubleTopBottom") criteria[criterion.Key] = entry.CounterTrendLegAfterDoubleTopBottom > 0 ? 1 : 0;
+				if (criterion.Key == "TrailingStopBeyondPreviousExtreme") criteria[criterion.Key] = entry.TrailingStopBeyondPreviousExtreme > 0 ? 1 : 0;
+				if (criterion.Key == "MovingAverageCrossover") criteria[criterion.Key] = entry.MovingAverageCrossover > 0 ? 1 : 0;
+				if (criterion.Key == "DoubleTopBottom") criteria[criterion.Key] = entry.DoubleTopBottom > 0 ? 1 : 0;
+				if (criterion.Key == "NoNewExtreme8") criteria[criterion.Key] = entry.NoNewExtreme8 > 0 ? 1 : 0;
+				if (criterion.Key == "NoNewExtreme10") criteria[criterion.Key] = entry.NoNewExtreme10 > 0 ? 1 : 0;
+				if (criterion.Key == "NoNewExtreme12") criteria[criterion.Key] = entry.NoNewExtreme12 > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendPressure") criteria[criterion.Key] = entry.CounterTrendPressure > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendStrongPressure") criteria[criterion.Key] = entry.CounterTrendStrongPressure > 0 ? 1 : 0;
+				if (criterion.Key == "CounterTrendStrongTrend") criteria[criterion.Key] = entry.CounterTrendStrongTrend > 0 ? 1 : 0;
+				if (criterion.Key == "RSIOutOfRange") criteria[criterion.Key] = entry.RSIOutOfRange > 0 ? 1 : 0;
+				if (criterion.Key == "ATRAboveAverageATR") criteria[criterion.Key] = entry.ATRAboveAverageATR > 0 ? 1 : 0;
+				if (criterion.Key == "ATRBelowAverageATR") criteria[criterion.Key] = entry.ATRBelowAverageATR > 0 ? 1 : 0;
+				if (criterion.Key == "ATRAboveAverageATRByAStdDev") criteria[criterion.Key] = entry.ATRAboveAverageATRByAStdDev > 0 ? 1 : 0;
+				if (criterion.Key == "ATRBelowAverageATRByAStdDev") criteria[criterion.Key] = entry.ATRBelowAverageATRByAStdDev > 0 ? 1 : 0;
+				if (criterion.Key == "StrongCounterTrendFollowThrough") criteria[criterion.Key] = entry.StrongCounterTrendFollowThrough > 0 ? 1 : 0;
+				if (criterion.Key == "ProfitTarget1") criteria[criterion.Key] = entry.ProfitTarget1 > 0 ? 1 : 0;
+				if (criterion.Key == "ProfitTarget2") criteria[criterion.Key] = entry.ProfitTarget2 > 0 ? 1 : 0;
+				if (criterion.Key == "ProfitTarget3") criteria[criterion.Key] = entry.ProfitTarget3 > 0 ? 1 : 0;
+				if (criterion.Key == "ProfitTarget4") criteria[criterion.Key] = entry.ProfitTarget4 > 0 ? 1 : 0;
+				if (criterion.Key == "ProfitTarget5") criteria[criterion.Key] = entry.ProfitTarget5 > 0 ? 1 : 0;
 			}
 
-			return (double) matchedCount / (double) significantExits;
+			entry.exitConditions = criteria;
+
+			return (double) criteria.Values.Sum() / (double) significantExits;
 		}
 		#endregion
 
 		#region EvaluateCriteria()
-		public bool EvaluateCriteria(int barsAgo)
+		public Dictionary<string, int> EvaluateCriteria(int barsAgo)
 		{
 			int criteriaCount = significantCorrelations.Count;
+			Dictionary<string, int> criteria = new Dictionary<string, int>();
 
 			if (criteriaCount == 0) {
 				matched[0] = 0;
-				return false;
+				return criteria;
 			}
-
-			int matchedCount = 0;
 
 			foreach (var criterion in significantCorrelations) {
 				bool positive = criterion.Value > 0;
 				if (criterion.Key == "RSI") {
-					matchedCount += EvaluateRSI(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateRSI(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "ATR") {
-					matchedCount += EvaluateATR(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateATR(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsEMADiverging") {
-					matchedCount += EvaluateEMADiverging(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateEMADiverging(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsEMAConverging") {
-					matchedCount += EvaluateEMAConverging(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateEMAConverging(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsWithTrendEMA") {
-					matchedCount += EvaluateWithTrendEMA(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateWithTrendEMA(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsWithTrendFastEMA") {
-					matchedCount += EvaluateWithTrendFastEMA(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateWithTrendFastEMA(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsWithTrendSlowEMA") {
-					matchedCount += EvaluateWithTrendSlowEMA(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateWithTrendSlowEMA(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "LeadsFastEMAByMoreThanATR") {
-					matchedCount += EvaluateLeadsFastEMAByMoreThanATR(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateLeadsFastEMAByMoreThanATR(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsWithTrendPressure") {
-					matchedCount += EvaluateWithTrendPressure(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateWithTrendPressure(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsStrongWithTrendPressure") {
-					matchedCount += EvaluateStrongWithTrendPressure(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateStrongWithTrendPressure(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsWithTrendTrendBar") {
-					matchedCount += EvaluateWithTrendTrendBar(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateWithTrendTrendBar(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsBreakoutBarPattern") {
-					matchedCount += EvaluateBreakoutBarPattern(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateBreakoutBarPattern(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsWeakBar") {
-					matchedCount += EvaluateWeakBar(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateWeakBar(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsStrongFollowThrough") {
-					matchedCount += EvaluateStrongFollowThrough(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateStrongFollowThrough(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsBreakout") {
-					matchedCount += EvaluateBreakout(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateBreakout(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsBroadChannel") {
-					matchedCount += EvaluateBroadChannel(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateBroadChannel(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsTightChannel") {
-					matchedCount += EvaluateTightChannel(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateTightChannel(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsWeakTrend") {
-					matchedCount += EvaluateWeakTrend(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateWeakTrend(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsStrongTrend") {
-					matchedCount += EvaluateStrongTrend(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateStrongTrend(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsRSIInRange") {
-					matchedCount += EvaluateRSIInRange(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateRSIInRange(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsAboveAverageATR") {
-					matchedCount += EvaluateAboveAverageATR(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateAboveAverageATR(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsBelowAverageATR") {
-					matchedCount += EvaluateBelowAverageATR(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateBelowAverageATR(barsAgo, positive) ? 1 : 0;
 				}
 				if (criterion.Key == "IsAboveAverageATRByAStdDev") {
-					matchedCount += EvaluateAboveAverageATRByAStdDev(barsAgo, positive) ? 1 : 0;
+					criteria[criterion.Key] = EvaluateAboveAverageATRByAStdDev(barsAgo, positive) ? 1 : 0;
 				}
 			}
 
-			double match = (double) matchedCount / (double) criteriaCount;
-			matched[0] = match;
+			matched[0] = (double) criteria.Values.Sum() / (double) criteriaCount;
 
-			return match == 1;
+			return criteria;
 		}
 		#endregion
 
