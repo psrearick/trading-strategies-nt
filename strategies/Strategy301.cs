@@ -82,7 +82,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				TimeShift									= -6;
 				Period 										= 10;
 				Quantity 									= 1;
-				Window										= 10;
+				Window										= 8;
 			}
 			#endregion
 
@@ -229,12 +229,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region shouldExit()
 		private bool shouldExit() {
 			if (Position.MarketPosition != MarketPosition.Flat) {
-//				if (entryEvaluator.EvaluateExitCriteria(entry) > successRate) {
-//					return true;
-//				}
-				if (entryEvaluator.EvaluateExitCriteria(entry) > 0) {
+				if (entryEvaluator.EvaluateExitCriteria(entry) > successRate * 0.5) {
 					return true;
 				}
+//				if (entryEvaluator.EvaluateExitCriteria(entry) > 0) {
+//					return true;
+//				}
 			}
 
 			return false;
@@ -314,13 +314,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			double entryRating = evaluateEntry();
 
-			double entryThreshold = successRate > successRateThreshold ? 0.5 : 0.7;
+			double entryThreshold = successRate > successRateThreshold ? 0.4 : 0.7;
 
 			if (entryRating < entryThreshold) {
 				return;
 			}
 
-			int quantity = Math.Max(1, (int) Math.Round(entryRating * (double) Quantity, 0));
+			int quantity = Math.Max(1, (int) Math.Round(((successRate + entryRating) / 2) * (double) Quantity, 0));
 			double stopLossAdjustment = 10 * (((entryEvaluator.avgAtr[0] - entryEvaluator.atr[0]) / entryEvaluator.stdDevAtr[0]));
 			double stopLossThreshold = 20 + (successRate < successRateThreshold ? stopLossAdjustment / 2 : stopLossAdjustment);
 
@@ -333,14 +333,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 					return;
 				}
 
-
 				entry.StopLossUsed = stopLossDistance;
 				entry.ProfitTargetUsed = profitDistance;
 
 				if (swingLow < Low[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
 					if (successRate < successRateThreshold) {
-						SetProfitTarget("LongEntry1", CalculationMode.Ticks, profitDistance);
+//						SetProfitTarget("LongEntry1", CalculationMode.Ticks, profitDistance);
 					}
 
 					EnterLong(quantity, "LongEntry1");
@@ -362,7 +361,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				if (swingHigh > High[0]) {
 					SetStopLoss(CalculationMode.Ticks, stopLossDistance);
 					if (successRate < successRateThreshold) {
-						SetProfitTarget("ShortEntry1", CalculationMode.Ticks, profitDistance);
+//						SetProfitTarget("ShortEntry1", CalculationMode.Ticks, profitDistance);
 					}
 
 					EnterShort(quantity, "ShortEntry1");
@@ -479,10 +478,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 			double successRateStdDev 	= utils.StandardDeviation(successRates);
 			double successRateAvg		= successRates.Average();
-//			double successRateStep		= successRateAvg * 0.01;
-//			double successRateMultiple	= ((successRates[successRates.Count - 1] - successRateAvg) / successRateStdDev - 1) / 0.5;
-//			Print(successRateMultiple);
-			successRateThreshold 		= successRateAvg + successRateStdDev * 0.5;
+			successRateThreshold 		= successRateAvg + successRateStdDev * 0.25;
 		}
 		#endregion
 
