@@ -36,16 +36,17 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public ATR atr;
 		public StdDev stdDevAtr;
 		public SMA avgAtr;
+		public SMA avgAtrFast;
 		public EMA emaFast;
 		public EMA emaSlow;
 		public Series<int> barsSinceDoubleTop;
 		public Series<int> barsSinceDoubleBottom;
 		private List<EntrySignal> entries = new List<EntrySignal>(200);
 		private Dictionary<string, double> correlations = new Dictionary<string, double>();
-		private Dictionary<string, double> significantCorrelations = new Dictionary<string, double>();
+		public Dictionary<string, double> significantCorrelations = new Dictionary<string, double>();
 		private Dictionary<string, double?> exitCorrelations = new Dictionary<string, double?>();
 		private Dictionary<string, double> filteredExitCorrelations = new Dictionary<string, double>();
-		private Dictionary<string, double> significantExitCorrelations = new Dictionary<string, double>();
+		public Dictionary<string, double> significantExitCorrelations = new Dictionary<string, double>();
 		public Series<double> matched;
 		private int WindowSize;
 		private int InitialWindow = 200;
@@ -93,8 +94,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			if (State == State.DataLoaded) {
 				barsSinceDoubleTop		= new Series<int>(this);
 				barsSinceDoubleBottom	= new Series<int>(this);
-				stdDevAtr				= StdDev(atr, 20);
-				avgAtr					= SMA(atr, 20);
+				stdDevAtr				= StdDev(atr, 21);
+				avgAtr					= SMA(atr, 21);
+				avgAtrFast				= SMA(atr, 9);
 				matched					= new Series<double>(this, MaximumBarsLookBack.TwoHundredFiftySix);
 
 //				for (int i = 0; i < InitialWindow; i++) {
@@ -357,10 +359,27 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region UpdateStopLoss()
+		public void UpdateStopLoss(double stopLossMultiplier)
+		{
+			double atrStopLossDistance = atr[0] * stopLossMultiplier;
+			foreach (var entry in entries.Where(e => !e.IsClosed).ToList())
+			{
+				double previousSwing = entry.Direction == TrendDirection.Bearish
+					? pa.HighestHigh(0, md.LegLong.BarsAgoStarts[0])
+					: pa.LowestLow(0, md.LegLong.BarsAgoStarts[0]);
+				double swingDistance = Math.Abs(Close[0] - previousSwing);
+
+				entry.StopDistance = Math.Min(swingDistance, atrStopLossDistance);
+			}
+		}
+		#endregion
+
 		#region UpdateEntryStatus()
 		private void UpdateEntryStatus()
 	    {
-	        foreach (var entry in entries) {
+	        foreach (var entry in entries)
+			{
 	            entry.UpdateStatus();
 	        }
 	    }
@@ -406,6 +425,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			entry.Rsi 				= rsi[0];
 			entry.Atr 				= atr[0];
 			entry.StdDevAtr			= stdDevAtr[0];
+			entry.AvgAtrFast			= avgAtrFast[0];
 			entry.AvgAtr				= avgAtr[0];
 			entry.EmaFast 			= emaFast[0];
 			entry.EmaSlow 			= emaSlow[0];

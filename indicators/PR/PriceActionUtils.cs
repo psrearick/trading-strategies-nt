@@ -292,6 +292,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region HighestHigh()
 		public double HighestHigh(int barsAgo = 0, int period = 12)
 		{
+			if (period == 0) {
+				return High[barsAgo];
+			}
+
 			return MAX(High, period)[barsAgo];
 		}
 		#endregion
@@ -299,6 +303,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region LowestLow()
 		public double LowestLow(int barsAgo = 0, int period = 12)
 		{
+			if (period == 0) {
+				return Low[barsAgo];
+			}
+
 			return MIN(Low, period)[barsAgo];
 		}
 		#endregion

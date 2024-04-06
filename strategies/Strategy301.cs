@@ -97,7 +97,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 TimeShift = -6;
                 Period = 10;
                 Quantity = 1;
-                Window = 8;
+                Window = 10;
 
 				SL = 1.5;
 				SLLimit = 5;
@@ -288,7 +288,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double exitMatched = entryEvaluator.EvaluateExitCriteria(entry);
 			double exitRating = evaluateExit();
 			double exitThresholdModifier = Math.Round((exitMatched * 0.15) / 0.05, 0) * 0.05;
-            double exitThreshold = 0.5 + exitThresholdModifier * (successRate > successRateThreshold ? -1 : 1);
+            double exitThreshold = 0 + exitThresholdModifier * (successRate > successRateThreshold ? -1 : 1);
 
 			if (exitRating > exitThreshold) {
 				return true;
@@ -425,7 +425,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 //			double maxStopLossDistancePoints = entryEvaluator.avgAtrFast[0] * CurrentStopLossLimitMultiplier;
 			double maxStopLossDistancePoints = entryEvaluator.avgAtrFast[0] * SLLimit;
-    			double maxStopLossDistanceTicks = maxStopLossDistancePoints * 4;
+			double maxStopLossDistanceTicks = maxStopLossDistancePoints * 4;
 //			double atrStopLossPoints = entryEvaluator.atr[0] * CurrentStopLossMultiplier;
 			double atrStopLossPoints = entryEvaluator.atr[0] * SL;
 
@@ -454,7 +454,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 					entry.StopLossMultiplier = CurrentStopLossMultiplier;
 					entry.StopLossLimitMultiplier = CurrentStopLossLimitMultiplier;
                     SetStopLoss(CalculationMode.Ticks, stopLossDistanceTicks);
-//					SetProfitTarget(CalculationMode.Ticks, stopLossDistanceTicks * 6);
+//					SetProfitTarget(CalculationMode.Ticks, stopLossDistanceTicks * 2);
 
                     EnterLong(quantity);
                 }
@@ -484,7 +484,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 					entry.StopLossMultiplier = CurrentStopLossMultiplier;
 					entry.StopLossLimitMultiplier = CurrentStopLossLimitMultiplier;
                     SetStopLoss(CalculationMode.Ticks, stopLossDistanceTicks);
-//					SetProfitTarget(CalculationMode.Ticks, stopLossDistanceTicks * 6);
+//					SetProfitTarget(CalculationMode.Ticks, stopLossDistanceTicks * 2);
 
                     EnterShort(quantity);
                 }
@@ -670,8 +670,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             )
             {
                 entryEvaluator.Window = Window * 1.2;
-				CurrentStopLossMultiplier = 3;
-				CurrentStopLossLimitMultiplier = 6;
+				CurrentStopLossMultiplier = 1;
+				CurrentStopLossLimitMultiplier = 1;
             }
             else if (
                 entryEvaluator.avgAtr[0] - stdDevAtr
@@ -680,13 +680,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 entryEvaluator.Window = Window * 0.8;
 				CurrentStopLossMultiplier = 1;
-				CurrentStopLossLimitMultiplier = 3;
+				CurrentStopLossLimitMultiplier = 1;
             }
             else
             {
                 entryEvaluator.Window = Window;
-				CurrentStopLossMultiplier = 1.5;
-				CurrentStopLossLimitMultiplier = 5;
+				CurrentStopLossMultiplier = 1;
+				CurrentStopLossLimitMultiplier = 1;
             }
 
 			OptimizeWindowSize();
@@ -754,12 +754,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        {
 		            PerformanceData bestPerformance = groupedPerformanceData[0];
 		            CurrentStopLossMultiplier = bestPerformance.StopLossMultiplier;
-					Print("Optimized: " + CurrentStopLossMultiplier);
-					return;
 		        }
 		    }
-
-			Print("Unoptimized: " + CurrentStopLossMultiplier);
 		}
 		#endregion
 
@@ -823,12 +819,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         public double Window { get; set; }
 
         [NinjaScriptProperty]
-        [Range(1, 200)]
+        [Range(0, 200)]
         [Display(Name = "SL", Description = "SL", Order = 3, GroupName = "Parameters")]
         public double SL { get; set; }
 
         [NinjaScriptProperty]
-        [Range(1, 200)]
+        [Range(0, 200)]
         [Display(Name = "SLLimit", Description = "SLLimit", Order = 3, GroupName = "Parameters")]
         public double SLLimit { get; set; }
 

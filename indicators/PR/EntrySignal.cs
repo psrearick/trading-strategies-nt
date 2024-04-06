@@ -48,6 +48,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		public double StopLossUsed;
 		public double ProfitTargetUsed;
+		public double StopLossMultiplier;
+		public double StopLossLimitMultiplier;
 
 		public bool IsEnabled = true;
 		public bool IsClosed;
@@ -63,6 +65,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public double Rsi;
 		public double Atr;
 		public double StdDevAtr;
+		public double AvgAtrFast;
 		public double AvgAtr;
 		public double EmaFast;
 		public double EmaSlow;
@@ -136,6 +139,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public double ProfitTarget5 = 0;
 
 		public double StopLoss = 0;
+		public double TrailingStopLoss = 0;
 
 		#endregion
 
@@ -165,18 +169,19 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		{
 			if (init) {
 				EvaluateExitConditions();
+				UpdateTrailingStopLoss();
 			}
 		}
 		#endregion
 
-		#region UpdateStopLoss()
-		private void UpdateStopLoss()
+		#region UpdateTrailingStopLoss()
+		private void UpdateTrailingStopLoss()
 		{
 			if (Direction == TrendDirection.Bullish) {
 				double swingLow = entryEvaluator.md.LegLong.BarsAgoStarts[0] > 0 ? MIN(Low, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0] : Low[0];
 
 				if (swingLow > StopLoss && entryEvaluator.md.LegLong[0] > 0) {
-					StopLoss = swingLow;
+					TrailingStopLoss = swingLow;
 				}
 			}
 
@@ -184,7 +189,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				double swingHigh = entryEvaluator.md.LegLong.BarsAgoStarts[0] > 0 ? MAX(High, entryEvaluator.md.LegLong.BarsAgoStarts[0])[0] : High[0];
 
 				if ((swingHigh < StopLoss || StopLoss == 0) && entryEvaluator.md.LegLong[0] < 0) {
-					StopLoss = swingHigh;
+					TrailingStopLoss = swingHigh;
 				}
 			}
 		}
@@ -193,7 +198,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region CalculateAdditionalValues()
 		public void CalculateAdditionalValues()
 	    {
-//			pa = entryEvaluator.pa;
 			CalculateEMAValues();
 			CalculateStopDistance();
 			CalculateBuySellPressure();
@@ -260,13 +264,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			int period 		= CurrentBar - (EntryBar - PreviousSwing);
 			DistanceMoved 	= Direction == TrendDirection.Bullish ? Close[0] - CloseEntry : CloseEntry - Close[0];
-			HighestHigh 		= period > 0 ? pa.HighestHigh(0, period) : High[0];
+			HighestHigh 	= period > 0 ? pa.HighestHigh(0, period) : High[0];
 			LowestLow		= period > 0 ? pa.LowestLow(0, period) : Low[0];
 			GreatestProfit	= Direction == TrendDirection.Bullish ? HighestHigh - CloseEntry : CloseEntry - LowestLow;
-			GreatestLoss		= Direction == TrendDirection.Bullish ? CloseEntry - LowestLow : HighestHigh - CloseEntry;
+			GreatestLoss	= Direction == TrendDirection.Bullish ? CloseEntry - LowestLow : HighestHigh - CloseEntry;
 			ProfitMultiples	= GreatestProfit / StopDistance;
 
-			IsSuccessful = (ProfitMultiples >= 1);
+//			IsSuccessful = (ProfitMultiples >= 1);
+			IsSuccessful = (ProfitMultiples >= 0.5);
 
 			if ((CurrentBar - EntryBar) > window) {
 				IsClosed = true;
@@ -434,12 +439,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			#region TrailingStopBeyondPreviousExtreme
 			if (TrailingStopBeyondPreviousExtreme == 0) {
-				if (Direction == TrendDirection.Bullish && Low[0] < StopLoss)
+				if (Direction == TrendDirection.Bullish && Low[0] < TrailingStopLoss)
 				{
 					TrailingStopBeyondPreviousExtreme = DistanceMoved;
 				}
 
-				if (Direction == TrendDirection.Bearish && High[0] > StopLoss)
+				if (Direction == TrendDirection.Bearish && High[0] > TrailingStopLoss)
 				{
 					TrailingStopBeyondPreviousExtreme = DistanceMoved;
 				}
