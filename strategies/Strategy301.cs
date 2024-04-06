@@ -314,21 +314,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			double entryRating = evaluateEntry();
 
-			double probabilityOfTrading = entryRating;
-			Random rand = new Random();
-       		double randomValue = rand.NextDouble();
-//			Print(probabilityOfTrading);
+			double entryThreshold = successRate > successRateThreshold ? 0.5 : 0.7;
 
-//        		if (randomValue > probabilityOfTrading) {
-////					Print(probabilityOfTrading);
-//				return;
-//			}
-
-			if (probabilityOfTrading < 0.7) {
+			if (entryRating < entryThreshold) {
 				return;
 			}
-
-//			Print(probabilityOfTrading);
 
 			int quantity = Math.Max(1, (int) Math.Round(entryRating * (double) Quantity, 0));
 
@@ -337,9 +327,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 				double stopLossDistance = 4 * (Close[0] - swingLow) + 1;
 				double profitDistance = (0.75 * successRate + 0.25) * stopLossDistance;
 
-				if (stopLossDistance > 50) {
+				if (stopLossDistance > entryRating * 10 * entryEvaluator.atr[0]) {
 					return;
 				}
+
 
 				entry.StopLossUsed = stopLossDistance;
 				entry.ProfitTargetUsed = profitDistance;
@@ -359,7 +350,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				double stopLossDistance = 4 * (swingHigh - Close[0]) + 1;
 				double profitDistance = (0.75 * successRate + 0.25) * stopLossDistance;
 
-				if (stopLossDistance > 50) {
+				if (stopLossDistance > entryRating * 10 * entryEvaluator.atr[0]) {
 					return;
 				}
 
@@ -401,22 +392,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 				historicalPerformance 	= historicalPerformance.Where(c => c > 0).ToList<double>();
 
 				double winRate = historicalPerformance.Count >= minimumTrades ? (double)historicalPerformance.Count(p => p > 0) / historicalPerformance.Count : defaultWinRate;
-//        			double frequencyFactor = (double)historicalPerformance.Count / windowSize;
-//        			double weight = winRate * frequencyFactor;
-
-//				double winRate 			= historicalPerformance.Count > 0 ? (double)historicalPerformance.Count(p => p > 0) / historicalPerformance.Count : defaultWinRate;
-//		        double smoothingFactor = Math.Min(1.0, (double)historicalPerformance.Count / windowSize);
-//		        double smoothedWinRate = (historicalPerformance.Count * winRate + (1 - smoothingFactor) * defaultWinRate) / (historicalPerformance.Count + (1 - smoothingFactor));
-
-//		        double weight = smoothedWinRate;
 
 		        if (entry.entryConditions.ContainsKey(criterion.Key) && entry.entryConditions[criterion.Key] == 1)
 		        {
 		            weightedSum += winRate;
 					totalCount++;
 		        }
-
-//		        totalWeight += weight;
 		    }
 
 		    if (totalCount > 0)
@@ -498,7 +479,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double successRateAvg		= successRates.Average();
 //			double successRateStep		= successRateAvg * 0.01;
 //			double successRateMultiple	= ((successRates[successRates.Count - 1] - successRateAvg) / successRateStdDev - 1) / 0.5;
-			successRateThreshold 		= successRateAvg;
+//			Print(successRateMultiple);
+			successRateThreshold 		= successRateAvg + successRateStdDev * 0.25;
 		}
 		#endregion
 
