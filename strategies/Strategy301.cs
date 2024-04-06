@@ -321,13 +321,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 			}
 
 			int quantity = Math.Max(1, (int) Math.Round(entryRating * (double) Quantity, 0));
+			double stopLossAdjustment = 10 * (((entryEvaluator.avgAtr[0] - entryEvaluator.atr[0]) / entryEvaluator.stdDevAtr[0]));
+			double stopLossThreshold = 20 + (successRate < successRateThreshold ? stopLossAdjustment / 2 : stopLossAdjustment);
 
 			if (marketDirection.Direction[0] == TrendDirection.Bullish) {
 				double swingLow = legs.BarsAgoStarts[0] > 0 ? Math.Min(MIN(Low, legs.BarsAgoStarts[0])[0], MIN(Low, 4)[0]) : Low[0];
 				double stopLossDistance = 4 * (Close[0] - swingLow) + 1;
 				double profitDistance = (0.75 * successRate + 0.25) * stopLossDistance;
 
-				if (stopLossDistance > entryRating * 10 * entryEvaluator.atr[0]) {
+				if (stopLossDistance > stopLossThreshold) {
 					return;
 				}
 
@@ -350,7 +352,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				double stopLossDistance = 4 * (swingHigh - Close[0]) + 1;
 				double profitDistance = (0.75 * successRate + 0.25) * stopLossDistance;
 
-				if (stopLossDistance > entryRating * 10 * entryEvaluator.atr[0]) {
+				if (stopLossDistance > stopLossThreshold) {
 					return;
 				}
 
@@ -480,7 +482,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 //			double successRateStep		= successRateAvg * 0.01;
 //			double successRateMultiple	= ((successRates[successRates.Count - 1] - successRateAvg) / successRateStdDev - 1) / 0.5;
 //			Print(successRateMultiple);
-			successRateThreshold 		= successRateAvg + successRateStdDev * 0.25;
+			successRateThreshold 		= successRateAvg + successRateStdDev * 0.5;
 		}
 		#endregion
 
