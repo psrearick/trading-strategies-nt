@@ -271,6 +271,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			List<EntrySignal> closedEntries = entries.Where(e => e.IsEnabled && (e.IsClosed || e.IsSuccessful)).ToList();
 
 			Dictionary<string, double> entryCorrelations = new Dictionary<string, double>();
+
 	        entryCorrelations["RSI"] = correlationCoefficient(closedEntries.Select(e => e.Rsi).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
 	        entryCorrelations["ATR"] = correlationCoefficient(closedEntries.Select(e => e.Atr).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
 	        entryCorrelations["IsEMADiverging"] = correlationCoefficient(closedEntries.Select(e => e.IsEMADiverging ? 1.0 : 0.0).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());

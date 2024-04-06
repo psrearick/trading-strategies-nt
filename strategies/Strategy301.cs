@@ -82,8 +82,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 				TimeShift									= -6;
 				Period 										= 10;
 				Quantity 									= 1;
-//				TargetMultiplier								= 1;
-//				QuantityMultiplier							= 2;
 				Window										= 10;
 			}
 			#endregion
@@ -165,25 +163,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			entry.Update();
 			entry.UpdateStatus();
 
-//			foreach (var criterion in entryCriteria) {
-//				if (criterion.Value.Count > 20) {
-//					criterion.Value.RemoveAt(0);
-//				}
-//			}
-
-//			foreach (var criterion in exitCriteria) {
-//				if (criterion.Value.Count > 20) {
-//					criterion.Value.RemoveAt(0);
-//				}
-//			}
-
-//			if (Position.MarketPosition == MarketPosition.Flat && tradeDirection != MarketPosition.Flat) {
-//				UpdateTradeOutcomes(entry.IsSuccessful);
-//				previousSuccessRate = successRate;
-//				UpdateSuccessRates();
-//				AdjustStrategy();
-//			}
-
 			tradeDirection = Position.MarketPosition;
 
 			if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1) {
@@ -224,6 +203,25 @@ namespace NinjaTrader.NinjaScript.Strategies
 			UpdateTradeOutcomes(entry.IsSuccessful);
 			previousSuccessRate = successRate;
 			UpdateSuccessRates();
+
+			foreach (var criterion in entryCriteria) {
+				if (entry.entryConditions.ContainsKey(criterion.Key) && entry.entryConditions[criterion.Key] == 1) {
+					entryCriteria[criterion.Key].Add(entry.DistanceMoved);
+					continue;
+				}
+
+				entryCriteria[criterion.Key].Add(0);
+			}
+
+			foreach (var criterion in exitCriteria) {
+				if (entry.exitConditions.ContainsKey(criterion.Key) && entry.exitConditions[criterion.Key] == 1) {
+					exitCriteria[criterion.Key].Add(entry.DistanceMoved);
+					continue;
+				}
+
+				exitCriteria[criterion.Key].Add(0);
+			}
+
 			AdjustStrategy();
 		}
 		#endregion
@@ -231,7 +229,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region shouldExit()
 		private bool shouldExit() {
 			if (Position.MarketPosition != MarketPosition.Flat) {
-				if (entryEvaluator.EvaluateExitCriteria(entry) > successRate) {
+//				if (entryEvaluator.EvaluateExitCriteria(entry) > successRate) {
+//					return true;
+//				}
+				if (entryEvaluator.EvaluateExitCriteria(entry) > 0) {
 					return true;
 				}
 			}
@@ -316,23 +317,29 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double probabilityOfTrading = entryRating;
 			Random rand = new Random();
        		double randomValue = rand.NextDouble();
+//			Print(probabilityOfTrading);
 
-			Print(randomValue);
-			Print(probabilityOfTrading);
-			Print("--");
+//        		if (randomValue > probabilityOfTrading) {
+////					Print(probabilityOfTrading);
+//				return;
+//			}
 
-        		if (randomValue > probabilityOfTrading) {
+			if (probabilityOfTrading < 0.7) {
 				return;
 			}
 
-			int quantity = Math.Max(1, (int) Math.Round(entryRating * (double) Quantity, 0));
+//			Print(probabilityOfTrading);
 
-//			int quantity = Math.Max(1, (int) Math.Round(entryEvaluator.matched[0] * (double) Quantity, 0));
+			int quantity = Math.Max(1, (int) Math.Round(entryRating * (double) Quantity, 0));
 
 			if (marketDirection.Direction[0] == TrendDirection.Bullish) {
 				double swingLow = legs.BarsAgoStarts[0] > 0 ? Math.Min(MIN(Low, legs.BarsAgoStarts[0])[0], MIN(Low, 4)[0]) : Low[0];
 				double stopLossDistance = 4 * (Close[0] - swingLow) + 1;
 				double profitDistance = (0.75 * successRate + 0.25) * stopLossDistance;
+
+				if (stopLossDistance > 50) {
+					return;
+				}
 
 				entry.StopLossUsed = stopLossDistance;
 				entry.ProfitTargetUsed = profitDistance;
@@ -352,6 +359,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 				double stopLossDistance = 4 * (swingHigh - Close[0]) + 1;
 				double profitDistance = (0.75 * successRate + 0.25) * stopLossDistance;
 
+				if (stopLossDistance > 50) {
+					return;
+				}
+
 				entry.StopLossUsed = stopLossDistance;
 				entry.ProfitTargetUsed = profitDistance;
 
@@ -360,6 +371,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 					if (successRate < successRateThreshold) {
 						SetProfitTarget("ShortEntry1", CalculationMode.Ticks, profitDistance);
 					}
+
 					EnterShort(quantity, "ShortEntry1");
 				}
 			}
@@ -372,31 +384,49 @@ namespace NinjaTrader.NinjaScript.Strategies
 			entry.entryConditions = entryEvaluator.EvaluateCriteria(0);
 
 			double weightedSum = 0;
-		    double totalWeight = 0;
-			double defaultWeight = 0.5;
+		    double totalCount = 0;
+			double defaultWinRate = entryEvaluator.matched[0];
+    			int windowSize = 30;
+			int minimumTrades = 5;
 
 		    foreach (var criterion in entryCriteria)
 		    {
-		        List<double> historicalPerformance = criterion.Value;
-		        double averagePerformance = historicalPerformance.Count > 0 ? historicalPerformance.Average() : 0;
-				double weight = historicalPerformance.Count > 0 ? Math.Max(0, averagePerformance) : defaultWeight;
+				List<double> historicalPerformance = criterion.Value;
+
+		        if (historicalPerformance.Count > windowSize)
+		        {
+		            historicalPerformance.RemoveAt(0);
+				}
+
+				historicalPerformance 	= historicalPerformance.Where(c => c > 0).ToList<double>();
+
+				double winRate = historicalPerformance.Count >= minimumTrades ? (double)historicalPerformance.Count(p => p > 0) / historicalPerformance.Count : defaultWinRate;
+//        			double frequencyFactor = (double)historicalPerformance.Count / windowSize;
+//        			double weight = winRate * frequencyFactor;
+
+//				double winRate 			= historicalPerformance.Count > 0 ? (double)historicalPerformance.Count(p => p > 0) / historicalPerformance.Count : defaultWinRate;
+//		        double smoothingFactor = Math.Min(1.0, (double)historicalPerformance.Count / windowSize);
+//		        double smoothedWinRate = (historicalPerformance.Count * winRate + (1 - smoothingFactor) * defaultWinRate) / (historicalPerformance.Count + (1 - smoothingFactor));
+
+//		        double weight = smoothedWinRate;
 
 		        if (entry.entryConditions.ContainsKey(criterion.Key) && entry.entryConditions[criterion.Key] == 1)
 		        {
-		            weightedSum += weight;
+		            weightedSum += winRate;
+					totalCount++;
 		        }
 
-		        totalWeight += weight;
+//		        totalWeight += weight;
 		    }
 
-		    if (totalWeight > 0)
+		    if (totalCount > 0)
 		    {
-		        double normalizedWeight = weightedSum / totalWeight;
+		        double normalizedWeight = weightedSum / totalCount;
 		        return Math.Min(1, Math.Max(0, normalizedWeight));
 		    }
 		    else
 		   	{
-		        return 0;
+		        return defaultWinRate;
 		    }
 
 		}
@@ -466,68 +496,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 			double successRateStdDev 	= utils.StandardDeviation(successRates);
 			double successRateAvg		= successRates.Average();
-			double successRateStep		= successRateAvg * 0.01;
-			double successRateMultiple	= ((successRates[successRates.Count - 1] - successRateAvg) / successRateStdDev - 1) / 0.5;
-			successRateThreshold 		= successRateAvg;// + successRateStep * successRateMultiple;
-
-//			double windowMin 			= Window * 0.75;
-//			double windowMax	 			= Window * 1.25;
-
-//			if (successRate < successRateAvg) {
-////				Print("Below");
-//				entryEvaluator.Window = entryEvaluator.Window == windowMin ? Window : windowMax;
-//			} else {
-////				Print("Above");
-//				entryEvaluator.Window = entryEvaluator.Window == windowMax ? Window : windowMin;
-//			}
-//			Print(entryEvaluator.Window);
-//			Print("==========");
-
-
-//			double windowAdjustmentSize	= Window * 0.02;
-//			double atrMultiple 			= (entryEvaluator.atr[0] - entryEvaluator.avgAtr[0]) / entryEvaluator.stdDevAtr[0];
-//			double windowAdjustment 		= windowAdjustmentSize * atrMultiple;
-//			double WindowMin 			= Window * 0.75;
-//			double WindowMax	 			= Window * 1.25;
-//			double windowAdjusted 		= Math.Max(WindowMin, Math.Min(WindowMax, entryEvaluator.Window + windowAdjustment));
-
-//			if (successRate < successRateAvg) {
-
-//				if (Math.Abs(atrMultiple) > 1) {
-//					entryEvaluator.Window = Math.Max(1, windowAdjusted);
-//				}
-//			}
-
-//			Print(Time[0]);
-//			Print(windowAdjustment);
-//			Print(successRateThreshold);
-//			Print(entryEvaluator.Window);
-
-//			Print(entry.StopLossUsed);
-//			Print(entry.ProfitTargetUsed);
-//			Print(entry.Atr);
-//			Print(entry.IsSuccessful);
-//			Print(entry.DistanceMoved > 0);
-//			Print("==========");
-
-//			Print(entry.StopLossUsed + "," + entry.ProfitTargetUsed + "," + entry.Atr + "," + entry.IsSuccessful + "," + (entry.DistanceMoved > 0) + "," + entry.DistanceMoved);
-			foreach (var criterion in entry.entryConditions) {
-				entryCriteria[criterion.Key].Add(entry.DistanceMoved);
-			}
-
-			foreach (var criterion in entry.exitConditions) {
-				exitCriteria[criterion.Key].Add(entry.DistanceMoved);
-			}
-
-//			Print("==========");
-//			Print("Entry");
-//			foreach (var criterion in entryCriteria) {
-//				Print(criterion.Key + "," + String.Join(",", criterion.Value));
-//			}
-//			Print("Exit");
-//			foreach (var criterion in exitCriteria) {
-//				Print(criterion.Key + "," + String.Join(",", criterion.Value));
-//			}
+//			double successRateStep		= successRateAvg * 0.01;
+//			double successRateMultiple	= ((successRates[successRates.Count - 1] - successRateAvg) / successRateStdDev - 1) / 0.5;
+			successRateThreshold 		= successRateAvg;
 		}
 		#endregion
 
