@@ -41,6 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double successRate;
         private List<double> successRates = new List<double>();
         private List<bool> tradeOutcomes = new List<bool>();
+		private List<WindowSizePerformance> windowSizePerformanceData = new List<WindowSizePerformance>();
         private int rollingWindowSize = 50;
         private MarketPosition tradeDirection = MarketPosition.Flat;
         private double successRateThreshold = 0.05;
@@ -255,6 +256,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 exitCriteria[criterion.Key].Add(0);
             }
 
+			WindowSizePerformance performance = new WindowSizePerformance
+		    {
+		        WindowSize = entryEvaluator.Window,
+		        ATR = entry.AvgAtr,
+		        SuccessRate = entry.IsSuccessful ? 1.0 : 0.0,
+		        Trades = 1
+		    };
+
+		    windowSizePerformanceData.Add(performance);
+
             AdjustStrategy();
         }
         #endregion
@@ -406,10 +417,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (swingLow < Low[0])
                 {
                     SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-                    if (successRate < successRateThreshold)
-                    {
-                        //						SetProfitTarget("LongEntry1", CalculationMode.Ticks, profitDistance);
-                    }
+//                    if (successRate < successRateThreshold)
+//                    {
+//                        	SetProfitTarget("LongEntry1", CalculationMode.Ticks, profitDistance);
+//                    }
 
                     EnterLong(quantity, "LongEntry1");
                 }
@@ -435,10 +446,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (swingHigh > High[0])
                 {
                     SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-                    if (successRate < successRateThreshold)
-                    {
-                        //						SetProfitTarget("ShortEntry1", CalculationMode.Ticks, profitDistance);
-                    }
+//                    if (successRate < successRateThreshold)
+//                    {
+//    						SetProfitTarget("ShortEntry1", CalculationMode.Ticks, profitDistance);
+//                    }
 
                     EnterShort(quantity, "ShortEntry1");
                 }
@@ -569,7 +580,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             double successRateAvg = successRates.Average();
             successRateThreshold = successRateAvg + successRateStdDev * 0.25;
 
-            if (
+			if (
                 entryEvaluator.avgAtr[0] + 0.5 * entryEvaluator.stdDevAtr[0]
                 < entryEvaluator.avgAtrFast[0]
             )
@@ -587,8 +598,43 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 entryEvaluator.Window = Window;
             }
+
+			OptimizeWindowSize();
         }
         #endregion
+
+		#region OptimizeWindowSize()
+		private void OptimizeWindowSize()
+		{
+		    double currentATR = entryEvaluator.avgAtr[0];
+		    double atrTolerance = 0.1 * currentATR;
+
+		    List<WindowSizePerformance> relevantPerformanceData = windowSizePerformanceData
+		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
+		        .ToList();
+
+		    if (relevantPerformanceData.Count >= 15)
+		    {
+		        var groupedPerformanceData = relevantPerformanceData
+		            .GroupBy(p => p.WindowSize)
+		            .Select(g => new WindowSizePerformance
+		            {
+		                WindowSize = g.Key,
+		                SuccessRate = g.Sum(p => p.SuccessRate) / g.Sum(p => p.Trades),
+		                Trades = g.Sum(p => p.Trades)
+		            })
+		            .OrderByDescending(p => p.SuccessRate)
+		            .ToList();
+
+		        if (groupedPerformanceData.Count > 0)
+		        {
+		            WindowSizePerformance bestPerformance = groupedPerformanceData[0];
+		            entryEvaluator.Window = bestPerformance.WindowSize;
+					return;
+		        }
+		    }
+		}
+		#endregion
 
         #region Properties
 
@@ -624,4 +670,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #endregion
     }
+
+	public class WindowSizePerformance
+	{
+	    public double WindowSize { get; set; }
+	    public double ATR { get; set; }
+	    public double SuccessRate { get; set; }
+	    public int Trades { get; set; }
+	}
 }
