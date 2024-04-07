@@ -37,6 +37,17 @@ namespace NinjaTrader.NinjaScript.Strategies
         private MarketPosition tradeDirection = MarketPosition.Flat;
 
         //		private TradesExporter tradesExporter;
+
+
+		// Bounds:
+		// - window size
+		// - stop loss multiplier
+		// - stop loss limit multiplier
+		// - take profit multiplier
+		// - entry threshold
+		private double[] lowerBounds = { 8, 0.5, 1, 1, 0.5 };
+		private double[] upperBounds = { 12, 3.0, 4, 10, 0.9 };
+
         private double previousSuccessRate;
         private double successRate;
         private int rollingWindowSize = 50;
@@ -233,7 +244,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             UpdateSuccessRates();
 			UpdateEntryCriteria();
 			UpdateExitCriteria();
-            UpdatePerformanceData();
+            UpdatePerformanceData(trade);
 
             AdjustStrategy();
         }
@@ -605,7 +616,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#endregion
 
 		#region UpdatePerformanceData()
-		private void UpdatePerformanceData()
+		private void UpdatePerformanceData(Trade trade)
 		{
 			PerformanceData performance = new PerformanceData
 		    {
@@ -616,7 +627,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 				StopLossMultiplier = entry.StopLossMultiplier,
 				StopLossLimitMultiplier = entry.StopLossLimitMultiplier,
 				TakeProfitMultiplier = entry.TakeProfitMultiplier,
-				EntryThreshold = entryThreshold
+				EntryThreshold = entryThreshold,
+				NetProfit = trade.ProfitPoints,
+				MaxAdverseExcursion = trade.MaePoints,
+				TradeDuration = (trade.Exit.Time - trade.Entry.Time).Minutes,
 		    };
 
 		    livePerformanceData.Add(performance);
@@ -688,230 +702,230 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         #endregion
 
-		#region OptimizeWindowSize()
-		private void OptimizeWindowSize()
-		{
-		    double currentATR = entryEvaluator.avgAtr[0];
-		    double atrTolerance = 0.1 * currentATR;
-			double minWindowSize = 20;
-		    double maxWindowSize = 50;
-		    double stepSize = 5;
-    		double comparisonTolerance = 0.001;
+		#region Optimize Single Parameters
+//		#region OptimizeWindowSize()
+//		private void OptimizeWindowSize()
+//		{
+//		    double currentATR = entryEvaluator.avgAtr[0];
+//		    double atrTolerance = 0.1 * currentATR;
+//			double minWindowSize = 20;
+//		    double maxWindowSize = 50;
+//		    double stepSize = 5;
+//    		double comparisonTolerance = 0.001;
 
-			List<double> windowSizes = GenerateValues(minWindowSize, maxWindowSize, stepSize);
+//			List<double> windowSizes = GenerateValues(minWindowSize, maxWindowSize, stepSize);
 
-		    List<PerformanceData> relevantPerformanceData = livePerformanceData
-		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
-		        .ToList();
+//		    List<PerformanceData> relevantPerformanceData = livePerformanceData
+//		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
+//		        .ToList();
 
-		    if (relevantPerformanceData.Count >= 10)
-		    {
-		        var groupedPerformanceData = relevantPerformanceData
-					.Where(p => windowSizes.Any(t => Math.Abs(p.WindowSize - t) <= comparisonTolerance))
-            		.GroupBy(p => windowSizes.First(t => Math.Abs(p.WindowSize - t) <= comparisonTolerance))
-		            .Select(g => new PerformanceData
-		            {
-		                WindowSize = g.Key,
-		                SuccessRate = g.Sum(p => p.SuccessRate) / g.Sum(p => p.Trades),
-		                Trades = g.Sum(p => p.Trades)
-		            })
-		            .OrderByDescending(p => p.SuccessRate)
-		            .ToList();
+//		    if (relevantPerformanceData.Count >= 10)
+//		    {
+//		        var groupedPerformanceData = relevantPerformanceData
+//					.Where(p => windowSizes.Any(t => Math.Abs(p.WindowSize - t) <= comparisonTolerance))
+//            		.GroupBy(p => windowSizes.First(t => Math.Abs(p.WindowSize - t) <= comparisonTolerance))
+//		            .Select(g => new PerformanceData
+//		            {
+//		                WindowSize = g.Key,
+//		                SuccessRate = g.Sum(p => p.SuccessRate) / g.Sum(p => p.Trades),
+//		                Trades = g.Sum(p => p.Trades)
+//		            })
+//		            .OrderByDescending(p => p.SuccessRate)
+//		            .ToList();
 
-		        if (groupedPerformanceData.Count > 0)
-		        {
-		            PerformanceData bestPerformance = groupedPerformanceData[0];
-		            entryEvaluator.Window = bestPerformance.WindowSize;
-		        }
-		    }
-			else
-		    {
-		        entryEvaluator.Window = CalculateATRBasedValue(currentATR, minWindowSize, maxWindowSize, stepSize);
-		    }
-		}
-		#endregion
+//		        if (groupedPerformanceData.Count > 0)
+//		        {
+//		            PerformanceData bestPerformance = groupedPerformanceData[0];
+//		            entryEvaluator.Window = bestPerformance.WindowSize;
+//		        }
+//		    }
+//			else
+//		    {
+//		        entryEvaluator.Window = CalculateATRBasedValue(currentATR, minWindowSize, maxWindowSize, stepSize);
+//		    }
+//		}
+//		#endregion
 
-		#region OptimizeStopLossMultiplier()
-		private void OptimizeStopLossMultiplier()
-		{
-		    double currentATR = entryEvaluator.avgAtr[0];
-		    double atrTolerance = 0.1 * currentATR;
-			double minMultiplier = 0.5;
-    		double maxMultiplier = 5;
-    		double stepSize = 0.5;
+//		#region OptimizeStopLossMultiplier()
+//		private void OptimizeStopLossMultiplier()
+//		{
+//		    double currentATR = entryEvaluator.avgAtr[0];
+//		    double atrTolerance = 0.1 * currentATR;
+//			double minMultiplier = 0.5;
+//    		double maxMultiplier = 5;
+//    		double stepSize = 0.5;
 
-			List<double> multipliers = GenerateValues(minMultiplier, maxMultiplier, stepSize);
+//			List<double> multipliers = GenerateValues(minMultiplier, maxMultiplier, stepSize);
 
-		    List<PerformanceData> relevantPerformanceData = livePerformanceData
-		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
-		        .ToList();
+//		    List<PerformanceData> relevantPerformanceData = livePerformanceData
+//		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
+//		        .ToList();
 
-		    if (relevantPerformanceData.Count >= 10)
-		    {
-		        var groupedPerformanceData = relevantPerformanceData
-            		.Where(p => multipliers.Contains(p.StopLossMultiplier))
-		            .GroupBy(p => p.StopLossMultiplier)
-		            .Select(g => new PerformanceData
-		            {
-		                StopLossMultiplier = g.Key,
-		                SuccessRate = g.Sum(p => p.SuccessRate) / g.Sum(p => p.Trades),
-		                Trades = g.Sum(p => p.Trades)
-		            })
-		            .OrderByDescending(p => p.SuccessRate)
-		            .ToList();
+//		    if (relevantPerformanceData.Count >= 10)
+//		    {
+//		        var groupedPerformanceData = relevantPerformanceData
+//            		.Where(p => multipliers.Contains(p.StopLossMultiplier))
+//		            .GroupBy(p => p.StopLossMultiplier)
+//		            .Select(g => new PerformanceData
+//		            {
+//		                StopLossMultiplier = g.Key,
+//		                SuccessRate = g.Sum(p => p.SuccessRate) / g.Sum(p => p.Trades),
+//		                Trades = g.Sum(p => p.Trades)
+//		            })
+//		            .OrderByDescending(p => p.SuccessRate)
+//		            .ToList();
 
-		        if (groupedPerformanceData.Count > 0)
-		        {
-		            PerformanceData bestPerformance = groupedPerformanceData[0];
-		            CurrentStopLossMultiplier = bestPerformance.StopLossMultiplier;
-		        }
-		    }
-			else
-		    {
-		        CurrentStopLossMultiplier = CalculateATRBasedValue(currentATR, minMultiplier, maxMultiplier, stepSize);
-		    }
+//		        if (groupedPerformanceData.Count > 0)
+//		        {
+//		            PerformanceData bestPerformance = groupedPerformanceData[0];
+//		            CurrentStopLossMultiplier = bestPerformance.StopLossMultiplier;
+//		        }
+//		    }
+//			else
+//		    {
+//		        CurrentStopLossMultiplier = CalculateATRBasedValue(currentATR, minMultiplier, maxMultiplier, stepSize);
+//		    }
 
-			entryEvaluator.UpdateStopLossMultiplier(CurrentStopLossMultiplier);
-		}
-		#endregion
+//			entryEvaluator.UpdateStopLossMultiplier(CurrentStopLossMultiplier);
+//		}
+//		#endregion
 
-		#region OptimizeStopLossLimitMultiplier()
-		private void OptimizeStopLossLimitMultiplier()
-		{
-		    double currentATR = entryEvaluator.avgAtr[0];
-		    double atrTolerance = 0.1 * currentATR;
-			double minMultiplier = 1;
-    		double maxMultiplier = 10;
-    		double stepSize = 1;
-    		double comparisonTolerance = 0.001;
+//		#region OptimizeStopLossLimitMultiplier()
+//		private void OptimizeStopLossLimitMultiplier()
+//		{
+//		    double currentATR = entryEvaluator.avgAtr[0];
+//		    double atrTolerance = 0.1 * currentATR;
+//			double minMultiplier = 1;
+//    		double maxMultiplier = 10;
+//    		double stepSize = 1;
+//    		double comparisonTolerance = 0.001;
 
-			List<double> multipliers = GenerateValues(minMultiplier, maxMultiplier, stepSize);
+//			List<double> multipliers = GenerateValues(minMultiplier, maxMultiplier, stepSize);
 
-		    List<PerformanceData> relevantPerformanceData = livePerformanceData
-		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
-		        .ToList();
+//		    List<PerformanceData> relevantPerformanceData = livePerformanceData
+//		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
+//		        .ToList();
 
-		    if (relevantPerformanceData.Count >= 10)
-		    {
-		        var groupedPerformanceData = relevantPerformanceData
-					.Where(p => multipliers.Any(t => Math.Abs(p.StopLossLimitMultiplier - t) <= comparisonTolerance))
-            		.GroupBy(p => multipliers.First(t => Math.Abs(p.StopLossLimitMultiplier - t) <= comparisonTolerance))
-		            .Select(g => new PerformanceData
-		            {
-		                StopLossLimitMultiplier = g.Key,
-		                SuccessRate = g.Sum(p => p.SuccessRate) / g.Sum(p => p.Trades),
-		                Trades = g.Sum(p => p.Trades)
-		            })
-		            .OrderByDescending(p => p.SuccessRate)
-		            .ToList();
+//		    if (relevantPerformanceData.Count >= 10)
+//		    {
+//		        var groupedPerformanceData = relevantPerformanceData
+//					.Where(p => multipliers.Any(t => Math.Abs(p.StopLossLimitMultiplier - t) <= comparisonTolerance))
+//            		.GroupBy(p => multipliers.First(t => Math.Abs(p.StopLossLimitMultiplier - t) <= comparisonTolerance))
+//		            .Select(g => new PerformanceData
+//		            {
+//		                StopLossLimitMultiplier = g.Key,
+//		                SuccessRate = g.Sum(p => p.SuccessRate) / g.Sum(p => p.Trades),
+//		                Trades = g.Sum(p => p.Trades)
+//		            })
+//		            .OrderByDescending(p => p.SuccessRate)
+//		            .ToList();
 
-		        if (groupedPerformanceData.Count > 0)
-		        {
-		            PerformanceData bestPerformance = groupedPerformanceData[0];
-		            CurrentStopLossLimitMultiplier = bestPerformance.StopLossLimitMultiplier;
-		        }
-		    }
-			else
-		    {
-		        CurrentStopLossLimitMultiplier = CalculateATRBasedValue(currentATR, minMultiplier, maxMultiplier, stepSize);
-		    }
-		}
-		#endregion
+//		        if (groupedPerformanceData.Count > 0)
+//		        {
+//		            PerformanceData bestPerformance = groupedPerformanceData[0];
+//		            CurrentStopLossLimitMultiplier = bestPerformance.StopLossLimitMultiplier;
+//		        }
+//		    }
+//			else
+//		    {
+//		        CurrentStopLossLimitMultiplier = CalculateATRBasedValue(currentATR, minMultiplier, maxMultiplier, stepSize);
+//		    }
+//		}
+//		#endregion
 
-		#region OptimizeTakeProfitMultiplier()
-		private void OptimizeTakeProfitMultiplier()
-		{
-		    double currentATR = entryEvaluator.avgAtr[0];
-		    double atrTolerance = 0.1 * currentATR;
-			double minMultiplier = 1;
-		    double maxMultiplier = 10;
-		    double stepSize = 1;
-    		double comparisonTolerance = 0.001;
+//		#region OptimizeTakeProfitMultiplier()
+//		private void OptimizeTakeProfitMultiplier()
+//		{
+//		    double currentATR = entryEvaluator.avgAtr[0];
+//		    double atrTolerance = 0.1 * currentATR;
+//			double minMultiplier = 1;
+//		    double maxMultiplier = 10;
+//		    double stepSize = 1;
+//    		double comparisonTolerance = 0.001;
 
-			List<double> multipliers = GenerateValues(minMultiplier, maxMultiplier, stepSize);
+//			List<double> multipliers = GenerateValues(minMultiplier, maxMultiplier, stepSize);
 
-		    List<PerformanceData> relevantPerformanceData = livePerformanceData
-		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
-		        .ToList();
+//		    List<PerformanceData> relevantPerformanceData = livePerformanceData
+//		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
+//		        .ToList();
 
-		    if (relevantPerformanceData.Count >= 10)
-		    {
-		        var groupedPerformanceData = relevantPerformanceData
-					.Where(p => multipliers.Any(t => Math.Abs(p.TakeProfitMultiplier - t) <= comparisonTolerance))
-            		.GroupBy(p => multipliers.First(t => Math.Abs(p.TakeProfitMultiplier - t) <= comparisonTolerance))
-		            .Select(g => new PerformanceData
-		            {
-		                TakeProfitMultiplier = g.Key,
-		                SuccessRate = g.Sum(p => p.SuccessRate) / g.Sum(p => p.Trades),
-		                Trades = g.Sum(p => p.Trades)
-		            })
-		            .OrderByDescending(p => p.SuccessRate)
-		            .ToList();
+//		    if (relevantPerformanceData.Count >= 10)
+//		    {
+//		        var groupedPerformanceData = relevantPerformanceData
+//					.Where(p => multipliers.Any(t => Math.Abs(p.TakeProfitMultiplier - t) <= comparisonTolerance))
+//            		.GroupBy(p => multipliers.First(t => Math.Abs(p.TakeProfitMultiplier - t) <= comparisonTolerance))
+//		            .Select(g => new PerformanceData
+//		            {
+//		                TakeProfitMultiplier = g.Key,
+//		                SuccessRate = g.Sum(p => p.SuccessRate) / g.Sum(p => p.Trades),
+//		                Trades = g.Sum(p => p.Trades)
+//		            })
+//		            .OrderByDescending(p => p.SuccessRate)
+//		            .ToList();
 
-		        if (groupedPerformanceData.Count > 0)
-		        {
-		            PerformanceData bestPerformance = groupedPerformanceData[0];
-		            CurrentTakeProfitMultiplier = bestPerformance.TakeProfitMultiplier;
-		        }
-		    }
-			else
-		    {
-		        CurrentTakeProfitMultiplier = CalculateATRBasedValue(currentATR, minMultiplier, maxMultiplier, stepSize);
-		    }
+//		        if (groupedPerformanceData.Count > 0)
+//		        {
+//		            PerformanceData bestPerformance = groupedPerformanceData[0];
+//		            CurrentTakeProfitMultiplier = bestPerformance.TakeProfitMultiplier;
+//		        }
+//		    }
+//			else
+//		    {
+//		        CurrentTakeProfitMultiplier = CalculateATRBasedValue(currentATR, minMultiplier, maxMultiplier, stepSize);
+//		    }
 
-			entryEvaluator.UpdateTakeProfitMultiplier(CurrentTakeProfitMultiplier);
-		}
-		#endregion
+//			entryEvaluator.UpdateTakeProfitMultiplier(CurrentTakeProfitMultiplier);
+//		}
+//		#endregion
 
-		#region OptimizeEntryThreshold()
-		private void OptimizeEntryThreshold()
-		{
-		    double currentATR = entryEvaluator.avgAtr[0];
-		    double atrTolerance = 0.1 * currentATR;
-			double minThreshold = 0.4;
-		    double maxThreshold = 1;
-		    double stepSize = 0.05;
-    		double comparisonTolerance = 0.001;
+//		#region OptimizeEntryThreshold()
+//		private void OptimizeEntryThreshold()
+//		{
+//		    double currentATR = entryEvaluator.avgAtr[0];
+//		    double atrTolerance = 0.1 * currentATR;
+//			double minThreshold = 0.4;
+//		    double maxThreshold = 1;
+//		    double stepSize = 0.05;
+//    		double comparisonTolerance = 0.001;
 
-			List<double> thresholds = GenerateValues(minThreshold, maxThreshold, stepSize);
+//			List<double> thresholds = GenerateValues(minThreshold, maxThreshold, stepSize);
 
-		    List<PerformanceData> relevantPerformanceData = livePerformanceData
-		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
-		        .ToList();
+//		    List<PerformanceData> relevantPerformanceData = livePerformanceData
+//		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
+//		        .ToList();
 
-		    if (relevantPerformanceData.Count >= 10)
-		    {
-		        var groupedPerformanceData = relevantPerformanceData
-					.Where(p => thresholds.Any(t => Math.Abs(p.EntryThreshold - t) <= comparisonTolerance))
-            		.GroupBy(p => thresholds.First(t => Math.Abs(p.EntryThreshold - t) <= comparisonTolerance))
-		            .Select(g => new PerformanceData
-		            {
-		                EntryThreshold = g.Key,
-		                SuccessRate = g.Sum(p => p.SuccessRate) / g.Sum(p => p.Trades),
-		                Trades = g.Sum(p => p.Trades)
-		            })
-		            .OrderByDescending(p => p.SuccessRate)
-		            .ToList();
+//		    if (relevantPerformanceData.Count >= 10)
+//		    {
+//		        var groupedPerformanceData = relevantPerformanceData
+//					.Where(p => thresholds.Any(t => Math.Abs(p.EntryThreshold - t) <= comparisonTolerance))
+//            		.GroupBy(p => thresholds.First(t => Math.Abs(p.EntryThreshold - t) <= comparisonTolerance))
+//		            .Select(g => new PerformanceData
+//		            {
+//		                EntryThreshold = g.Key,
+//		                SuccessRate = g.Sum(p => p.SuccessRate) / g.Sum(p => p.Trades),
+//		                Trades = g.Sum(p => p.Trades)
+//		            })
+//		            .OrderByDescending(p => p.SuccessRate)
+//		            .ToList();
 
-		        if (groupedPerformanceData.Count > 0)
-		        {
-		            PerformanceData bestPerformance = groupedPerformanceData[0];
-		            entryThreshold = bestPerformance.EntryThreshold;
-		        }
-		    }
-			else
-		    {
-		        entryThreshold = CalculateATRBasedValue(currentATR, minThreshold, maxThreshold, stepSize, true);
-		    }
-		}
+//		        if (groupedPerformanceData.Count > 0)
+//		        {
+//		            PerformanceData bestPerformance = groupedPerformanceData[0];
+//		            entryThreshold = bestPerformance.EntryThreshold;
+//		        }
+//		    }
+//			else
+//		    {
+//		        entryThreshold = CalculateATRBasedValue(currentATR, minThreshold, maxThreshold, stepSize, true);
+//		    }
+//		}
+//		#endregion
 		#endregion
 
 		#region OptimizeParameters()
 		private void OptimizeParameters()
 		{
-		    double[] lowerBounds = { 8, 0.5, 1, 1, 0.5 }; // Lower bounds for window size, stop loss multiplier, stop loss limit multiplier, take profit multiplier, and entry threshold
-		    double[] upperBounds = { 12, 3.0, 4, 10, 0.9 }; // Upper bounds for window size, stop loss multiplier, stop loss limit multiplier, take profit multiplier, and entry threshold
-		    int numParticles = 20;
+		    int numParticles = 50;
 		    int maxIterations = 50;
 
 		    Func<double[], double> fitnessFunction = CalculateFitness;
@@ -937,23 +951,33 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    double takeProfitMultiplier = position[3];
 		    double entryThreshold = position[4];
 
-		    // Calculate the fitness based on historical performance data
-		    // You can use the livePerformanceData list to evaluate the performance
-		    // of the strategy with the given parameter values
-		    // Return a fitness score (e.g., success rate, profit factor, Sharpe ratio)
+		    double fitnessScore = 0;
 
-		    // Example fitness calculation based on success rate
-		    int totalTrades = livePerformanceData.Count;
-		    int successfulTrades = livePerformanceData.Count(p =>
-		        p.WindowSize == windowSize &&
-		        p.StopLossMultiplier == stopLossMultiplier &&
-		        p.StopLossLimitMultiplier == stopLossLimitMultiplier &&
-		        p.TakeProfitMultiplier == takeProfitMultiplier &&
-		        p.EntryThreshold == entryThreshold &&
-		        p.SuccessRate == 1.0);
+		    foreach (var trade in livePerformanceData)
+		    {
+		        // Calculate scores for each parameter based on their proximity to the historical values
+		        double windowSizeScore = 1.0 - Math.Abs(trade.WindowSize - windowSize) / (upperBounds[0] - lowerBounds[0]);
+		        double stopLossMultiplierScore = 1.0 - Math.Abs(trade.StopLossMultiplier - stopLossMultiplier) / (upperBounds[1] - lowerBounds[1]);
+		        double stopLossLimitMultiplierScore = 1.0 - Math.Abs(trade.StopLossLimitMultiplier - stopLossLimitMultiplier) / (upperBounds[2] - lowerBounds[2]);
+		        double takeProfitMultiplierScore = 1.0 - Math.Abs(trade.TakeProfitMultiplier - takeProfitMultiplier) / (upperBounds[3] - lowerBounds[3]);
+		        double entryThresholdScore = 1.0 - Math.Abs(trade.EntryThreshold - entryThreshold) / (upperBounds[4] - lowerBounds[4]);
 
-		    double successRate = (double)successfulTrades / totalTrades;
-		    return successRate;
+		        // Calculate performance metrics for the trade
+		        double netProfitScore = trade.NetProfit;
+		        double maxAdverseExcursionScore = 1.0 - trade.MaxAdverseExcursion / trade.ATR;
+		        double tradeDurationScore = 1.0 - trade.TradeDuration / (24 * 60); // Assuming trade duration is in minutes
+
+		        // Combine the scores and performance metrics into a single fitness
+				double tradeScore = windowSizeScore + stopLossMultiplierScore + stopLossLimitMultiplierScore + takeProfitMultiplierScore + entryThresholdScore;
+        		tradeScore += netProfitScore + maxAdverseExcursionScore + tradeDurationScore;
+
+		        fitnessScore += tradeScore;
+		    }
+
+		    // Normalize the fitness score based on the number of trades
+		    fitnessScore /= livePerformanceData.Count;
+
+		    return fitnessScore;
 		}
 		#endregion
 
@@ -1033,11 +1057,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 	{
 	    public double WindowSize { get; set; }
 	    public double ATR { get; set; }
-	    public double SuccessRate { get; set; }
-	    public int Trades { get; set; }
 		public double StopLossMultiplier { get; set; }
 		public double StopLossLimitMultiplier { get; set; }
 		public double TakeProfitMultiplier { get; set; }
 		public double EntryThreshold { get; set; }
+	    public double SuccessRate { get; set; }
+	    public int Trades { get; set; }
+	    public double NetProfit { get; set; }
+	    public double MaxAdverseExcursion { get; set; }
+	    public double TradeDuration { get; set; }
 	}
 }
