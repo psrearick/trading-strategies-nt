@@ -54,6 +54,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public double successRate = 0.5;
 		private int frequency;
 		private double StopLossMultiplier = 1;
+		private double TakeProfitMultiplier = 5;
 		#endregion
 
 		#region OnStateChange()
@@ -367,6 +368,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region UpdateTakeProfitMultiplier()
+		public void UpdateTakeProfitMultiplier(double takeProfitMultiplier)
+		{
+			TakeProfitMultiplier = takeProfitMultiplier;
+		}
+		#endregion
+
 		#region UpdateStopLoss()
 		private void UpdateStopLoss(EntrySignal entry)
 		{
@@ -380,6 +388,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			entry.StopDistance = Math.Max(currentBarExtremeDistance, Math.Min(swingDistance, atrStopLossDistance));
 
+		}
+		#endregion
+
+		#region UpdateTakeProfit()
+		private void UpdateTakeProfit(EntrySignal entry)
+		{
+			entry.ProfitDistance = entry.StopDistance * entry.TakeProfitMultiplier;
 		}
 		#endregion
 
@@ -451,6 +466,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			entry.Update();
 
 			UpdateStopLoss(entry);
+			UpdateTakeProfit(entry);
 
 			return entry;
 		}

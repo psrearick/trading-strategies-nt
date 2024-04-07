@@ -33,21 +33,22 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Legs legs;
         private MarketDirection marketDirection;
         private EntryEvaluator entryEvaluator;
+        private EntrySignal entry;
+        private MarketPosition tradeDirection = MarketPosition.Flat;
 
         //		private TradesExporter tradesExporter;
-        private ISet<int> tradesTracking = new HashSet<int>();
-        private EntrySignal entry;
         private double previousSuccessRate;
         private double successRate;
-        private List<double> successRates = new List<double>();
-        private List<bool> tradeOutcomes = new List<bool>();
-		private List<PerformanceData> livePerformanceData = new List<PerformanceData>();
         private int rollingWindowSize = 50;
-        private MarketPosition tradeDirection = MarketPosition.Flat;
         private double successRateThreshold = 0.05;
 		private double CurrentStopLossMultiplier = 1.5;
 		private double CurrentStopLossLimitMultiplier = 5;
+		private double CurrentTakeProfitMultiplier = 5;
 
+        private ISet<int> tradesTracking = new HashSet<int>();
+        private List<double> successRates = new List<double>();
+        private List<bool> tradeOutcomes = new List<bool>();
+		private List<PerformanceData> livePerformanceData = new List<PerformanceData>();
         private Dictionary<string, List<double>> entryCriteria =
             new Dictionary<string, List<double>>();
         private Dictionary<string, List<double>> exitCriteria =
@@ -98,9 +99,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Period = 10;
                 Quantity = 1;
                 Window = 10;
-
-				SL = 1.5;
-				SLLimit = 5;
             }
             #endregion
 
@@ -232,46 +230,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             UpdateTradeOutcomes(entry.IsSuccessful);
             previousSuccessRate = successRate;
             UpdateSuccessRates();
-
-            foreach (var criterion in entryCriteria)
-            {
-                if (
-                    entry.entryConditions.ContainsKey(criterion.Key)
-                    && entry.entryConditions[criterion.Key] == 1
-                )
-                {
-                    entryCriteria[criterion.Key].Add(entry.DistanceMoved);
-                    continue;
-                }
-
-                entryCriteria[criterion.Key].Add(0);
-            }
-
-            foreach (var criterion in exitCriteria)
-            {
-                if (
-                    entry.exitConditions.ContainsKey(criterion.Key)
-                    && entry.exitConditions[criterion.Key] == 1
-                )
-                {
-                    exitCriteria[criterion.Key].Add(entry.DistanceMoved);
-                    continue;
-                }
-
-                exitCriteria[criterion.Key].Add(0);
-            }
-
-			PerformanceData performance = new PerformanceData
-		    {
-		        WindowSize = entryEvaluator.Window,
-		        ATR = entry.AvgAtr,
-		        SuccessRate = entry.IsSuccessful ? 1.0 : 0.0,
-		        Trades = 1,
-				StopLossMultiplier = entry.StopLossMultiplier,
-				StopLossLimitMultiplier = entry.StopLossLimitMultiplier,
-		    };
-
-		    livePerformanceData.Add(performance);
+			UpdateEntryCriteria();
+			UpdateExitCriteria();
+            UpdatePerformanceData();
 
             AdjustStrategy();
         }
@@ -411,7 +372,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             double entryRating = evaluateEntry();
 
 			double entryThresholdModifier = Math.Round((entryEvaluator.matched[0] * 0.15) / 0.05, 0) * 0.05;
-            double entryThreshold = 0.5 + entryThresholdModifier * (successRate > successRateThreshold ? -1 : 1);
+            double entryThreshold = 0.8 + entryThresholdModifier * (successRate > successRateThreshold ? -1 : 1);
+			entryThreshold = Math.Min(entryThreshold, 0.9);
 
             if (entryRating < entryThreshold)
             {
@@ -424,10 +386,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             );
 
 			double maxStopLossDistancePoints = entryEvaluator.avgAtrFast[0] * CurrentStopLossLimitMultiplier;
-//			double maxStopLossDistancePoints = entryEvaluator.avgAtrFast[0] * SLLimit;
 			double maxStopLossDistanceTicks = maxStopLossDistancePoints * 4;
 			double atrStopLossPoints = entryEvaluator.atr[0] * CurrentStopLossMultiplier;
-//			double atrStopLossPoints = entryEvaluator.atr[0] * SL;
 
             if (marketDirection.Direction[0] == TrendDirection.Bullish)
             {
@@ -447,14 +407,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        }
 
 		        entry.StopLossUsed = stopLossDistanceTicks;
-		        entry.ProfitTargetUsed = stopLossDistanceTicks * 6;
+		        entry.ProfitTargetUsed = stopLossDistanceTicks * CurrentTakeProfitMultiplier;
 
                 if (swingLow < barLow && stopLossPrice < barLow)
                 {
 					entry.StopLossMultiplier = CurrentStopLossMultiplier;
 					entry.StopLossLimitMultiplier = CurrentStopLossLimitMultiplier;
                     SetStopLoss(CalculationMode.Ticks, stopLossDistanceTicks);
-//					SetProfitTarget(CalculationMode.Ticks, stopLossDistanceTicks * 2);
+					SetProfitTarget(CalculationMode.Ticks, stopLossDistanceTicks * CurrentTakeProfitMultiplier);
 
                     EnterLong(quantity);
                 }
@@ -477,14 +437,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        }
 
                 entry.StopLossUsed = stopLossDistanceTicks;
-                entry.ProfitTargetUsed = stopLossDistanceTicks * 6;
+                entry.ProfitTargetUsed = stopLossDistanceTicks * CurrentTakeProfitMultiplier;
 
                 if (swingHigh > barHigh && stopLossPrice > barHigh)
                 {
 					entry.StopLossMultiplier = CurrentStopLossMultiplier;
 					entry.StopLossLimitMultiplier = CurrentStopLossLimitMultiplier;
                     SetStopLoss(CalculationMode.Ticks, stopLossDistanceTicks);
-//					SetProfitTarget(CalculationMode.Ticks, stopLossDistanceTicks * 2);
+					SetProfitTarget(CalculationMode.Ticks, stopLossDistanceTicks * CurrentTakeProfitMultiplier);
 
                     EnterShort(quantity);
                 }
@@ -617,6 +577,75 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         #endregion
 
+		#region UpdateEntryCriteria()
+		private void UpdateEntryCriteria()
+		{
+			foreach (var criterion in entryCriteria)
+            {
+                if (
+                    entry.entryConditions.ContainsKey(criterion.Key)
+                    && entry.entryConditions[criterion.Key] == 1
+                )
+                {
+                    entryCriteria[criterion.Key].Add(entry.DistanceMoved);
+                } else {
+                	entryCriteria[criterion.Key].Add(0);
+				}
+
+				if (entryCriteria[criterion.Key].Count > rollingWindowSize)
+				{
+					entryCriteria[criterion.Key].RemoveAt(0);
+				}
+            }
+		}
+		#endregion
+
+		#region UpdateExitCriteria()
+		private void UpdateExitCriteria()
+		{
+			foreach (var criterion in exitCriteria)
+            {
+                if (
+                    entry.exitConditions.ContainsKey(criterion.Key)
+                    && entry.exitConditions[criterion.Key] == 1
+                )
+                {
+                    exitCriteria[criterion.Key].Add(entry.DistanceMoved);
+                } else {
+					exitCriteria[criterion.Key].Add(0);
+				}
+
+				if (exitCriteria[criterion.Key].Count > rollingWindowSize)
+				{
+					exitCriteria[criterion.Key].RemoveAt(0);
+				}
+            }
+		}
+		#endregion
+
+		#region UpdatePerformanceData()
+		private void UpdatePerformanceData()
+		{
+			PerformanceData performance = new PerformanceData
+		    {
+		        WindowSize = entryEvaluator.Window,
+		        ATR = entry.AvgAtr,
+		        SuccessRate = entry.IsSuccessful ? 1.0 : 0.0,
+		        Trades = 1,
+				StopLossMultiplier = entry.StopLossMultiplier,
+				StopLossLimitMultiplier = entry.StopLossLimitMultiplier,
+				TakeProfitMultiplier = entry.TakeProfitMultiplier
+		    };
+
+		    livePerformanceData.Add(performance);
+
+			if (livePerformanceData.Count > rollingWindowSize)
+			{
+				livePerformanceData.RemoveAt(0);
+			}
+		}
+		#endregion
+
         #region UpdateTradeOutcomes()
         private void UpdateTradeOutcomes(bool isSuccessful)
         {
@@ -672,6 +701,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 entryEvaluator.Window = Window * 1.2;
 				CurrentStopLossMultiplier = 1.5;
 				CurrentStopLossLimitMultiplier = 2;
+				CurrentTakeProfitMultiplier = 4;
             }
             else if (
                 entryEvaluator.avgAtr[0] - stdDevAtr
@@ -681,17 +711,20 @@ namespace NinjaTrader.NinjaScript.Strategies
                 entryEvaluator.Window = Window * 0.8;
 				CurrentStopLossMultiplier = 1;
 				CurrentStopLossLimitMultiplier = 1;
+				CurrentTakeProfitMultiplier = 1;
             }
             else
             {
                 entryEvaluator.Window = Window;
 				CurrentStopLossMultiplier = 1;
 				CurrentStopLossLimitMultiplier = 1;
+				CurrentTakeProfitMultiplier = 2;
             }
 
 			OptimizeWindowSize();
 			OptimizeStopLossMultiplier();
 			OptimizeStopLossLimitMultiplier();
+			OptimizeTakeProfitMultiplier();
         }
         #endregion
 
@@ -793,6 +826,40 @@ namespace NinjaTrader.NinjaScript.Strategies
 		}
 		#endregion
 
+		#region OptimizeTakeProfitMultiplier()
+		private void OptimizeTakeProfitMultiplier()
+		{
+		    double currentATR = entryEvaluator.avgAtr[0];
+		    double atrTolerance = 0.1 * currentATR;
+
+		    List<PerformanceData> relevantPerformanceData = livePerformanceData
+		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
+		        .ToList();
+
+		    if (relevantPerformanceData.Count >= 15)
+		    {
+		        var groupedPerformanceData = relevantPerformanceData
+		            .GroupBy(p => p.TakeProfitMultiplier)
+		            .Select(g => new PerformanceData
+		            {
+		                TakeProfitMultiplier = g.Key,
+		                SuccessRate = g.Sum(p => p.SuccessRate) / g.Sum(p => p.Trades),
+		                Trades = g.Sum(p => p.Trades)
+		            })
+		            .OrderByDescending(p => p.SuccessRate)
+		            .ToList();
+
+		        if (groupedPerformanceData.Count > 0)
+		        {
+		            PerformanceData bestPerformance = groupedPerformanceData[0];
+		            CurrentTakeProfitMultiplier = bestPerformance.TakeProfitMultiplier;
+		        }
+		    }
+
+			entryEvaluator.UpdateTakeProfitMultiplier(CurrentTakeProfitMultiplier);
+		}
+		#endregion
+
         #region Properties
 
         [NinjaScriptProperty]
@@ -820,15 +887,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Window", Description = "Window", Order = 3, GroupName = "Parameters")]
         public double Window { get; set; }
 
-        [NinjaScriptProperty]
-        [Range(0, 200)]
-        [Display(Name = "SL", Description = "SL", Order = 3, GroupName = "Parameters")]
-        public double SL { get; set; }
+//        [NinjaScriptProperty]
+//        [Range(0, 200)]
+//        [Display(Name = "SL", Description = "SL", Order = 3, GroupName = "Parameters")]
+//        public double SL { get; set; }
 
-        [NinjaScriptProperty]
-        [Range(0, 200)]
-        [Display(Name = "SLLimit", Description = "SLLimit", Order = 3, GroupName = "Parameters")]
-        public double SLLimit { get; set; }
+//        [NinjaScriptProperty]
+//        [Range(0, 200)]
+//        [Display(Name = "SLLimit", Description = "SLLimit", Order = 3, GroupName = "Parameters")]
+//        public double SLLimit { get; set; }
 
         //		[NinjaScriptProperty]
         //		[Display(Name="Export Trades", Description="Export Trades", Order=6, GroupName="Parameters")]
@@ -846,5 +913,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 	    public int Trades { get; set; }
 		public double StopLossMultiplier { get; set; }
 		public double StopLossLimitMultiplier { get; set; }
+		public double TakeProfitMultiplier { get; set; }
 	}
 }

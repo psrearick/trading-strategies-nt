@@ -48,13 +48,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		public double StopLossUsed;
 		public double ProfitTargetUsed;
-		public double StopLossMultiplier;
-		public double StopLossLimitMultiplier;
+		public double StopLossMultiplier = 1;
+		public double StopLossLimitMultiplier = 1;
+		public double TakeProfitMultiplier = 1;
 
 		public bool IsEnabled = true;
 		public bool IsClosed;
 		public bool IsSuccessful;
 		public double StopDistance;
+		public double ProfitDistance = 0;
 		public double DistanceMoved;
 		public double HighestHigh;
 		public double LowestLow;
@@ -279,6 +281,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			if (GreatestLoss > StopDistance) {
 				IsClosed = true;
+			}
+
+			if (ProfitDistance > 0 && GreatestProfit > ProfitDistance) {
+				IsClosed = true;
+				IsSuccessful = true;
 			}
 
 //			if (CurrentDirection != TrendDirection.Flat && CurrentDirection != Direction) {
