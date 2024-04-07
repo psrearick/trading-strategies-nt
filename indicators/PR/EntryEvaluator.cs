@@ -39,6 +39,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public SMA avgAtrFast;
 		public EMA emaFast;
 		public EMA emaSlow;
+		public MIN minATR;
+		public MAX maxATR;
 		public Series<int> barsSinceDoubleTop;
 		public Series<int> barsSinceDoubleBottom;
 		private List<EntrySignal> entries = new List<EntrySignal>(200);
@@ -99,6 +101,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				stdDevAtr				= StdDev(atr, 21);
 				avgAtr					= SMA(atr, 21);
 				avgAtrFast				= SMA(atr, 9);
+				minATR					= MIN(atr, 50);
+				maxATR					= MAX(atr, 50);
 				matched					= new Series<double>(this, MaximumBarsLookBack.TwoHundredFiftySix);
 
 //				for (int i = 0; i < InitialWindow; i++) {
@@ -131,7 +135,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				for (int i = 0; i < toDisable; i++) {
 					int positionToDisable = nextEntryIndex + i;
 					if (positionToDisable > WindowSize - 1) positionToDisable -= WindowSize;
-					entries[positionToDisable].IsEnabled = true;
+					entries[positionToDisable].IsEnabled = false;
 				}
 			}
 
@@ -411,6 +415,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region AddEntry()
 		private void AddEntry()
 		{
+			if (nextEntryIndex >= WindowSize) {
+				nextEntryIndex = 0;
+			}
+
 			if (nextEntryIndex >= entries.Count) {
 				entries.Add(EntrySignal(CurrentBar));
 			}
