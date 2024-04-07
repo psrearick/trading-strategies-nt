@@ -44,6 +44,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	#endregion
 	#endregion
 
+	#region Utils
 	public class Utils : Indicator
 	{
 		public TrendDirection DirectionFromInt(int direction)
@@ -86,6 +87,105 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 	}
+	#endregion
+
+	#region Particle Swarm
+	#region Particle
+	public class Particle
+	{
+	    public double[] Position { get; set; }
+	    public double[] Velocity { get; set; }
+	    public double[] BestPosition { get; set; }
+	    public double BestFitness { get; set; }
+
+	    public Particle(int dimensions)
+	    {
+	        Position = new double[dimensions];
+	        Velocity = new double[dimensions];
+	        BestPosition = new double[dimensions];
+	        BestFitness = double.MinValue;
+	    }
+	}
+	#endregion
+
+	#region ParticleSwarmOptimization
+	public class ParticleSwarmOptimization
+	{
+	    private const double C1 = 2.0;
+	    private const double C2 = 2.0;
+	    private const double W = 0.7;
+
+	    public static double[] Optimize(Func<double[], double> fitnessFunction, double[] lowerBounds, double[] upperBounds, int numParticles, int maxIterations)
+	    {
+	        int dimensions = lowerBounds.Length;
+	        Particle[] swarm = InitializeSwarm(numParticles, dimensions, lowerBounds, upperBounds);
+	        double[] globalBestPosition = new double[dimensions];
+	        double globalBestFitness = double.MinValue;
+			Random rand = new Random();
+
+	        for (int i = 0; i < maxIterations; i++)
+	        {
+	            foreach (Particle particle in swarm)
+	            {
+	                double fitness = fitnessFunction(particle.Position);
+
+	                if (fitness > particle.BestFitness)
+	                {
+	                    particle.BestPosition = (double[])particle.Position.Clone();
+	                    particle.BestFitness = fitness;
+	                }
+
+	                if (fitness > globalBestFitness)
+	                {
+	                    globalBestPosition = (double[])particle.Position.Clone();
+	                    globalBestFitness = fitness;
+	                }
+	            }
+
+	            foreach (Particle particle in swarm)
+	            {
+	                for (int j = 0; j < dimensions; j++)
+	                {
+	                    double r1 = rand.NextDouble();
+	                    double r2 = rand.NextDouble();
+
+	                    particle.Velocity[j] = W * particle.Velocity[j]
+	                        + C1 * r1 * (particle.BestPosition[j] - particle.Position[j])
+	                        + C2 * r2 * (globalBestPosition[j] - particle.Position[j]);
+
+	                    particle.Position[j] += particle.Velocity[j];
+	                    particle.Position[j] = Math.Max(lowerBounds[j], Math.Min(particle.Position[j], upperBounds[j]));
+	                }
+	            }
+	        }
+
+	        return globalBestPosition;
+	    }
+
+	    private static Particle[] InitializeSwarm(int numParticles, int dimensions, double[] lowerBounds, double[] upperBounds)
+	    {
+			Random rand = new Random();
+	        Particle[] swarm = new Particle[numParticles];
+
+	        for (int i = 0; i < numParticles; i++)
+	        {
+	            Particle particle = new Particle(dimensions);
+
+	            for (int j = 0; j < dimensions; j++)
+	            {
+	                particle.Position[j] = rand.NextDouble() * (upperBounds[j] - lowerBounds[j]) + lowerBounds[j];
+	                particle.Velocity[j] = rand.NextDouble() * (upperBounds[j] - lowerBounds[j]) * 0.1;
+	            }
+
+	            swarm[i] = particle;
+	        }
+
+	        return swarm;
+	    }
+	}
+	#endregion
+	#endregion
+
 }
 
 #region NinjaScript generated code. Neither change nor remove.

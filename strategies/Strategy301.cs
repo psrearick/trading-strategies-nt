@@ -675,11 +675,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double adjustedAverage = successRateAvg + successRateStdDev * 0.25;
             successRateThreshold = Double.IsNaN(adjustedAverage) ? successRateThreshold : adjustedAverage;
 
-			OptimizeWindowSize();
-			OptimizeStopLossMultiplier();
-			OptimizeStopLossLimitMultiplier();
-			OptimizeTakeProfitMultiplier();
-			OptimizeEntryThreshold();
+//			OptimizeWindowSize();
+//			OptimizeStopLossMultiplier();
+//			OptimizeStopLossLimitMultiplier();
+//			OptimizeTakeProfitMultiplier();
+//			OptimizeEntryThreshold();
+
+
+			OptimizeParameters();
+			entryEvaluator.UpdateStopLossMultiplier(CurrentStopLossMultiplier);
+			entryEvaluator.UpdateTakeProfitMultiplier(CurrentTakeProfitMultiplier);
         }
         #endregion
 
@@ -688,21 +693,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 		    double currentATR = entryEvaluator.avgAtr[0];
 		    double atrTolerance = 0.1 * currentATR;
-			double minWindowSize = 10;
-		    double maxWindowSize = 12;
-		    double stepSize = 1;
+			double minWindowSize = 20;
+		    double maxWindowSize = 50;
+		    double stepSize = 5;
     		double comparisonTolerance = 0.001;
 
 			List<double> windowSizes = GenerateValues(minWindowSize, maxWindowSize, stepSize);
 
 		    List<PerformanceData> relevantPerformanceData = livePerformanceData
-				.Where(p => windowSizes.Any(t => Math.Abs(p.WindowSize - t) <= comparisonTolerance))
 		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
 		        .ToList();
 
-		    if (relevantPerformanceData.Count >= 5)
+		    if (relevantPerformanceData.Count >= 10)
 		    {
 		        var groupedPerformanceData = relevantPerformanceData
+					.Where(p => windowSizes.Any(t => Math.Abs(p.WindowSize - t) <= comparisonTolerance))
             		.GroupBy(p => windowSizes.First(t => Math.Abs(p.WindowSize - t) <= comparisonTolerance))
 		            .Select(g => new PerformanceData
 		            {
@@ -732,8 +737,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    double currentATR = entryEvaluator.avgAtr[0];
 		    double atrTolerance = 0.1 * currentATR;
 			double minMultiplier = 0.5;
-    		double maxMultiplier = 3;
-    		double stepSize = 0.25;
+    		double maxMultiplier = 5;
+    		double stepSize = 0.5;
 
 			List<double> multipliers = GenerateValues(minMultiplier, maxMultiplier, stepSize);
 
@@ -741,7 +746,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
 		        .ToList();
 
-		    if (relevantPerformanceData.Count >= 5)
+		    if (relevantPerformanceData.Count >= 10)
 		    {
 		        var groupedPerformanceData = relevantPerformanceData
             		.Where(p => multipliers.Contains(p.StopLossMultiplier))
@@ -776,8 +781,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    double currentATR = entryEvaluator.avgAtr[0];
 		    double atrTolerance = 0.1 * currentATR;
 			double minMultiplier = 1;
-    		double maxMultiplier = 2;
-    		double stepSize = 0.25;
+    		double maxMultiplier = 10;
+    		double stepSize = 1;
     		double comparisonTolerance = 0.001;
 
 			List<double> multipliers = GenerateValues(minMultiplier, maxMultiplier, stepSize);
@@ -786,7 +791,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
 		        .ToList();
 
-		    if (relevantPerformanceData.Count >= 5)
+		    if (relevantPerformanceData.Count >= 10)
 		    {
 		        var groupedPerformanceData = relevantPerformanceData
 					.Where(p => multipliers.Any(t => Math.Abs(p.StopLossLimitMultiplier - t) <= comparisonTolerance))
@@ -819,8 +824,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    double currentATR = entryEvaluator.avgAtr[0];
 		    double atrTolerance = 0.1 * currentATR;
 			double minMultiplier = 1;
-		    double maxMultiplier = 4;
-		    double stepSize = 0.5;
+		    double maxMultiplier = 10;
+		    double stepSize = 1;
     		double comparisonTolerance = 0.001;
 
 			List<double> multipliers = GenerateValues(minMultiplier, maxMultiplier, stepSize);
@@ -829,7 +834,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
 		        .ToList();
 
-		    if (relevantPerformanceData.Count >= 5)
+		    if (relevantPerformanceData.Count >= 10)
 		    {
 		        var groupedPerformanceData = relevantPerformanceData
 					.Where(p => multipliers.Any(t => Math.Abs(p.TakeProfitMultiplier - t) <= comparisonTolerance))
@@ -863,8 +868,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 		    double currentATR = entryEvaluator.avgAtr[0];
 		    double atrTolerance = 0.1 * currentATR;
-			double minThreshold = 0.3;
-		    double maxThreshold = 0.8;
+			double minThreshold = 0.4;
+		    double maxThreshold = 1;
 		    double stepSize = 0.05;
     		double comparisonTolerance = 0.001;
 
@@ -874,7 +879,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
 		        .ToList();
 
-		    if (relevantPerformanceData.Count >= 5)
+		    if (relevantPerformanceData.Count >= 10)
 		    {
 		        var groupedPerformanceData = relevantPerformanceData
 					.Where(p => thresholds.Any(t => Math.Abs(p.EntryThreshold - t) <= comparisonTolerance))
@@ -898,6 +903,57 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    {
 		        entryThreshold = CalculateATRBasedValue(currentATR, minThreshold, maxThreshold, stepSize, true);
 		    }
+		}
+		#endregion
+
+		#region OptimizeParameters()
+		private void OptimizeParameters()
+		{
+		    double[] lowerBounds = { 8, 0.5, 1, 1, 0.5 }; // Lower bounds for window size, stop loss multiplier, stop loss limit multiplier, take profit multiplier, and entry threshold
+		    double[] upperBounds = { 12, 3.0, 4, 10, 0.9 }; // Upper bounds for window size, stop loss multiplier, stop loss limit multiplier, take profit multiplier, and entry threshold
+		    int numParticles = 20;
+		    int maxIterations = 50;
+
+		    Func<double[], double> fitnessFunction = CalculateFitness;
+
+		    double[] bestPosition = ParticleSwarmOptimization.Optimize(fitnessFunction, lowerBounds, upperBounds, numParticles, maxIterations);
+
+//			Print("Window: " + bestPosition[0] + ", SL: " + bestPosition[1] + ", SLL: " + bestPosition[2] + ", TP: " + bestPosition[3] + ", ET: " + bestPosition[4]);
+
+		    entryEvaluator.Window = bestPosition[0];
+		    CurrentStopLossMultiplier = bestPosition[1];
+		    CurrentStopLossLimitMultiplier = bestPosition[2];
+		    CurrentTakeProfitMultiplier = bestPosition[3];
+		    entryThreshold = bestPosition[4];
+		}
+		#endregion
+
+		#region CalculateFitness()
+		private double CalculateFitness(double[] position)
+		{
+		    double windowSize = position[0];
+		    double stopLossMultiplier = position[1];
+		    double stopLossLimitMultiplier = position[2];
+		    double takeProfitMultiplier = position[3];
+		    double entryThreshold = position[4];
+
+		    // Calculate the fitness based on historical performance data
+		    // You can use the livePerformanceData list to evaluate the performance
+		    // of the strategy with the given parameter values
+		    // Return a fitness score (e.g., success rate, profit factor, Sharpe ratio)
+
+		    // Example fitness calculation based on success rate
+		    int totalTrades = livePerformanceData.Count;
+		    int successfulTrades = livePerformanceData.Count(p =>
+		        p.WindowSize == windowSize &&
+		        p.StopLossMultiplier == stopLossMultiplier &&
+		        p.StopLossLimitMultiplier == stopLossLimitMultiplier &&
+		        p.TakeProfitMultiplier == takeProfitMultiplier &&
+		        p.EntryThreshold == entryThreshold &&
+		        p.SuccessRate == 1.0);
+
+		    double successRate = (double)successfulTrades / totalTrades;
+		    return successRate;
 		}
 		#endregion
 
