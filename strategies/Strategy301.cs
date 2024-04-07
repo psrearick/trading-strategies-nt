@@ -423,11 +423,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 (int)Math.Round(((successRate + entryRating) / 2) * (double)Quantity, 0)
             );
 
-//			double maxStopLossDistancePoints = entryEvaluator.avgAtrFast[0] * CurrentStopLossLimitMultiplier;
-			double maxStopLossDistancePoints = entryEvaluator.avgAtrFast[0] * SLLimit;
+			double maxStopLossDistancePoints = entryEvaluator.avgAtrFast[0] * CurrentStopLossLimitMultiplier;
+//			double maxStopLossDistancePoints = entryEvaluator.avgAtrFast[0] * SLLimit;
 			double maxStopLossDistanceTicks = maxStopLossDistancePoints * 4;
-//			double atrStopLossPoints = entryEvaluator.atr[0] * CurrentStopLossMultiplier;
-			double atrStopLossPoints = entryEvaluator.atr[0] * SL;
+			double atrStopLossPoints = entryEvaluator.atr[0] * CurrentStopLossMultiplier;
+//			double atrStopLossPoints = entryEvaluator.atr[0] * SL;
 
             if (marketDirection.Direction[0] == TrendDirection.Bullish)
             {
@@ -670,8 +670,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             )
             {
                 entryEvaluator.Window = Window * 1.2;
-				CurrentStopLossMultiplier = 1;
-				CurrentStopLossLimitMultiplier = 1;
+				CurrentStopLossMultiplier = 1.5;
+				CurrentStopLossLimitMultiplier = 2;
             }
             else if (
                 entryEvaluator.avgAtr[0] - stdDevAtr
@@ -788,6 +788,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		            CurrentStopLossLimitMultiplier = bestPerformance.StopLossLimitMultiplier;
 		        }
 		    }
+
+			entryEvaluator.UpdateStopLossMultiplier(CurrentStopLossMultiplier);
 		}
 		#endregion
 

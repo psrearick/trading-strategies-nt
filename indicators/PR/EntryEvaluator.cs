@@ -53,6 +53,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private int nextEntryIndex = 0;
 		public double successRate = 0.5;
 		private int frequency;
+		private double StopLossMultiplier = 1;
 		#endregion
 
 		#region OnStateChange()
@@ -359,19 +360,26 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region UpdateStopLoss()
-		public void UpdateStopLoss(double stopLossMultiplier)
+		#region UpdateStopLossMultiplier()
+		public void UpdateStopLossMultiplier(double stopLossMultiplier)
 		{
-			double atrStopLossDistance = atr[0] * stopLossMultiplier;
-			foreach (var entry in entries.Where(e => !e.IsClosed).ToList())
-			{
-				double previousSwing = entry.Direction == TrendDirection.Bearish
-					? pa.HighestHigh(0, md.LegLong.BarsAgoStarts[0])
-					: pa.LowestLow(0, md.LegLong.BarsAgoStarts[0]);
-				double swingDistance = Math.Abs(Close[0] - previousSwing);
+			StopLossMultiplier = stopLossMultiplier;
+		}
+		#endregion
 
-				entry.StopDistance = Math.Min(swingDistance, atrStopLossDistance);
-			}
+		#region UpdateStopLoss()
+		private void UpdateStopLoss(EntrySignal entry)
+		{
+			double atrStopLossDistance = atr[0] * StopLossMultiplier;
+			double previousSwing = entry.Direction == TrendDirection.Bearish
+				? pa.HighestHigh(0, md.LegLong.BarsAgoStarts[0])
+				: pa.LowestLow(0, md.LegLong.BarsAgoStarts[0]);
+			double swingDistance = Math.Abs(Close[0] - previousSwing);
+			double currentBarExtreme = entry.Direction == TrendDirection.Bearish ? High[0] : Low[0];
+			double currentBarExtremeDistance = Math.Abs(Close[0] - currentBarExtreme);
+
+			entry.StopDistance = Math.Max(currentBarExtremeDistance, Math.Min(swingDistance, atrStopLossDistance));
+
 		}
 		#endregion
 
@@ -441,6 +449,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			entry.CalculateAdditionalValues();
 			entry.Update();
+
+			UpdateStopLoss(entry);
 
 			return entry;
 		}
