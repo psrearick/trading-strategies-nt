@@ -251,6 +251,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double exitThresholdModifier = Math.Round((exitMatched * 0.15) / 0.05, 0) * 0.05;
             double exitThreshold = 0.5 + exitThresholdModifier * (successRate > successRateThreshold ? -1 : 1);
 
+			if (exitMatched <= 0) {
+				return false;
+			}
+
 			if (exitRating > exitThreshold) {
 				return true;
 			}
@@ -668,35 +672,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             double successRateAvg = successRates.Average();
             successRateThreshold = successRateAvg + successRateStdDev * 0.25;
 
-			double stdDevAtr = 0.75 * entryEvaluator.stdDevAtr[0];
-			if (
-                entryEvaluator.avgAtr[0] + stdDevAtr
-                < entryEvaluator.avgAtrFast[0]
-            )
-            {
-                entryEvaluator.Window = Window * 1.2;
-				CurrentStopLossMultiplier = 1.5;
-				CurrentStopLossLimitMultiplier = 2;
-				CurrentTakeProfitMultiplier = 4;
-            }
-            else if (
-                entryEvaluator.avgAtr[0] - stdDevAtr
-                > entryEvaluator.avgAtrFast[0]
-            )
-            {
-                entryEvaluator.Window = Window * 0.8;
-				CurrentStopLossMultiplier = 1;
-				CurrentStopLossLimitMultiplier = 1;
-				CurrentTakeProfitMultiplier = 1;
-            }
-            else
-            {
-                entryEvaluator.Window = Window;
-				CurrentStopLossMultiplier = 1;
-				CurrentStopLossLimitMultiplier = 1;
-				CurrentTakeProfitMultiplier = 2;
-            }
-
 			OptimizeWindowSize();
 			OptimizeStopLossMultiplier();
 			OptimizeStopLossLimitMultiplier();
@@ -708,9 +683,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private void OptimizeWindowSize()
 		{
 		    double currentATR = entryEvaluator.avgAtr[0];
-		    double atrTolerance = 0.2 * currentATR;
+		    double atrTolerance = 0.1 * currentATR;
+			double minWindowSize = 10;
+		    double maxWindowSize = 12;
+		    double stepSize = 1;
+
+			List<double> windowSizes = GenerateValues(minWindowSize, maxWindowSize, stepSize);
 
 		    List<PerformanceData> relevantPerformanceData = livePerformanceData
+            	.Where(p => windowSizes.Contains(p.WindowSize))
 		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
 		        .ToList();
 
@@ -733,6 +714,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		            entryEvaluator.Window = bestPerformance.WindowSize;
 		        }
 		    }
+			else
+		    {
+		        entryEvaluator.Window = CalculateATRBasedValue(currentATR, minWindowSize, maxWindowSize, stepSize);
+		    }
 		}
 		#endregion
 
@@ -740,7 +725,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private void OptimizeStopLossMultiplier()
 		{
 		    double currentATR = entryEvaluator.avgAtr[0];
-		    double atrTolerance = 0.2 * currentATR;
+		    double atrTolerance = 0.1 * currentATR;
+			double minMultiplier = 0.5;
+    		double maxMultiplier = 3;
+    		double stepSize = 0.25;
+
+			List<double> multipliers = GenerateValues(minMultiplier, maxMultiplier, stepSize);
 
 		    List<PerformanceData> relevantPerformanceData = livePerformanceData
 		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
@@ -749,6 +739,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    if (relevantPerformanceData.Count >= 5)
 		    {
 		        var groupedPerformanceData = relevantPerformanceData
+            		.Where(p => multipliers.Contains(p.StopLossMultiplier))
 		            .GroupBy(p => p.StopLossMultiplier)
 		            .Select(g => new PerformanceData
 		            {
@@ -765,6 +756,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		            CurrentStopLossMultiplier = bestPerformance.StopLossMultiplier;
 		        }
 		    }
+			else
+		    {
+		        CurrentStopLossMultiplier = CalculateATRBasedValue(currentATR, minMultiplier, maxMultiplier, stepSize);
+		    }
 
 			entryEvaluator.UpdateStopLossMultiplier(CurrentStopLossMultiplier);
 		}
@@ -774,7 +769,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private void OptimizeStopLossLimitMultiplier()
 		{
 		    double currentATR = entryEvaluator.avgAtr[0];
-		    double atrTolerance = 0.2 * currentATR;
+		    double atrTolerance = 0.1 * currentATR;
+			double minMultiplier = 1;
+    		double maxMultiplier = 4;
+    		double stepSize = 1;
+
+			List<double> multipliers = GenerateValues(minMultiplier, maxMultiplier, stepSize);
 
 		    List<PerformanceData> relevantPerformanceData = livePerformanceData
 		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
@@ -783,6 +783,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    if (relevantPerformanceData.Count >= 5)
 		    {
 		        var groupedPerformanceData = relevantPerformanceData
+            		.Where(p => multipliers.Contains(p.StopLossLimitMultiplier))
 		            .GroupBy(p => p.StopLossLimitMultiplier)
 		            .Select(g => new PerformanceData
 		            {
@@ -799,6 +800,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		            CurrentStopLossLimitMultiplier = bestPerformance.StopLossLimitMultiplier;
 		        }
 		    }
+			else
+		    {
+		        CurrentStopLossLimitMultiplier = CalculateATRBasedValue(currentATR, minMultiplier, maxMultiplier, stepSize);
+		    }
 		}
 		#endregion
 
@@ -806,7 +811,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private void OptimizeTakeProfitMultiplier()
 		{
 		    double currentATR = entryEvaluator.avgAtr[0];
-		    double atrTolerance = 0.2 * currentATR;
+		    double atrTolerance = 0.1 * currentATR;
+			double minMultiplier = 0.5;
+		    double maxMultiplier = 6;
+		    double stepSize = 0.5;
+
+			List<double> multipliers = GenerateValues(minMultiplier, maxMultiplier, stepSize);
 
 		    List<PerformanceData> relevantPerformanceData = livePerformanceData
 		        .Where(p => Math.Abs(p.ATR - currentATR) <= atrTolerance)
@@ -815,6 +825,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    if (relevantPerformanceData.Count >= 5)
 		    {
 		        var groupedPerformanceData = relevantPerformanceData
+            		.Where(p => multipliers.Contains(p.TakeProfitMultiplier))
 		            .GroupBy(p => p.TakeProfitMultiplier)
 		            .Select(g => new PerformanceData
 		            {
@@ -831,8 +842,39 @@ namespace NinjaTrader.NinjaScript.Strategies
 		            CurrentTakeProfitMultiplier = bestPerformance.TakeProfitMultiplier;
 		        }
 		    }
+			else
+		    {
+		        CurrentTakeProfitMultiplier = CalculateATRBasedValue(currentATR, minMultiplier, maxMultiplier, stepSize);
+		    }
 
 			entryEvaluator.UpdateTakeProfitMultiplier(CurrentTakeProfitMultiplier);
+		}
+		#endregion
+
+		#region GenerateValues()
+		private List<double> GenerateValues(double minValue, double maxValue, double stepSize)
+		{
+		    List<double> values = new List<double>();
+		    for (double value = minValue; value <= maxValue; value += stepSize)
+		    {
+		        values.Add(value);
+		    }
+		    return values;
+		}
+		#endregion
+
+		#region CalculateATRBasedValue()
+		private double CalculateATRBasedValue(double currentATR, double minValue, double maxValue, double stepSize, bool negate = false)
+		{
+		    double normalizedATR = (currentATR - entryEvaluator.minATR[0]) / (entryEvaluator.maxATR[0] - entryEvaluator.minATR[0]);
+		    int stepCount = (int)((maxValue - minValue) / stepSize);
+		    int selectedStep = (int)(normalizedATR * stepCount);
+
+			if (negate) {
+				return maxValue - (selectedStep * stepSize);
+			}
+
+		    return minValue + (selectedStep * stepSize);
 		}
 		#endregion
 
