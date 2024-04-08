@@ -258,18 +258,36 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		    correlations = GetEntryCorrelations();
 
-			if (correlations.Count > 0) {
-			    double mean = correlations.Values.Average();
-			    double stdDev = utils.StandardDeviation(correlations.Values);
+			if (correlations.Count == 0)
+			{
+				return;
+			}
 
-		    		double threshold = 4 - 4 * successRate;
+			foreach (var entry in correlations)
+		    {
+		        double correlation = entry.Value;
+		        int n = entries.Where(e => e.IsEnabled && (e.IsClosed || e.IsSuccessful)).ToList().Count;
+		        double tStatistic = correlation * Math.Sqrt((n - 2) / (1 - Math.Pow(correlation, 2)));
+		        double pValue = TStudent.CDF(n - 2, -Math.Abs(tStatistic)) * 2;
 
-		   	 	double significanceThreshold = mean + threshold * stdDev;
-
-		    		significantCorrelations = correlations.Where(c => Math.Abs(c.Value) > significanceThreshold).ToDictionary(i => i.Key, i => i.Value);
-			} else {
-		        significantCorrelations.Clear();
+		        if (pValue < 0.05) // Adjust the significance level as needed
+		        {
+		            significantCorrelations[entry.Key] = correlation;
+		        }
 		    }
+
+//			if (correlations.Count > 0) {
+//			    double mean = correlations.Values.Average();
+//			    double stdDev = utils.StandardDeviation(correlations.Values);
+
+//		    		double threshold = 4 - 4 * successRate;
+
+//		   	 	double significanceThreshold = mean + threshold * stdDev;
+
+//		    		significantCorrelations = correlations.Where(c => Math.Abs(c.Value) > significanceThreshold).ToDictionary(i => i.Key, i => i.Value);
+//			} else {
+//		        significantCorrelations.Clear();
+//		    }
 		}
 		#endregion
 
@@ -279,6 +297,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			List<EntrySignal> closedEntries = entries.Where(e => e.IsEnabled && (e.IsClosed || e.IsSuccessful)).ToList();
 
 			Dictionary<string, double> entryCorrelations = new Dictionary<string, double>();
+
+			if (closedEntries.Count == 0) {
+				return entryCorrelations;
+			}
 
 //	        entryCorrelations["RSI"] = correlationCoefficient(closedEntries.Select(e => e.Rsi).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
 //	        entryCorrelations["ATR"] = correlationCoefficient(closedEntries.Select(e => e.Atr).ToArray(), closedEntries.Select(e => e.IsSuccessful ? 1.0 : 0.0).ToArray());
@@ -309,37 +331,80 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region correlationCoefficient()
-		private double correlationCoefficient(double []X, double []Y)
+		private double correlationCoefficient(double []x, double []y)
 	    {
-			int n = X.Length;
-	        double sum_X = 0, sum_Y = 0, sum_XY = 0;
-	        double squareSum_X = 0, squareSum_Y = 0;
+			if (x.Length != y.Length)
+		    {
+		        throw new ArgumentException("Input arrays must have the same length.");
+		    }
 
-	        for (int i = 0; i < n; i++)
-	        {
-	            // sum of elements of array X.
-	            sum_X = sum_X + X[i];
+		    int n = x.Length;
+		    double[] rankX = Rank(x);
+		    double[] rankY = Rank(y);
 
-	            // sum of elements of array Y.
-	            sum_Y = sum_Y + Y[i];
+		    double sumDiffSquared = 0;
+		    for (int i = 0; i < n; i++)
+		    {
+		        sumDiffSquared += Math.Pow(rankX[i] - rankY[i], 2);
+		    }
 
-	            // sum of X[i] * Y[i].
-	            sum_XY = sum_XY + X[i] * Y[i];
+		    double correlation = 1 - (6 * sumDiffSquared) / (n * (Math.Pow(n, 2) - 1));
+		    return correlation;
 
-	            // sum of square of array elements.
-	            squareSum_X = squareSum_X + X[i] * X[i];
-	            squareSum_Y = squareSum_Y + Y[i] * Y[i];
-	        }
+//			int n = X.Length;
+//	        double sum_X = 0, sum_Y = 0, sum_XY = 0;
+//	        double squareSum_X = 0, squareSum_Y = 0;
 
-	        // use formula for calculating correlation
-	        // coefficient.
-	        double corr = (double)(n * sum_XY - sum_X * sum_Y)/
-	                     (double)(Math.Sqrt((n * squareSum_X -
-	                     sum_X * sum_X) * (n * squareSum_Y -
-	                     sum_Y * sum_Y)));
+//	        for (int i = 0; i < n; i++)
+//	        {
+//	            // sum of elements of array X.
+//	            sum_X = sum_X + X[i];
 
-	        return corr;
+//	            // sum of elements of array Y.
+//	            sum_Y = sum_Y + Y[i];
+
+//	            // sum of X[i] * Y[i].
+//	            sum_XY = sum_XY + X[i] * Y[i];
+
+//	            // sum of square of array elements.
+//	            squareSum_X = squareSum_X + X[i] * X[i];
+//	            squareSum_Y = squareSum_Y + Y[i] * Y[i];
+//	        }
+
+//	        // use formula for calculating correlation
+//	        // coefficient.
+//	        double corr = (double)(n * sum_XY - sum_X * sum_Y)/
+//	                     (double)(Math.Sqrt((n * squareSum_X -
+//	                     sum_X * sum_X) * (n * squareSum_Y -
+//	                     sum_Y * sum_Y)));
+
+//	        return corr;
 	    }
+		#endregion
+
+		#region Rank()
+		private double[] Rank(double[] values)
+		{
+		    int n = values.Length;
+		    var pairs = values.Select((value, index) => new { Value = value, Index = index }).OrderBy(pair => pair.Value);
+
+		    double[] ranks = new double[n];
+		    int currentRank = 1;
+		    double currentValue = pairs.First().Value;
+
+		    foreach (var pair in pairs)
+		    {
+		        if (pair.Value != currentValue)
+		        {
+		            currentRank = pair.Index + 1;
+		            currentValue = pair.Value;
+		        }
+
+		        ranks[pair.Index] = currentRank;
+		    }
+
+		    return ranks;
+		}
 		#endregion
 
 		#region LookForEntryBar()
@@ -456,8 +521,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			entry.Rsi 				= rsi[0];
 			entry.Atr 				= atr[0];
 			entry.StdDevAtr			= stdDevAtr[0];
-			entry.AvgAtrFast			= avgAtrFast[0];
-			entry.AvgAtr				= avgAtr[0];
+			entry.AvgAtrFast		= avgAtrFast[0];
+			entry.AvgAtr			= avgAtr[0];
 			entry.EmaFast 			= emaFast[0];
 			entry.EmaSlow 			= emaSlow[0];
 			entry.HighEntry			= High[0];
@@ -468,7 +533,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			entry.IsClosed 			= false;
 			entry.IsSuccessful 		= false;
-			entry.entryEvaluator		= this;
+			entry.entryEvaluator	= this;
 
 			entry.CalculateAdditionalValues();
 			entry.Update();

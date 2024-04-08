@@ -45,12 +45,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 		// - stop loss limit multiplier
 		// - take profit multiplier
 		// - entry threshold
-		private double[] lowerBounds = { 8, 0.5, 1, 1, 0.5 };
-		private double[] upperBounds = { 12, 3.0, 4, 10, 0.9 };
+		private double[] lowerBounds = { 10, 0.5, 1, 1, 0.6 };
+		private double[] upperBounds = { 12, 3.0, 3, 6, 1 };
+		private double[] stepSizes = { 2, 0.5, 1, 1, 0.05 };
 
+		private int livePerformanceDataNextEntry = 0;
+        private int rollingWindowSize = 30;
         private double previousSuccessRate;
         private double successRate;
-        private int rollingWindowSize = 50;
         private double successRateThreshold = 0.5;
 		private double entryThreshold = 0.7;
 		private double CurrentStopLossMultiplier = 1.5;
@@ -181,6 +183,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 //				tradesExporter			= TradesExporter(Name, Instrument.MasterInstrument.Name);
                 marketDirection = entryEvaluator.md;
                 legs = marketDirection.LegLong;
+
+				for (int i = 0; i < rollingWindowSize; i++)
+				{
+					PerformanceData data = new PerformanceData();
+					data.IsEnabled = false;
+					livePerformanceData.Add(data);
+				}
             }
             #endregion
         }
@@ -376,69 +385,84 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double maxStopLossDistancePoints = entryEvaluator.avgAtrFast[0] * CurrentStopLossLimitMultiplier;
 			double maxStopLossDistanceTicks = maxStopLossDistancePoints * 4;
 			double atrStopLossPoints = entryEvaluator.atr[0] * CurrentStopLossMultiplier;
+			double atrStopLossTicks = atrStopLossPoints * 4;
+			double stopLossDistanceTicks = atrStopLossTicks;
+
+			if (stopLossDistanceTicks > maxStopLossDistanceTicks)
+	        {
+	            return;
+	        }
+
+			entry.StopLossUsed = stopLossDistanceTicks;
+		    entry.ProfitTargetUsed = stopLossDistanceTicks * CurrentTakeProfitMultiplier;
+			entry.StopLossMultiplier = CurrentStopLossMultiplier;
+			entry.StopLossLimitMultiplier = CurrentStopLossLimitMultiplier;
+
+            SetStopLoss(CalculationMode.Ticks, stopLossDistanceTicks);
+			SetProfitTarget(CalculationMode.Ticks, stopLossDistanceTicks * CurrentTakeProfitMultiplier);
 
 			#region Bullish Entry
             if (marketDirection.Direction[0] == TrendDirection.Bullish)
             {
-                double swingLow =
-                    legs.BarsAgoStarts[0] > 0
-                        ? Math.Min(MIN(Low, legs.BarsAgoStarts[0])[0], MIN(Low, 4)[0])
-                        : Low[0];
+//                double swingLow =
+//                    legs.BarsAgoStarts[0] > 0
+//                        ? Math.Min(MIN(Low, legs.BarsAgoStarts[0])[0], MIN(Low, 4)[0])
+//                        : Low[0];
 
-				double barLow = Low[0];
-		        double stopLossDistancePoints = Math.Min((Close[0] - swingLow), atrStopLossPoints);
-		        double stopLossDistanceTicks = stopLossDistancePoints * 4;
-				double stopLossPrice = Close[0] - stopLossDistancePoints;
+//				double barLow = Low[0];
+//		        double stopLossDistancePoints = Math.Min((Close[0] - swingLow), atrStopLossPoints);
+//		        double stopLossDistanceTicks = stopLossDistancePoints * 4;
+//				double stopLossPrice = Close[0] - stopLossDistancePoints;
 
-				if (stopLossDistanceTicks > maxStopLossDistanceTicks)
-		        {
-		            return;
-		        }
+//				if (stopLossDistanceTicks > maxStopLossDistanceTicks)
+//		        {
+//		            return;
+//		        }
 
-		        entry.StopLossUsed = stopLossDistanceTicks;
-		        entry.ProfitTargetUsed = stopLossDistanceTicks * CurrentTakeProfitMultiplier;
+//		        entry.StopLossUsed = stopLossDistanceTicks;
+//		        entry.ProfitTargetUsed = stopLossDistanceTicks * CurrentTakeProfitMultiplier;
 
-                if (swingLow < barLow && stopLossPrice < barLow)
-                {
-					entry.StopLossMultiplier = CurrentStopLossMultiplier;
-					entry.StopLossLimitMultiplier = CurrentStopLossLimitMultiplier;
-                    SetStopLoss(CalculationMode.Ticks, stopLossDistanceTicks);
-					SetProfitTarget(CalculationMode.Ticks, stopLossDistanceTicks * CurrentTakeProfitMultiplier);
+//                if (swingLow < barLow && stopLossPrice < barLow)
+//                {
+//					entry.StopLossMultiplier = CurrentStopLossMultiplier;
+//					entry.StopLossLimitMultiplier = CurrentStopLossLimitMultiplier;
+//                    SetStopLoss(CalculationMode.Ticks, stopLossDistanceTicks);
+//					SetProfitTarget(CalculationMode.Ticks, stopLossDistanceTicks * CurrentTakeProfitMultiplier);
 
                     EnterLong(quantity);
-                }
+//                }
             }
 			#endregion
 
 			#region Bearish Entry
             if (marketDirection.Direction[0] == TrendDirection.Bearish)
             {
-                double swingHigh =
-                    legs.BarsAgoStarts[0] > 0
-                        ? Math.Max(MAX(High, legs.BarsAgoStarts[0])[0], MAX(High, 4)[0])
-                        : High[0];
-				double barHigh = High[0];
-				double stopLossDistancePoints = Math.Min((swingHigh - Close[0]), atrStopLossPoints);
-		        double stopLossDistanceTicks = stopLossDistancePoints * 4;
-				double stopLossPrice = Close[0] + stopLossDistancePoints;
+//                double swingHigh =
+//                    legs.BarsAgoStarts[0] > 0
+//                        ? Math.Max(MAX(High, legs.BarsAgoStarts[0])[0], MAX(High, 4)[0])
+//                        : High[0];
+//				double barHigh = High[0];
+//				double stopLossDistancePoints = Math.Min((swingHigh - Close[0]), atrStopLossPoints);
+//		        double stopLossDistanceTicks = stopLossDistancePoints * 4;
+//				double stopLossPrice = Close[0] + stopLossDistancePoints;
 
-				if (stopLossDistanceTicks > maxStopLossDistanceTicks)
-		        {
-		            return;
-		        }
+//				if (stopLossDistanceTicks > maxStopLossDistanceTicks)
+//		        {
+//		            return;
+//		        }
 
-                entry.StopLossUsed = stopLossDistanceTicks;
-                entry.ProfitTargetUsed = stopLossDistanceTicks * CurrentTakeProfitMultiplier;
+//                entry.StopLossUsed = stopLossDistanceTicks;
+//                entry.ProfitTargetUsed = stopLossDistanceTicks * CurrentTakeProfitMultiplier;
 
-                if (swingHigh > barHigh && stopLossPrice > barHigh)
-                {
-					entry.StopLossMultiplier = CurrentStopLossMultiplier;
-					entry.StopLossLimitMultiplier = CurrentStopLossLimitMultiplier;
-                    SetStopLoss(CalculationMode.Ticks, stopLossDistanceTicks);
-					SetProfitTarget(CalculationMode.Ticks, stopLossDistanceTicks * CurrentTakeProfitMultiplier);
+//                if (swingHigh > barHigh && stopLossPrice > barHigh)
+//                {
+//					entry.StopLossMultiplier = CurrentStopLossMultiplier;
+//					entry.StopLossLimitMultiplier = CurrentStopLossLimitMultiplier;
+//                    SetStopLoss(CalculationMode.Ticks, stopLossDistanceTicks);
+//					SetProfitTarget(CalculationMode.Ticks, stopLossDistanceTicks * CurrentTakeProfitMultiplier);
 
                     EnterShort(quantity);
-                }
+//                }
             }
 			#endregion
         }
@@ -584,7 +608,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 	entryCriteria[criterion.Key].Add(0);
 				}
 
-				if (entryCriteria[criterion.Key].Count > rollingWindowSize)
+				if (entryCriteria[criterion.Key].Count >= rollingWindowSize)
 				{
 					entryCriteria[criterion.Key].RemoveAt(0);
 				}
@@ -607,7 +631,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 					exitCriteria[criterion.Key].Add(0);
 				}
 
-				if (exitCriteria[criterion.Key].Count > rollingWindowSize)
+				if (exitCriteria[criterion.Key].Count >= rollingWindowSize)
 				{
 					exitCriteria[criterion.Key].RemoveAt(0);
 				}
@@ -618,26 +642,26 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region UpdatePerformanceData()
 		private void UpdatePerformanceData(Trade trade)
 		{
-			PerformanceData performance = new PerformanceData
-		    {
-		        WindowSize = entryEvaluator.Window,
-		        ATR = entry.AvgAtr,
-		        SuccessRate = entry.IsSuccessful ? 1.0 : 0.0,
-		        Trades = 1,
-				StopLossMultiplier = entry.StopLossMultiplier,
-				StopLossLimitMultiplier = entry.StopLossLimitMultiplier,
-				TakeProfitMultiplier = entry.TakeProfitMultiplier,
-				EntryThreshold = entryThreshold,
-				NetProfit = trade.ProfitPoints,
-				MaxAdverseExcursion = trade.MaePoints,
-				TradeDuration = (trade.Exit.Time - trade.Entry.Time).Minutes,
-		    };
+			PerformanceData performance = livePerformanceData[livePerformanceDataNextEntry];
 
-		    livePerformanceData.Add(performance);
+	        performance.WindowSize = entryEvaluator.Window;
+	        performance.ATR = entry.AvgAtr;
+	        performance.SuccessRate = entry.IsSuccessful ? 1.0 : 0.0;
+	        performance.Trades = 1;
+			performance.StopLossMultiplier = entry.StopLossMultiplier;
+			performance.StopLossLimitMultiplier = entry.StopLossLimitMultiplier;
+			performance.TakeProfitMultiplier = entry.TakeProfitMultiplier;
+			performance.EntryThreshold = entryThreshold;
+			performance.NetProfit = trade.ProfitPoints;
+			performance.MaxAdverseExcursion = trade.MaePoints;
+			performance.TradeDuration = (trade.Exit.Time - trade.Entry.Time).Minutes;
+			performance.IsEnabled = true;
 
-			if (livePerformanceData.Count > rollingWindowSize)
+			livePerformanceDataNextEntry++;
+
+			if (livePerformanceData.Count <= livePerformanceDataNextEntry)
 			{
-				livePerformanceData.RemoveAt(0);
+				livePerformanceDataNextEntry = 0;
 			}
 		}
 		#endregion
@@ -925,20 +949,51 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region OptimizeParameters()
 		private void OptimizeParameters()
 		{
+//			if (!HasSufficientData())
+//			{
+//				SetDefaultParameterValues();
+
+//				return;
+//			}
+
 		    int numParticles = 50;
-		    int maxIterations = 50;
+		    int maxIterations = 100;
 
 		    Func<double[], double> fitnessFunction = CalculateFitness;
 
 		    double[] bestPosition = ParticleSwarmOptimization.Optimize(fitnessFunction, lowerBounds, upperBounds, numParticles, maxIterations);
-
-//			Print("Window: " + bestPosition[0] + ", SL: " + bestPosition[1] + ", SLL: " + bestPosition[2] + ", TP: " + bestPosition[3] + ", ET: " + bestPosition[4]);
 
 		    entryEvaluator.Window = bestPosition[0];
 		    CurrentStopLossMultiplier = bestPosition[1];
 		    CurrentStopLossLimitMultiplier = bestPosition[2];
 		    CurrentTakeProfitMultiplier = bestPosition[3];
 		    entryThreshold = bestPosition[4];
+		}
+		#endregion
+
+		#region HasSufficientData()
+		private bool HasSufficientData()
+		{
+			double currentATR = entryEvaluator.avgAtr[0];
+		    double atrTolerance = 0.1 * currentATR;
+
+		    List<PerformanceData> relevantPerformanceData = livePerformanceData
+		        .Where(p => p.IsEnabled && (Math.Abs(p.ATR - currentATR) <= atrTolerance))
+		        .ToList();
+
+		    return relevantPerformanceData.Count >= 10;
+		}
+		#endregion
+
+		#region SetDefaultParameterValues()
+		private void SetDefaultParameterValues()
+		{
+			double currentATR = entryEvaluator.avgAtr[0];
+			entryEvaluator.Window = CalculateATRBasedValue(currentATR, lowerBounds[0], upperBounds[0], stepSizes[0]);
+			CurrentStopLossMultiplier = CalculateATRBasedValue(currentATR, lowerBounds[1], upperBounds[1], stepSizes[1]);
+			CurrentStopLossLimitMultiplier = CalculateATRBasedValue(currentATR, lowerBounds[2], upperBounds[2], stepSizes[2]);
+			CurrentTakeProfitMultiplier = CalculateATRBasedValue(currentATR, lowerBounds[3], upperBounds[3], stepSizes[3]);
+			entryThreshold = CalculateATRBasedValue(currentATR, lowerBounds[4], upperBounds[4], stepSizes[4], true);
 		}
 		#endregion
 
@@ -953,7 +1008,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		    double fitnessScore = 0;
 
-		    foreach (var trade in livePerformanceData)
+			List<PerformanceData> trades = livePerformanceData.Where(p => p.IsEnabled).ToList();
+
+		    foreach (var trade in trades)
 		    {
 		        // Calculate scores for each parameter based on their proximity to the historical values
 		        double windowSizeScore = 1.0 - Math.Abs(trade.WindowSize - windowSize) / (upperBounds[0] - lowerBounds[0]);
@@ -975,7 +1032,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    }
 
 		    // Normalize the fitness score based on the number of trades
-		    fitnessScore /= livePerformanceData.Count;
+		    fitnessScore /= trades.Count;
 
 		    return fitnessScore;
 		}
@@ -1066,5 +1123,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 	    public double NetProfit { get; set; }
 	    public double MaxAdverseExcursion { get; set; }
 	    public double TradeDuration { get; set; }
+	    public bool IsEnabled { get; set; }
 	}
 }

@@ -186,6 +186,105 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	#endregion
 	#endregion
 
+	#region TStudent
+	public static class TStudent
+	{
+	    public static double CDF(double degreesOfFreedom, double t)
+	    {
+	        if (degreesOfFreedom <= 0)
+	        {
+	            throw new ArgumentException("Degrees of freedom must be positive.");
+	        }
+
+	        double x = degreesOfFreedom / (degreesOfFreedom + Math.Pow(t, 2));
+	        double a = degreesOfFreedom / 2;
+	        double b = 0.5;
+
+	        double cdf = RegularizedIncompleteBeta(a, b, x);
+
+	        if (t < 0)
+	        {
+	            cdf = 1 - cdf;
+	        }
+
+	        return cdf;
+	    }
+
+	    private static double RegularizedIncompleteBeta(double a, double b, double x)
+	    {
+	        const double Epsilon = 1e-14;
+	        const int MaxIterations = 100;
+
+	        if (a <= 0 || b <= 0)
+	        {
+	            throw new ArgumentException("Parameters a and b must be positive.");
+	        }
+
+	        if (x < 0 || x > 1)
+	        {
+	            throw new ArgumentException("Parameter x must be between 0 and 1 (inclusive).");
+	        }
+
+	        if (x == 0)
+	        {
+	            return 0;
+	        }
+
+	        if (x == 1)
+	        {
+	            return 1;
+	        }
+
+	        double logX = Math.Log(x);
+	        double logOneMinusX = Math.Log(1 - x);
+	        double logBetaAB = LogBeta(a, b);
+
+	        double sum = 1;
+	        double term = 1;
+	        double n = 0;
+
+	        while (Math.Abs(term) > Epsilon && n < MaxIterations)
+	        {
+	            term *= (a + n) * x / (a + b + n);
+	            sum += term;
+	            n++;
+	        }
+
+	        return Math.Exp(a * logX + b * logOneMinusX - logBetaAB) * sum;
+	    }
+
+	    private static double LogBeta(double a, double b)
+	    {
+	        return LogGamma(a) + LogGamma(b) - LogGamma(a + b);
+	    }
+
+	    private static double LogGamma(double x)
+	    {
+	        double[] coefficients = {
+	            76.18009172947146,
+	            -86.50532032941677,
+	            24.01409824083091,
+	            -1.231739572450155,
+	            0.1208650973866179e-2,
+	            -0.5395239384953e-5
+	        };
+
+	        double y = x;
+	        double tmp = x + 5.5;
+	        tmp -= (x + 0.5) * Math.Log(tmp);
+	        double seriesSum = 1.000000000190015;
+
+	        for (int i = 0; i < coefficients.Length; i++)
+	        {
+	            y += 1;
+	            seriesSum += coefficients[i] / y;
+	        }
+
+	        return -tmp + Math.Log(2.5066282746310005 * seriesSum / x);
+	    }
+	}
+	#endregion
+
 }
 
 #region NinjaScript generated code. Neither change nor remove.
