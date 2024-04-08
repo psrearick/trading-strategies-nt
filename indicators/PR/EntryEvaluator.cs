@@ -239,7 +239,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			if (filteredExitCorrelations.Count > 0) {
 			    double mean = filteredExitCorrelations.Values.Average();
-			    double stdDev = utils.StandardDeviation(filteredExitCorrelations.Values);
+			    double stdDev = Helpers.StandardDeviation(filteredExitCorrelations.Values);
 
 		    		double threshold = successRate;
 		   	 	double significanceThreshold = mean + threshold * stdDev;

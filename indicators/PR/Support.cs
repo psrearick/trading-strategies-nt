@@ -42,6 +42,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		Flat
 	};
 	#endregion
+
+	#region SignalType
+	public enum SignalType {
+		Entry,
+		Exit
+	};
+	#endregion
 	#endregion
 
 	#region Utils
@@ -76,9 +83,26 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		{
 			PrintMessage(message.ToString(), memberName, sourceFilePath, sourceLineNumber);
 		}
+	}
+	#endregion
+
+	#region Helpers
+	public class Helpers
+	{
+		#region GenerateRangeOfValues()
+		public static List<double> GenerateRangeOfValues(double minValue, double maxValue, double stepSize)
+		{
+		    List<double> values = new List<double>();
+		    for (double value = minValue; value <= maxValue; value += stepSize)
+		    {
+		        values.Add(value);
+		    }
+		    return values;
+		}
+		#endregion
 
 		#region StandardDeviation()
-		public double StandardDeviation(IEnumerable<double> values)
+		public static double StandardDeviation(IEnumerable<double> values)
 		{
 		    double avg = values.Average();
 		    double sum = values.Sum(d => Math.Pow(d - avg, 2));
@@ -285,6 +309,57 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
+	#region Object Pool
+	public interface IPoolable
+	{
+	    bool IsActive { get; set; }
+	    void Activate();
+	    void Deactivate();
+	}
+
+	public class ObjectPool<T> where T : IPoolable, new()
+	{
+	    private List<T> items = new List<T>();
+	    private Func<T> createFunc;
+
+	    public ObjectPool(int initialSize, Func<T> createFunc)
+	    {
+	        this.createFunc = createFunc;
+	        for (int i = 0; i < initialSize; i++)
+	        {
+	            items.Add(createFunc());
+	        }
+	    }
+
+		public T At(int position)
+		{
+			return items[position];
+		}
+
+	    public T Get()
+	    {
+	        T item = items.FirstOrDefault(x => !x.IsActive);
+	        if (item == null)
+	        {
+	            item = createFunc();
+	            items.Add(item);
+	        }
+	        item.Activate();
+	        return item;
+	    }
+
+	    public void Release(T item)
+	    {
+	        item.Deactivate();
+	    }
+
+		public IEnumerable<T> ActiveItems
+		{
+		    get { return items.Where(x => x.IsActive); }
+		}
+	}
+
+	#endregion
 }
 
 #region NinjaScript generated code. Neither change nor remove.

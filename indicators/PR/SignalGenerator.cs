@@ -41,15 +41,25 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public MAX maxATR;
 		public Series<int> barsSinceDoubleTop;
 		public Series<int> barsSinceDoubleBottom;
-		public List<double> stopLossMultiplier;
-		public List<double> profitTargetMultiplier;
-		private Dictionary<string, double> upperBoundsDict;
-		private Dictionary<string, double> lowerBoundsDict;
-		private double[] upperBounds;
-		private double[] lowerBounds;
-		private string[] parameterLabels;
-		public Dictionary<string, double> optimizedParameters;
+//		public List<double> stopLossMultiplier;
+//		public List<double> profitTargetMultiplier;
+//		private Dictionary<string, double> upperBoundsDict;
+//		private Dictionary<string, double> lowerBoundsDict;
+//		private double[] upperBounds;
+//		private double[] lowerBounds;
+		private ObjectPool<ParameterType> parameterTypes;
+		public ObjectPool<Parameter> optimizedParameters;
 		#endregion
+
+		public IEnumerable<ParameterType> ActiveParameterTypes
+		{
+		    get { return parameterTypes.ActiveItems; }
+		}
+
+		public IEnumerable<Parameter> ActiveOptimizedParameters
+		{
+		    get { return optimizedParameters.ActiveItems; }
+		}
 
 		#region OnStateChange()
 		protected override void OnStateChange()
@@ -77,10 +87,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				rsi						= RSI(14, 3);
 				emaFast					= EMA(9);
 				emaSlow					= EMA(21);
-				stopLossMultiplier		= GenerateRangeOfValues(0.5, 10.0, 0.5);
-				profitTargetMultiplier	= GenerateRangeOfValues(0.5, 10.0, 0.5);
-				upperBoundsDict			= SetUpperBounds();
-				lowerBoundsDict			= SetLowerBounds();
+
+				parameterTypes = new ObjectPool<ParameterType>(50, () => new ParameterType());
+				optimizedParameters = new ObjectPool<Parameter>(50, () => new Parameter());
+//				SetParameterTypes();
+//				stopLossMultiplier		= GenerateRangeOfValues(0.5, 10.0, 0.5);
+//				profitTargetMultiplier	= GenerateRangeOfValues(0.5, 10.0, 0.5);
+//				upperBoundsDict			= SetUpperBounds();
+//				lowerBoundsDict			= SetLowerBounds();
 			}
 			#endregion
 			#region State.DataLoaded
@@ -91,12 +105,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				avgAtrFast				= SMA(atr, 9);
 				minATR					= MIN(atr, 50);
 				maxATR					= MAX(atr, 50);
+
 				barsSinceDoubleTop		= new Series<int>(this);
 				barsSinceDoubleBottom	= new Series<int>(this);
-				upperBounds				= upperBoundsDict.Values.ToArray();
-				lowerBounds				= lowerBoundsDict.Values.ToArray();
-				parameterLabels			= upperBoundsDict.Keys.ToArray();
-				optimizedParameters		= new Dictionary<string, double>(lowerBoundsDict);
+
+//				upperBounds				= upperBoundsDict.Values.ToArray();
+//				lowerBounds				= lowerBoundsDict.Values.ToArray();
+//				parameterLabels			= upperBoundsDict.Keys.ToArray();
+//				optimizedParameters		= new Dictionary<string, double>(lowerBoundsDict);
 			}
 			#endregion
 		}
@@ -128,49 +144,48 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region GenerateRangeOfValues()
-		private List<double> GenerateRangeOfValues(double minValue, double maxValue, double stepSize)
-		{
-		    List<double> values = new List<double>();
-		    for (double value = minValue; value <= maxValue; value += stepSize)
-		    {
-		        values.Add(value);
-		    }
-		    return values;
-		}
-		#endregion
+//		#region SetParameterTypes
+//		private void SetParameterTypes()
+//		{}
+//		#endregion
 
-		#region SetUpperBounds()
-		private Dictionary<string, double> SetUpperBounds()
-		{
-			Dictionary<string, double> bounds = new Dictionary<string, double>();
-			return bounds;
-		}
-		#endregion
+//		#region SetUpperBounds()
+//		private Dictionary<string, double> SetUpperBounds()
+//		{
+//			Dictionary<string, double> bounds = new Dictionary<string, double>();
+//			return bounds;
+//		}
+//		#endregion
 
-		#region SetLowerBounds()
-		private Dictionary<string, double> SetLowerBounds()
-		{
-			Dictionary<string, double> bounds = new Dictionary<string, double>();
-			return bounds;
-		}
-		#endregion
+//		#region SetLowerBounds()
+//		private Dictionary<string, double> SetLowerBounds()
+//		{
+//			Dictionary<string, double> bounds = new Dictionary<string, double>();
+//			return bounds;
+//		}
+//		#endregion
 
 		#region OptimizeParameters()
-		private void OptimizeParameters()
+		public void OptimizeParameters()
 		{
 		    int numParticles = 50;
 		    int maxIterations = 100;
 
-		    Func<double[], double> fitnessFunction = CalculateFitness;
+			Func<double[], double> fitnessFunction = CalculateFitness;
+
+			double[] lowerBounds = ActiveParameterTypes.Select(p => p.LowerBound).ToArray();
+			double[] upperBounds = ActiveParameterTypes.Select(p => p.UpperBound).ToArray();
+			string[] names = ActiveParameterTypes.Select(p => p.Name).ToArray();
 
 		    double[] bestPosition = ParticleSwarmOptimization.Optimize(fitnessFunction, lowerBounds, upperBounds, numParticles, maxIterations);
 
-			for (int i = 0; i < bestPosition.Count(); i++) {
-				string key = parameterLabels[i];
-				double value = bestPosition[i];
+			foreach (var optimized in optimizedParameters.ActiveItems) {
+				optimizedParameters.Release(optimized);
+			}
 
-				optimizedParameters[key] = value;
+			for (int i = 0; i < bestPosition.Count(); i++) {
+				Parameter optimized = optimizedParameters.Get();
+				optimized.Set(ActiveParameterTypes.First(p => p.Name == names[i]), bestPosition[i]);
 			}
 		}
 		#endregion
@@ -219,39 +234,159 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 	public class SimTrade
 	{
+		#region Variables
 		public Signal EntrySignal;
 		public Signal ExitSignal;
+		public TradePerformance Performance = new TradePerformance();
+		public Indicator Source;
+		#endregion
 
-		public TradePerformance Performance;
+		#region SimTrade()
+		public SimTrade(Indicator indicator)
+		{
+			Source = indicator;
+		}
+		#endregion
 
+		#region Enter()
+		public void Enter(TrendDirection direction)
+		{
+			EntrySignal = new Signal(Source, SignalType.Entry);
+			EntrySignal.Set(direction);
+		}
+		#endregion
+
+		#region Exit()
+		public void Exit()
+		{
+			ExitSignal = new Signal(Source, EntrySignal.Type);
+			ExitSignal.Set(EntrySignal.Direction);
+		}
+		#endregion
+
+		#region CalculatePerformance()
 		public void CalculatePerformance()
 		{
-			Performance.TradeDuration = (ExitSignal.Time - EntrySignal.Time).Seconds;
-			Performance.BarsInTrade = ExitSignal.Bar - EntrySignal.Bar;
-//			Performance.NetProfit = EntrySignal.Direction == TrendDirection.Bullish
-//				?
-
+			Performance.Calculate(EntrySignal, ExitSignal);
 		}
+		#endregion
 	}
 
 	public class Signal
 	{
-		public Dictionary<string, double> Parameters = new Dictionary<string, double>();
+		#region Variables
+		public List<Parameter> Parameters = new List<Parameter>();
 		public Dictionary<string, double> Conditions = new Dictionary<string, double>();
 		public SignalType Type;
 		public DateTime Time;
 		public int Bar;
 		public Indicator Source;
 		public TrendDirection Direction;
+		public double Price;
+		#endregion
+
+		#region Signal()
+		public Signal(Indicator indicator, SignalType type)
+		{
+			Source = indicator;
+			Type = type;
+		}
+		#endregion
+
+		#region Set()
+		public void Set(TrendDirection direction)
+		{
+			Direction = direction;
+			Time = Source.Time[0];
+			Bar = Source.CurrentBar;
+			Price = Source.Close[0];
+		}
+		#endregion
 	}
 
 	public class TradePerformance
 	{
-		public double NetProfit { get; set; }
-	    public double MaxFavorableExcursion { get; set; }
-	    public double MaxAdverseExcursion { get; set; }
-	    public int TradeDuration { get; set; }
+		#region Variables
 		public int BarsInTrade { get; set; }
+	    public double MaxAdverseExcursion { get; set; }
+	    public double MaxFavorableExcursion { get; set; }
+		public double NetProfit { get; set; }
+	    public int TradeDuration { get; set; }
+		#endregion
+
+		#region Calculate()
+		public void Calculate(Signal entry, Signal exit)
+		{
+			BarsInTrade = exit.Bar - entry.Bar;
+			int barsAgoEntry = entry.Source.CurrentBar - entry.Bar;
+			double highestHigh = entry.Source.MAX(entry.Source.High, BarsInTrade)[barsAgoEntry];
+			double lowestLow = entry.Source.MIN(entry.Source.Low, BarsInTrade)[barsAgoEntry];
+			MaxAdverseExcursion = entry.Direction == TrendDirection.Bullish ? lowestLow : highestHigh;
+			MaxFavorableExcursion = entry.Direction == TrendDirection.Bullish ? highestHigh : lowestLow;
+			NetProfit = entry.Direction == TrendDirection.Bullish ? exit.Price - entry.Price : entry.Price - exit.Price;
+			TradeDuration = (exit.Time - entry.Time).Seconds;
+		}
+		#endregion
+	}
+
+	public class Parameter : IPoolable
+	{
+		#region Variables
+		public ParameterType Type;
+		public double Value;
+		public bool IsActive { get; set; }
+		#endregion
+
+		#region Manage Poolable
+	    public void Activate()
+	    {
+	        IsActive = true;
+	    }
+
+		public void Set(ParameterType type, double value)
+		{
+			Type = type;
+			Value = value;
+		}
+
+	    public void Deactivate()
+	    {
+	        IsActive = false;
+	    }
+		#endregion
+	}
+
+	public class ParameterType : IPoolable
+	{
+		#region Variables
+		public string Name;
+		public double UpperBound;
+		public double LowerBound;
+		public double Step;
+		public double[] Values;
+		public bool IsActive { get; set; }
+		#endregion
+
+		#region Manage Poolable
+	    public void Activate()
+	    {
+	        IsActive = true;
+	    }
+
+		public void Set(string name, double upperBound, double lowerBound, double step)
+		{
+			Name = name;
+			UpperBound = upperBound;
+			LowerBound = lowerBound;
+			Step = step;
+			Values = Helpers.GenerateRangeOfValues(lowerBound, upperBound, step).ToArray();
+		}
+
+	    public void Deactivate()
+	    {
+	        IsActive = false;
+	    }
+		#endregion
 	}
 }
 

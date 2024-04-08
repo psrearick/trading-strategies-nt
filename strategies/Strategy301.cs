@@ -708,7 +708,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         #region AdjustStrategy()
         private void AdjustStrategy()
         {
-            double successRateStdDev = utils.StandardDeviation(successRates);
+            double successRateStdDev = Helpers.StandardDeviation(successRates);
             double successRateAvg = successRates.Average();
 			double adjustedAverage = successRateAvg + successRateStdDev * 0.25;
             successRateThreshold = Double.IsNaN(adjustedAverage) ? successRateThreshold : adjustedAverage;
