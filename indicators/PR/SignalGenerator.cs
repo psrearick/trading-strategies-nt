@@ -216,6 +216,43 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 	}
+
+	public class SimTrade
+	{
+		public Signal EntrySignal;
+		public Signal ExitSignal;
+
+		public TradePerformance Performance;
+
+		public void CalculatePerformance()
+		{
+			Performance.TradeDuration = (ExitSignal.Time - EntrySignal.Time).Seconds;
+			Performance.BarsInTrade = ExitSignal.Bar - EntrySignal.Bar;
+//			Performance.NetProfit = EntrySignal.Direction == TrendDirection.Bullish
+//				?
+
+		}
+	}
+
+	public class Signal
+	{
+		public Dictionary<string, double> Parameters = new Dictionary<string, double>();
+		public Dictionary<string, double> Conditions = new Dictionary<string, double>();
+		public SignalType Type;
+		public DateTime Time;
+		public int Bar;
+		public Indicator Source;
+		public TrendDirection Direction;
+	}
+
+	public class TradePerformance
+	{
+		public double NetProfit { get; set; }
+	    public double MaxFavorableExcursion { get; set; }
+	    public double MaxAdverseExcursion { get; set; }
+	    public int TradeDuration { get; set; }
+		public int BarsInTrade { get; set; }
+	}
 }
 
 #region NinjaScript generated code. Neither change nor remove.
