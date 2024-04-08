@@ -48,8 +48,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 //		private double[] upperBounds;
 //		private double[] lowerBounds;
 		private ObjectPool<ParameterType> parameterTypes;
+		private ObjectPool<SimTrade> trades;
 		public ObjectPool<Parameter> optimizedParameters;
 		#endregion
+
+		public IEnumerable<SimTrade> ActiveTrades
+		{
+			get { return trades.ActiveItems; }
+		}
 
 		public IEnumerable<ParameterType> ActiveParameterTypes
 		{
@@ -179,11 +185,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		    double[] bestPosition = ParticleSwarmOptimization.Optimize(fitnessFunction, lowerBounds, upperBounds, numParticles, maxIterations);
 
-			foreach (var optimized in optimizedParameters.ActiveItems) {
+			foreach (var optimized in optimizedParameters.ActiveItems)
+			{
 				optimizedParameters.Release(optimized);
 			}
 
-			for (int i = 0; i < bestPosition.Count(); i++) {
+			for (int i = 0; i < bestPosition.Count(); i++)
+			{
 				Parameter optimized = optimizedParameters.Get();
 				optimized.Set(ActiveParameterTypes.First(p => p.Name == names[i]), bestPosition[i]);
 			}
@@ -193,74 +201,76 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region CalculateFitness()
 		private double CalculateFitness(double[] position)
 		{
-//		    double windowSize = position[0];
-//		    double stopLossMultiplier = position[1];
-//		    double stopLossLimitMultiplier = position[2];
-//		    double takeProfitMultiplier = position[3];
-//		    double entryThreshold = position[4];
-
 		    double fitnessScore = 0;
 
-//			List<PerformanceData> trades = livePerformanceData.Where(p => p.IsEnabled).ToList();
+		    foreach (var trade in ActiveTrades)
+		    {
+				double tradeScore = 0;
 
-//		    foreach (var trade in trades)
-//		    {
-//		        // Calculate scores for each parameter based on their proximity to the historical values
-//		        double windowSizeScore = 1.0 - Math.Abs(trade.WindowSize - windowSize) / (upperBounds[0] - lowerBounds[0]);
-//		        double stopLossMultiplierScore = 1.0 - Math.Abs(trade.StopLossMultiplier - stopLossMultiplier) / (upperBounds[1] - lowerBounds[1]);
-//		        double stopLossLimitMultiplierScore = 1.0 - Math.Abs(trade.StopLossLimitMultiplier - stopLossLimitMultiplier) / (upperBounds[2] - lowerBounds[2]);
-//		        double takeProfitMultiplierScore = 1.0 - Math.Abs(trade.TakeProfitMultiplier - takeProfitMultiplier) / (upperBounds[3] - lowerBounds[3]);
-//		        double entryThresholdScore = 1.0 - Math.Abs(trade.EntryThreshold - entryThreshold) / (upperBounds[4] - lowerBounds[4]);
+				for (int i = 0; i < ActiveParameterTypes.Count(); i++)
+				{
+					ParameterType paramType = ActiveParameterTypes.ToArray()[i];
+					Parameter tradeParam = trade.Parameters.FirstOrDefault(p => p.Type.Name == paramType.Name);
 
-//		        // Calculate performance metrics for the trade
-//		        double netProfitScore = trade.NetProfit;
-//		        double maxAdverseExcursionScore = 1.0 - trade.MaxAdverseExcursion / trade.ATR;
-//		        double tradeDurationScore = 1.0 - trade.TradeDuration / (24 * 60); // Assuming trade duration is in minutes
+					if (tradeParam == null)
+					{
+						continue;
+					}
 
-//		        // Combine the scores and performance metrics into a single fitness
-//				double tradeScore = windowSizeScore + stopLossMultiplierScore + stopLossLimitMultiplierScore + takeProfitMultiplierScore + entryThresholdScore;
-//        		tradeScore += netProfitScore + maxAdverseExcursionScore + tradeDurationScore;
+					tradeScore += 1.0 - Math.Abs(tradeParam.Value - position[i]) / (paramType.UpperBound - paramType.LowerBound);
+				}
 
-//		        fitnessScore += tradeScore;
-//		    }
+		        double netProfitScore = trade.Performance.NetProfit;
+		        double maxAdverseExcursionScore = 1.0 - trade.Performance.MaxAdverseExcursion / trade.Indicators["ATR"];
+		        double tradeDurationScore = 1.0 - trade.Performance.TradeDuration / (24 * 60 * 60);
 
-//		    // Normalize the fitness score based on the number of trades
-//		    fitnessScore /= trades.Count;
+		        tradeScore += netProfitScore + maxAdverseExcursionScore + tradeDurationScore;
+
+		        fitnessScore += tradeScore;
+		    }
+
+		    fitnessScore /= ActiveTrades.Count();
 
 		    return fitnessScore;
 		}
 		#endregion
 	}
 
-	public class SimTrade
+	public class SimTrade : IPoolable
 	{
 		#region Variables
-		public Signal EntrySignal;
-		public Signal ExitSignal;
-		public TradePerformance Performance = new TradePerformance();
-		public Indicator Source;
+		public Signal EntrySignal { get; set; }
+		public Signal ExitSignal { get; set; }
+		public TradePerformance Performance { get; set; }
+		public Indicator Source { get; set; }
+		public bool IsActive { get; set; }
 		#endregion
 
-		#region SimTrade()
-		public SimTrade(Indicator indicator)
+		public Dictionary<string, double> Indicators
 		{
-			Source = indicator;
+		    get { return EntrySignal.Indicators; }
 		}
-		#endregion
+
+		public List<Parameter> Parameters
+		{
+		    get { return EntrySignal.Parameters; }
+		}
 
 		#region Enter()
 		public void Enter(TrendDirection direction)
 		{
-			EntrySignal = new Signal(Source, SignalType.Entry);
-			EntrySignal.Set(direction);
+			EntrySignal = new Signal();
+			EntrySignal.Activate();
+			EntrySignal.Set(direction, Source, SignalType.Entry);
 		}
 		#endregion
 
 		#region Exit()
 		public void Exit()
 		{
-			ExitSignal = new Signal(Source, EntrySignal.Type);
-			ExitSignal.Set(EntrySignal.Direction);
+			ExitSignal = new Signal();
+			ExitSignal.Activate();
+			ExitSignal.Set(EntrySignal.Direction, Source, EntrySignal.Type);
 		}
 		#endregion
 
@@ -270,37 +280,81 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			Performance.Calculate(EntrySignal, ExitSignal);
 		}
 		#endregion
+
+		#region Manage Poolable
+		#region Activate()
+	    public void Activate()
+	    {
+	        IsActive = true;
+	    }
+		#endregion
+
+		#region Set()
+		public void Set(Indicator indicator)
+		{
+			Source = indicator;
+			Performance = new TradePerformance();
+		}
+		#endregion
+
+		#region Deactivate()
+	    public void Deactivate()
+	    {
+	        IsActive = false;
+	    }
+		#endregion
+		#endregion
 	}
 
-	public class Signal
+	public class Signal : IPoolable
 	{
 		#region Variables
 		public List<Parameter> Parameters = new List<Parameter>();
 		public Dictionary<string, double> Conditions = new Dictionary<string, double>();
-		public SignalType Type;
-		public DateTime Time;
-		public int Bar;
-		public Indicator Source;
-		public TrendDirection Direction;
-		public double Price;
+		public Dictionary<string, double> Indicators = new Dictionary<string, double>();
+		public SignalType Type { get; set; }
+		public DateTime Time { get; set; }
+		public int Bar { get; set; }
+		public Indicator Source { get; set; }
+		public TrendDirection Direction { get; set; }
+		public double Price { get; set; }
+		public bool IsActive { get; set; }
 		#endregion
 
-		#region Signal()
-		public Signal(Indicator indicator, SignalType type)
-		{
-			Source = indicator;
-			Type = type;
-		}
+		#region Manage Poolable
+		#region Activate()
+	    public void Activate()
+	    {
+	        IsActive = true;
+	    }
+		#endregion
+
+		#region SetIndicators()
+		public void SetIndicators()
+		{}
 		#endregion
 
 		#region Set()
-		public void Set(TrendDirection direction)
+		public void Set(TrendDirection direction, Indicator indicator, SignalType type)
 		{
+			Source = indicator;
+			Type = type;
 			Direction = direction;
 			Time = Source.Time[0];
 			Bar = Source.CurrentBar;
 			Price = Source.Close[0];
+			Parameters = new List<Parameter>();
+			Conditions = new Dictionary<string, double>();
+			SetIndicators();
 		}
+		#endregion
+
+		#region Deactivate()
+	    public void Deactivate()
+	    {
+	        IsActive = false;
+	    }
+		#endregion
 		#endregion
 	}
 
@@ -332,8 +386,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	public class Parameter : IPoolable
 	{
 		#region Variables
-		public ParameterType Type;
-		public double Value;
+		public ParameterType Type { get; set; }
+		public double Value { get; set; }
 		public bool IsActive { get; set; }
 		#endregion
 
