@@ -41,12 +41,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public MAX maxATR;
 		public Series<int> barsSinceDoubleTop;
 		public Series<int> barsSinceDoubleBottom;
-//		public List<double> stopLossMultiplier;
-//		public List<double> profitTargetMultiplier;
-//		private Dictionary<string, double> upperBoundsDict;
-//		private Dictionary<string, double> lowerBoundsDict;
-//		private double[] upperBounds;
-//		private double[] lowerBounds;
+		private List<Condition> entryConditions;
+		private List<Condition> exitConditions;
 		private ObjectPool<ParameterType> parameterTypes;
 		private ObjectPool<SimTrade> trades;
 		public ObjectPool<Parameter> optimizedParameters;
@@ -93,19 +89,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				rsi						= RSI(14, 3);
 				emaFast					= EMA(9);
 				emaSlow					= EMA(21);
-
-				parameterTypes = new ObjectPool<ParameterType>(50, () => new ParameterType());
-				optimizedParameters = new ObjectPool<Parameter>(50, () => new Parameter());
-//				SetParameterTypes();
-//				stopLossMultiplier		= GenerateRangeOfValues(0.5, 10.0, 0.5);
-//				profitTargetMultiplier	= GenerateRangeOfValues(0.5, 10.0, 0.5);
-//				upperBoundsDict			= SetUpperBounds();
-//				lowerBoundsDict			= SetLowerBounds();
-			}
-			#endregion
-			#region State.DataLoaded
-			if (State == State.DataLoaded)
-			{
 				stdDevAtr				= StdDev(atr, 21);
 				avgAtr					= SMA(atr, 21);
 				avgAtrFast				= SMA(atr, 9);
@@ -115,10 +98,16 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				barsSinceDoubleTop		= new Series<int>(this);
 				barsSinceDoubleBottom	= new Series<int>(this);
 
-//				upperBounds				= upperBoundsDict.Values.ToArray();
-//				lowerBounds				= lowerBoundsDict.Values.ToArray();
-//				parameterLabels			= upperBoundsDict.Keys.ToArray();
-//				optimizedParameters		= new Dictionary<string, double>(lowerBoundsDict);
+				parameterTypes = new ObjectPool<ParameterType>(50, () => new ParameterType());
+				optimizedParameters = new ObjectPool<Parameter>(50, () => new Parameter());
+
+				SetConditions();
+			}
+			#endregion
+			#region State.DataLoaded
+			if (State == State.DataLoaded)
+			{
+
 			}
 			#endregion
 		}
@@ -150,26 +139,21 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-//		#region SetParameterTypes
-//		private void SetParameterTypes()
-//		{}
-//		#endregion
+		#region SetConditions()
+		private void SetConditions()
+		{
+			entryConditions.Add(new RSIRangeCondition());
+			entryConditions.Add(new AboveAverageATRCondition());
+			entryConditions.Add(new BelowAverageATRCondition());
+			entryConditions.Add(new AboveAverageATRByAStdDevCondition());
+			entryConditions.Add(new BreakoutCondition());
+			entryConditions.Add(new BroadChannelCondition());
+			entryConditions.Add(new TightChannelCondition());
+			entryConditions.Add(new WeakTrendCondition());
+			entryConditions.Add(new StrongTrendCondition());
 
-//		#region SetUpperBounds()
-//		private Dictionary<string, double> SetUpperBounds()
-//		{
-//			Dictionary<string, double> bounds = new Dictionary<string, double>();
-//			return bounds;
-//		}
-//		#endregion
-
-//		#region SetLowerBounds()
-//		private Dictionary<string, double> SetLowerBounds()
-//		{
-//			Dictionary<string, double> bounds = new Dictionary<string, double>();
-//			return bounds;
-//		}
-//		#endregion
+		}
+		#endregion
 
 		#region OptimizeParameters()
 		public void OptimizeParameters()
@@ -242,7 +226,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public Signal EntrySignal { get; set; }
 		public Signal ExitSignal { get; set; }
 		public TradePerformance Performance { get; set; }
-		public Indicator Source { get; set; }
+		public SignalGenerator Source { get; set; }
 		public bool IsActive { get; set; }
 		#endregion
 
@@ -290,7 +274,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region Set()
-		public void Set(Indicator indicator)
+		public void Set(SignalGenerator indicator)
 		{
 			Source = indicator;
 			Performance = new TradePerformance();
@@ -315,7 +299,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public SignalType Type { get; set; }
 		public DateTime Time { get; set; }
 		public int Bar { get; set; }
-		public Indicator Source { get; set; }
+		public SignalGenerator Source { get; set; }
 		public TrendDirection Direction { get; set; }
 		public double Price { get; set; }
 		public bool IsActive { get; set; }
@@ -331,11 +315,23 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		#region SetIndicators()
 		public void SetIndicators()
-		{}
+		{
+			Indicators["ATR"] = Source.atr[0];
+			Indicators["RSI"] = Source.rsi[0];
+			Indicators["EMAFast"] = Source.emaFast[0];
+			Indicators["EMASlow"] = Source.emaSlow[0];
+			Indicators["ATRStdDev"] = Source.stdDevAtr[0];
+			Indicators["AvgATR"] = Source.avgAtr[0];
+			Indicators["AvgATRFast"] = Source.avgAtrFast[0];
+			Indicators["MinATR"] = Source.minATR[0];
+			Indicators["MaxATR"] = Source.maxATR[0];
+			Indicators["BarsSinceDoubleTop"] = Source.barsSinceDoubleTop[0];
+			Indicators["BarsSinceDoubleBottom"] = Source.barsSinceDoubleBottom[0];
+		}
 		#endregion
 
 		#region Set()
-		public void Set(TrendDirection direction, Indicator indicator, SignalType type)
+		public void Set(TrendDirection direction, SignalGenerator indicator, SignalType type)
 		{
 			Source = indicator;
 			Type = type;
@@ -442,6 +438,134 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	    }
 		#endregion
 	}
+
+	#region Conditions
+	#region Condition
+	public abstract class Condition
+	{
+		public List<double> Parameters;
+
+	    public abstract bool IsMet(SignalGenerator generator);
+	}
+	#endregion
+
+	#region RSIRangeCondition
+	public class RSIRangeCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			if (generator.md.Direction[0] == TrendDirection.Bullish) {
+				return generator.rsi[0] > 50 && generator.rsi[0] < 70;
+			}
+
+			return generator.rsi[0] > 30 && generator.rsi[0] < 50;
+		}
+	}
+	#endregion
+
+	#region AboveAverageATRCondition
+	public class AboveAverageATRCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			return generator.atr[0] > generator.avgAtr[0];
+		}
+	}
+	#endregion
+
+	#region BelowAverageATRCondition
+	public class BelowAverageATRCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			return generator.atr[0] < generator.avgAtr[0];
+		}
+	}
+	#endregion
+
+	#region AboveAverageATRByAStdDevCondition
+	public class AboveAverageATRByAStdDevCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			return (generator.atr[0] - generator.avgAtr[0]) > generator.stdDevAtr[0];
+		}
+	}
+	#endregion
+
+	#region BreakoutCondition
+	public class BreakoutCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			return generator.md.Stage[0] == MarketCycleStage.Breakout;
+		}
+	}
+	#endregion
+
+	#region BroadChannelCondition
+	public class BroadChannelCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			return generator.md.Stage[0] == MarketCycleStage.BroadChannel;
+		}
+	}
+	#endregion
+
+	#region TightChannelCondition
+	public class TightChannelCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			return generator.md.Stage[0] == MarketCycleStage.TightChannel;
+		}
+	}
+	#endregion
+
+	#region WeakTrendCondition
+	public class WeakTrendCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			TrendDirection Direction = generator.md.Direction[0];
+			int BarsAgo = generator.md.LegLong.BarsAgoStarts[0];
+
+			int PreviousSwing = Direction == TrendDirection.Bearish
+				? generator.pa.BarsAgoHigh(0, BarsAgo)
+				: generator.pa.BarsAgoLow(0, BarsAgo);
+
+			return Direction == TrendDirection.Bullish
+				? generator.pa.IsWeakBullishTrend(0, PreviousSwing)
+				: generator.pa.IsWeakBearishTrend(0, PreviousSwing);
+		}
+	}
+	#endregion
+
+	#region StrongTrendCondition
+	public class StrongTrendCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			TrendDirection Direction = generator.md.Direction[0];
+			int BarsAgo = generator.md.LegLong.BarsAgoStarts[0];
+
+			int PreviousSwing = Direction == TrendDirection.Bearish
+				? generator.pa.BarsAgoHigh(0, BarsAgo)
+				: generator.pa.BarsAgoLow(0, BarsAgo);
+
+			return Direction == TrendDirection.Bullish
+				? generator.pa.IsStrongBullishTrend(0, PreviousSwing)
+				: generator.pa.IsStrongBearishTrend(0, PreviousSwing);
+		}
+	}
+	#endregion
+
+
+
+
+
+	#endregion
 }
 
 #region NinjaScript generated code. Neither change nor remove.
