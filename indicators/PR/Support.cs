@@ -321,14 +321,18 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	{
 	    private List<T> items = new List<T>();
 	    private Func<T> createFunc;
+		public int MaxSize;
 
-	    public ObjectPool(int initialSize, Func<T> createFunc)
+	    public ObjectPool(int initialSize, Func<T> createFunc, int maxSize = 0)
 	    {
 	        this.createFunc = createFunc;
+
 	        for (int i = 0; i < initialSize; i++)
 	        {
 	            items.Add(createFunc());
 	        }
+
+			MaxSize = maxSize;
 	    }
 
 		public T At(int position)
@@ -343,6 +347,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	        {
 	            item = createFunc();
 	            items.Add(item);
+				LimitSize();
 	        }
 	        item.Activate();
 	        return item;
@@ -356,6 +361,30 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public IEnumerable<T> ActiveItems
 		{
 		    get { return items.Where(x => x.IsActive); }
+		}
+
+		public void SetMaxSize(int maxSize)
+		{
+			MaxSize = maxSize;
+		}
+
+		public void LimitSize(int maxSize = 0)
+		{
+			int size = maxSize > 0 ? maxSize : MaxSize;
+
+			if (size < 0)
+			{
+				return;
+			}
+
+		    while (ActiveItems.Count() > size)
+		    {
+		        T itemToRelease = ActiveItems.FirstOrDefault();
+		        if (itemToRelease != null)
+		        {
+		            Release(itemToRelease);
+		        }
+		    }
 		}
 	}
 

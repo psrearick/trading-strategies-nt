@@ -235,75 +235,96 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region TestIndividualConditions()
+
 		private void TestIndividualConditions()
 		{
-		    entryPerformance.Clear();
-			exitPerformance.Clear();
-
+		    // Test entry conditions
 		    foreach (Condition entryCondition in entryConditions)
+		    {
+		        if (entryCondition.IsMet(this))
+		        {
+		            Signal entrySignal = entrySignals.Get();
+		            entrySignal.Set(md.Direction[0], this, SignalType.Entry);
+		            entrySignal.EntryConditions[entryCondition] = new List<Parameter>();
+		        }
+		    }
+
+		    // Test exit conditions for each entry signal
+		    foreach (Signal entrySignal in entrySignals.ActiveItems)
 		    {
 		        foreach (ExitCondition exitCondition in exitConditions)
 		        {
 		            if (exitCondition.ParameterTypes.Count > 0)
 		            {
-		                currentParameterValues.Clear();
+		                // Generate all possible parameter combinations for the exit condition
+		                List<List<Parameter>> parameterCombinations = GenerateParameterCombinations(exitCondition.ParameterTypes);
 
-		                GenerateParameterCombinations(0, exitCondition, entryCondition);
+		                foreach (List<Parameter> parameterCombination in parameterCombinations)
+		                {
+		                    exitCondition.Reset();
+		                    foreach (Parameter parameter in parameterCombination)
+		                    {
+		                        exitCondition.SetParameterValue(parameter.Type, parameter.Value);
+		                    }
+
+		                    if (exitCondition.IsMet(this, entrySignal))
+		                    {
+		                        Signal exitSignal = exitSignals.Get();
+		                        exitSignal.Set(entrySignal.Direction, this, SignalType.Exit);
+		                        exitSignal.ExitConditions[exitCondition] = parameterCombination;
+
+		                        SimTrade trade = trades.Get();
+		                        trade.Set(this);
+		                        trade.EntrySignal = entrySignal;
+		                        trade.ExitSignal = exitSignal;
+		                    }
+		                }
 		            }
 		            else
 		            {
-		                List<SimTrade> trades = GenerateSimulatedTrades(entryCondition, exitCondition);
-		                PerformanceMetrics metrics = CalculatePerformanceMetrics(trades);
+		                if (exitCondition.IsMet(this, entrySignal))
+		                {
+		                    Signal exitSignal = exitSignals.Get();
+		                    exitSignal.Set(entrySignal.Direction, this, SignalType.Exit);
+		                    exitSignal.ExitConditions[exitCondition] = new List<Parameter>();
 
-		                entryPerformance[entryCondition] = metrics;
-		                exitPerformance[exitCondition] = metrics;
+		                    SimTrade trade = trades.Get();
+		                    trade.Set(this);
+		                    trade.EntrySignal = entrySignal;
+		                    trade.ExitSignal = exitSignal;
+		                }
 		            }
 		        }
 		    }
-		}
-		#endregion
 
-        private void GenerateParameterCombinations(int depth, ExitCondition exitCondition, Condition entryCondition)
-        {
-            if (depth == exitCondition.ParameterTypes.Count)
-            {
-                ExitCondition exitConditionInstance = Activator.CreateInstance(exitCondition.GetType()) as ExitCondition;
-
-                for (int i = 0; i < exitCondition.ParameterTypes.Count; i++)
-                {
-                    exitConditionInstance.SetParameterValue(exitCondition.ParameterTypes[i], currentParameterValues[i]);
-                }
-
-                List<SimTrade> trades = GenerateSimulatedTrades(entryCondition, exitConditionInstance);
-                PerformanceMetrics metrics = CalculatePerformanceMetrics(trades);
-
-                entryPerformance[entryCondition] = metrics;
-                exitPerformance[exitConditionInstance] = metrics;
-            }
-            else
-            {
-                foreach (double value in exitCondition.ParameterTypes[depth].Values)
-                {
-                    currentParameterValues.Add(value);
-                    GenerateParameterCombinations(depth + 1, exitCondition, entryCondition);
-                    currentParameterValues.RemoveAt(currentParameterValues.Count - 1);
-                }
-            }
-        }
-
-		private List<SimTrade> GenerateSimulatedTrades(Condition entryCondition, ExitCondition exitCondition)
-		{
-			List<SimTrade> simTrades = new List<SimTrade>();
-
-			return simTrades;
+			entrySignals.LimitSize(200);
+			exitSignals.LimitSize(200);
 		}
 
-		private PerformanceMetrics CalculatePerformanceMetrics(List<SimTrade> trades)
+		private List<List<Parameter>> GenerateParameterCombinations(List<ParameterType> parameterTypes)
 		{
-			PerformanceMetrics metrics = new PerformanceMetrics();
+		    List<List<Parameter>> combinations = new List<List<Parameter>>();
+		    GenerateCombinationsHelper(parameterTypes, 0, new List<Parameter>(), combinations);
+		    return combinations;
+		}
 
-			return metrics;
+		private void GenerateCombinationsHelper(List<ParameterType> parameterTypes, int depth, List<Parameter> currentCombination, List<List<Parameter>> combinations)
+		{
+		    if (depth == parameterTypes.Count)
+		    {
+		        combinations.Add(new List<Parameter>(currentCombination));
+		    }
+		    else
+		    {
+		        foreach (double value in parameterTypes[depth].Values)
+		        {
+		            Parameter parameter = new Parameter();
+		            parameter.Set(parameterTypes[depth], value);
+		            currentCombination.Add(parameter);
+		            GenerateCombinationsHelper(parameterTypes, depth + 1, currentCombination, combinations);
+		            currentCombination.RemoveAt(currentCombination.Count - 1);
+		        }
+		    }
 		}
 
 		#region OptimizeParameters()
@@ -597,6 +618,20 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	#region Condition
 	public abstract class Condition
 	{
+		public List<ParameterType> ParameterTypes;
+
+		public Dictionary<string, double> ParameterValues = new Dictionary<string, double>();
+
+		public void Reset()
+		{
+			ParameterValues.Clear();
+		}
+
+		public void SetParameterValue(ParameterType type, double value)
+		{
+			ParameterValues[type.Name] = value;
+		}
+
 	    public abstract bool IsMet(SignalGenerator generator);
 	}
 	#endregion
