@@ -151,6 +151,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			entryConditions.Add(new TightChannelCondition());
 			entryConditions.Add(new WeakTrendCondition());
 			entryConditions.Add(new StrongTrendCondition());
+			entryConditions.Add(new WithTrendTrendBarCondition());
+			entryConditions.Add(new BreakoutBarPatternCondition());
+			entryConditions.Add(new WeakBarCondition());
+			entryConditions.Add(new StrongFollowThroughCondition());
+			entryConditions.Add(new WithTrendPressureCondition());
+			entryConditions.Add(new StrongWithTrendPressureCondition());
 
 		}
 		#endregion
@@ -449,6 +455,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
+	#region Entry Conditions
+	#region RSI
+
 	#region RSIRangeCondition
 	public class RSIRangeCondition : Condition
 	{
@@ -462,6 +471,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 	}
 	#endregion
+
+	#endregion
+
+	#region ATR
 
 	#region AboveAverageATRCondition
 	public class AboveAverageATRCondition : Condition
@@ -492,6 +505,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 	}
 	#endregion
+
+	#endregion
+
+	#region Chart Patterns
 
 	#region BreakoutCondition
 	public class BreakoutCondition : Condition
@@ -561,10 +578,100 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
+	#endregion
 
+	#region Bar Patterns
 
+	#region WithTrendTrendBarCondition
+	public class WithTrendTrendBarCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			return generator.pa.IsTrendBar(0)
+					&& (generator.md.Direction[0] == TrendDirection.Bullish
+							? generator.pa.IsBullishBar(0)
+							: generator.pa.IsBearishBar(0)
+						);
+		}
+	}
+	#endregion
 
+	#region BreakoutBarPatternCondition
+	public class BreakoutBarPatternCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			return generator.pa.DoesInsideOutsideMatch("ii", 0)
+				|| generator.pa.DoesInsideOutsideMatch("ioi", 0);
+		}
+	}
+	#endregion
 
+	#region WeakBarCondition
+	public class WeakBarCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			return generator.pa.IsDoji(0) || generator.pa.IsTradingRangeBar(0);
+		}
+	}
+	#endregion
+
+	#region StrongFollowThroughCondition
+	public class StrongFollowThroughCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			return generator.pa.IsStrongFollowThroughBar(0);
+		}
+	}
+	#endregion
+
+	#endregion
+
+	#region Buy/Sell Pressure
+
+	#region WithTrendPressureCondition
+	public class WithTrendPressureCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			TrendDirection Direction = generator.md.Direction[0];
+			int BarsAgo = generator.md.LegLong.BarsAgoStarts[0];
+
+			int PreviousSwing = Direction == TrendDirection.Bearish
+				? generator.pa.BarsAgoHigh(0, BarsAgo)
+				: generator.pa.BarsAgoLow(0, BarsAgo);
+
+			double BuySellPressure = generator.pa.GetBuySellPressure(0, PreviousSwing);
+
+			return Direction == TrendDirection.Bullish ? BuySellPressure > 75 : BuySellPressure < 25;
+		}
+	}
+	#endregion
+
+	#region StrongWithTrendPressureCondition
+	public class StrongWithTrendPressureCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			TrendDirection Direction = generator.md.Direction[0];
+			int BarsAgo = generator.md.LegLong.BarsAgoStarts[0];
+
+			int PreviousSwing = Direction == TrendDirection.Bearish
+				? generator.pa.BarsAgoHigh(0, BarsAgo)
+				: generator.pa.BarsAgoLow(0, BarsAgo);
+
+			double BuySellPressure = generator.pa.GetBuySellPressure(0, PreviousSwing);
+
+			return Direction == TrendDirection.Bullish ? BuySellPressure > 90 : BuySellPressure < 10;
+		}
+	}
+	#endregion
+
+	#endregion
+
+	#endregion
 	#endregion
 }
 
