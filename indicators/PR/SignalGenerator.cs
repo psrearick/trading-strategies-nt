@@ -41,12 +41,27 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public MAX maxATR;
 		public Series<int> barsSinceDoubleTop;
 		public Series<int> barsSinceDoubleBottom;
+		private Dictionary<Condition, PerformanceMetrics> entryPerformance = new Dictionary<Condition, PerformanceMetrics>();
+		private Dictionary<ExitCondition, PerformanceMetrics> exitPerformance = new Dictionary<ExitCondition, PerformanceMetrics>();
+		private List<double> currentParameterValues = new List<double>();
 		private List<Condition> entryConditions;
 		private List<ExitCondition> exitConditions;
-		private ObjectPool<ParameterType> parameterTypes;
+		private ObjectPool<Signal> entrySignals;
+		private ObjectPool<Signal> exitSignals;
 		private ObjectPool<SimTrade> trades;
+		private ObjectPool<ParameterType> parameterTypes;
 		public ObjectPool<Parameter> optimizedParameters;
 		#endregion
+
+		public IEnumerable<Signal> ActiveEntrySignals
+		{
+			get { return entrySignals.ActiveItems; }
+		}
+
+		public IEnumerable<Signal> ActiveExitSignals
+		{
+			get { return exitSignals.ActiveItems; }
+		}
 
 		public IEnumerable<SimTrade> ActiveTrades
 		{
@@ -100,6 +115,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 				parameterTypes = new ObjectPool<ParameterType>(5, () => new ParameterType());
 				optimizedParameters = new ObjectPool<Parameter>(5, () => new Parameter());
+				trades = new ObjectPool<SimTrade>(200, () => new SimTrade());
+				exitSignals = new ObjectPool<Signal>(200, () => new Signal());
+				entrySignals = new ObjectPool<Signal>(200, () => new Signal());
 
 				SetParameterTypes();
 				SetConditions();
@@ -210,70 +228,149 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region OptimizeParameters()
-		public void OptimizeParameters()
+		#region AnalyzeConditionPerformance()
+		private void AnalyzeConditionPerformance()
 		{
-		    int numParticles = 50;
-		    int maxIterations = 100;
-
-			Func<double[], double> fitnessFunction = CalculateFitness;
-
-			double[] lowerBounds = ActiveParameterTypes.Select(p => p.LowerBound).ToArray();
-			double[] upperBounds = ActiveParameterTypes.Select(p => p.UpperBound).ToArray();
-			string[] names = ActiveParameterTypes.Select(p => p.Name).ToArray();
-
-		    double[] bestPosition = ParticleSwarmOptimization.Optimize(fitnessFunction, lowerBounds, upperBounds, numParticles, maxIterations);
-
-			foreach (var optimized in optimizedParameters.ActiveItems)
-			{
-				optimizedParameters.Release(optimized);
-			}
-
-			for (int i = 0; i < bestPosition.Count(); i++)
-			{
-				Parameter optimized = optimizedParameters.Get();
-				optimized.Set(ActiveParameterTypes.First(p => p.Name == names[i]), bestPosition[i]);
-			}
+			TestIndividualConditions();
 		}
+		#endregion
+
+		#region TestIndividualConditions()
+		private void TestIndividualConditions()
+		{
+		    entryPerformance.Clear();
+			exitPerformance.Clear();
+
+		    foreach (Condition entryCondition in entryConditions)
+		    {
+		        foreach (ExitCondition exitCondition in exitConditions)
+		        {
+		            if (exitCondition.ParameterTypes.Count > 0)
+		            {
+		                currentParameterValues.Clear();
+
+		                GenerateParameterCombinations(0, exitCondition, entryCondition);
+		            }
+		            else
+		            {
+		                List<SimTrade> trades = GenerateSimulatedTrades(entryCondition, exitCondition);
+		                PerformanceMetrics metrics = CalculatePerformanceMetrics(trades);
+
+		                entryPerformance[entryCondition] = metrics;
+		                exitPerformance[exitCondition] = metrics;
+		            }
+		        }
+		    }
+		}
+		#endregion
+
+        private void GenerateParameterCombinations(int depth, ExitCondition exitCondition, Condition entryCondition)
+        {
+            if (depth == exitCondition.ParameterTypes.Count)
+            {
+                ExitCondition exitConditionInstance = Activator.CreateInstance(exitCondition.GetType()) as ExitCondition;
+
+                for (int i = 0; i < exitCondition.ParameterTypes.Count; i++)
+                {
+                    exitConditionInstance.SetParameterValue(exitCondition.ParameterTypes[i], currentParameterValues[i]);
+                }
+
+                List<SimTrade> trades = GenerateSimulatedTrades(entryCondition, exitConditionInstance);
+                PerformanceMetrics metrics = CalculatePerformanceMetrics(trades);
+
+                entryPerformance[entryCondition] = metrics;
+                exitPerformance[exitConditionInstance] = metrics;
+            }
+            else
+            {
+                foreach (double value in exitCondition.ParameterTypes[depth].Values)
+                {
+                    currentParameterValues.Add(value);
+                    GenerateParameterCombinations(depth + 1, exitCondition, entryCondition);
+                    currentParameterValues.RemoveAt(currentParameterValues.Count - 1);
+                }
+            }
+        }
+
+		private List<SimTrade> GenerateSimulatedTrades(Condition entryCondition, ExitCondition exitCondition)
+		{
+			List<SimTrade> simTrades = new List<SimTrade>();
+
+			return simTrades;
+		}
+
+		private PerformanceMetrics CalculatePerformanceMetrics(List<SimTrade> trades)
+		{
+			PerformanceMetrics metrics = new PerformanceMetrics();
+
+			return metrics;
+		}
+
+		#region OptimizeParameters()
+//		public void OptimizeParameters()
+//		{
+//		    int numParticles = 50;
+//		    int maxIterations = 100;
+
+//			Func<double[], double> fitnessFunction = CalculateFitness;
+
+//			double[] lowerBounds = ActiveParameterTypes.Select(p => p.LowerBound).ToArray();
+//			double[] upperBounds = ActiveParameterTypes.Select(p => p.UpperBound).ToArray();
+//			string[] names = ActiveParameterTypes.Select(p => p.Name).ToArray();
+
+//		    double[] bestPosition = ParticleSwarmOptimization.Optimize(fitnessFunction, lowerBounds, upperBounds, numParticles, maxIterations);
+
+//			foreach (var optimized in optimizedParameters.ActiveItems)
+//			{
+//				optimizedParameters.Release(optimized);
+//			}
+
+//			for (int i = 0; i < bestPosition.Count(); i++)
+//			{
+//				Parameter optimized = optimizedParameters.Get();
+//				optimized.Set(ActiveParameterTypes.First(p => p.Name == names[i]), bestPosition[i]);
+//			}
+//		}
 		#endregion
 
 		#region CalculateFitness()
-		private double CalculateFitness(double[] position)
-		{
-		    double fitnessScore = 0;
+//		private double CalculateFitness(double[] position)
+//		{
+//		    double fitnessScore = 0;
 
-		    foreach (var trade in ActiveTrades)
-		    {
-				double tradeScore = 0;
+//		    foreach (var trade in ActiveTrades)
+//		    {
+//				double tradeScore = 0;
 
-				for (int i = 0; i < ActiveParameterTypes.Count(); i++)
-				{
-					ParameterType paramType = ActiveParameterTypes.ToArray()[i];
-					Parameter tradeParam = trade.Parameters.FirstOrDefault(p => p.Type.Name == paramType.Name);
+//				for (int i = 0; i < ActiveParameterTypes.Count(); i++)
+//				{
+//					ParameterType paramType = ActiveParameterTypes.ToArray()[i];
+//					Parameter tradeParam = trade.Parameters.FirstOrDefault(p => p.Type.Name == paramType.Name);
 
-					if (tradeParam == null)
-					{
-						continue;
-					}
+//					if (tradeParam == null)
+//					{
+//						continue;
+//					}
 
-					tradeScore += 1.0 - Math.Abs(tradeParam.Value - position[i]) / (paramType.UpperBound - paramType.LowerBound);
-				}
+//					tradeScore += 1.0 - Math.Abs(tradeParam.Value - position[i]) / (paramType.UpperBound - paramType.LowerBound);
+//				}
 
-		        double netProfitScore = trade.Performance.NetProfit;
-		        double maxAdverseExcursionScore = 1.0 - trade.Performance.MaxAdverseExcursion / trade.Indicators["ATR"];
-		        double tradeDurationScore = 1.0 - trade.Performance.TradeDuration / (24 * 60 * 60);
+//		        double netProfitScore = trade.Performance.NetProfit;
+//		        double maxAdverseExcursionScore = 1.0 - trade.Performance.MaxAdverseExcursion / trade.Indicators["ATR"];
+//		        double tradeDurationScore = 1.0 - trade.Performance.TradeDuration / (24 * 60 * 60);
 
-		        tradeScore += netProfitScore + maxAdverseExcursionScore + tradeDurationScore;
+//		        tradeScore += netProfitScore + maxAdverseExcursionScore + tradeDurationScore;
 
-		        fitnessScore += tradeScore;
-		    }
+//		        fitnessScore += tradeScore;
+//		    }
 
-		    fitnessScore /= ActiveTrades.Count();
+//		    fitnessScore /= ActiveTrades.Count();
 
-		    return fitnessScore;
-		}
+//		    return fitnessScore;
+//		}
 		#endregion
 	}
+
 
 	public class SimTrade : IPoolable
 	{
@@ -288,11 +385,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public Dictionary<string, double> Indicators
 		{
 		    get { return EntrySignal.Indicators; }
-		}
-
-		public List<Parameter> Parameters
-		{
-		    get { return EntrySignal.Parameters; }
 		}
 
 		#region Enter()
@@ -348,8 +440,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	public class Signal : IPoolable
 	{
 		#region Variables
-		public List<Parameter> Parameters = new List<Parameter>();
-		public Dictionary<string, double> Conditions = new Dictionary<string, double>();
+		public Dictionary<ExitCondition, List<Parameter>> ExitConditions = new Dictionary<ExitCondition, List<Parameter>>();
+		public Dictionary<Condition, List<Parameter>> EntryConditions = new Dictionary<Condition, List<Parameter>>();
 		public Dictionary<string, double> Indicators = new Dictionary<string, double>();
 		public SignalType Type { get; set; }
 		public DateTime Time { get; set; }
@@ -398,8 +490,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			Time = Source.Time[0];
 			Bar = Source.CurrentBar;
 			Price = Source.Close[0];
-			Parameters = new List<Parameter>();
-			Conditions = new Dictionary<string, double>();
+			ExitConditions.Clear();
+			EntryConditions.Clear();
 			SetIndicators();
 		}
 		#endregion
@@ -437,6 +529,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 	}
+
+	public class PerformanceMetrics
+	{}
 
 	public class Parameter : IPoolable
 	{
@@ -1067,8 +1162,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	#region NoNewExtremeCondition
 	public class NoNewExtremeCondition : ExitCondition
 	{
-		public List<double> Parameters = Helpers.GenerateRangeOfValues(6, 20, 2);
-
 		public override bool IsMet(SignalGenerator generator, Signal entry)
 		{
 			if (entry.Direction == TrendDirection.Flat)
