@@ -198,14 +198,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			exitConditions.Add(new StopLossCondition());
 			exitConditions.Add(new CounterTrendPressureCondition());
 			exitConditions.Add(new CounterTrendWeakTrendCondition());
-
-
-//			exitConditions.Add(new CounterTrendTightChannelCondition());
-//			exitConditions.Add(new CounterTrendTightChannelCondition());
-//			exitConditions.Add(new CounterTrendTightChannelCondition());
-//			exitConditions.Add(new CounterTrendTightChannelCondition());
-//			exitConditions.Add(new CounterTrendTightChannelCondition());
-//			exitConditions.Add(new CounterTrendTightChannelCondition());
+			exitConditions.Add(new CounterTrendStrongTrendCondition());
+			exitConditions.Add(new RSIOutOfRangeCondition());
+			exitConditions.Add(new AboveAverageATRExitCondition());
+			exitConditions.Add(new BelowAverageATRExitCondition());
+			exitConditions.Add(new AboveAverageATRByAStdDevExitCondition());
+			exitConditions.Add(new BelowAverageATRByAStdDevExitCondition());
+			exitConditions.Add(new StrongCounterTrendFollowThroughCondition());
 			#endregion
 
 		}
@@ -841,7 +840,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 	#region Exit Conditions
 
-	#region Trend Direction/Type
+	#region Trend Direction/Type/Strength
 
 	#region TrendDirectionChangedCondition
 	public class TrendDirectionChangedCondition : ExitCondition
@@ -928,6 +927,56 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
+	#region CounterTrendWeakTrendCondition
+	public class CounterTrendWeakTrendCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			if (entry.Direction == TrendDirection.Flat)
+			{
+				return false;
+			}
+
+			int barsAgo = generator.md.LegLong.BarsAgoStarts[0];
+			int previousSwing = entry.Direction == TrendDirection.Bearish
+				? generator.pa.BarsAgoHigh(0, barsAgo)
+				: generator.pa.BarsAgoLow(0, barsAgo);
+
+			if (entry.Direction == TrendDirection.Bullish)
+			{
+				return generator.pa.IsWeakBearishTrend(0, previousSwing);
+			}
+
+			return generator.pa.IsWeakBullishTrend(0, previousSwing);
+		}
+	}
+	#endregion
+
+	#region CounterTrendStrongTrendCondition
+	public class CounterTrendStrongTrendCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			if (entry.Direction == TrendDirection.Flat)
+			{
+				return false;
+			}
+
+			int barsAgo = generator.md.LegLong.BarsAgoStarts[0];
+			int previousSwing = entry.Direction == TrendDirection.Bearish
+				? generator.pa.BarsAgoHigh(0, barsAgo)
+				: generator.pa.BarsAgoLow(0, barsAgo);
+
+			if (entry.Direction == TrendDirection.Bullish)
+			{
+				return generator.pa.IsStrongBearishTrend(0, previousSwing);
+			}
+
+			return generator.pa.IsStrongBullishTrend(0, previousSwing);
+		}
+	}
+	#endregion
+
 	#endregion
 
 	#region Chart Patterns
@@ -968,6 +1017,25 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			return false;
+		}
+	}
+	#endregion
+
+	#region StrongCounterTrendFollowThroughCondition
+	public class StrongCounterTrendFollowThroughCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			if (entry.Direction == TrendDirection.Flat)
+			{
+				return false;
+			}
+
+			if (entry.Direction == TrendDirection.Bullish) {
+				return generator.pa.IsBearishBar(0) && generator.pa.IsStrongFollowThroughBar(0);
+			}
+
+			return generator.pa.IsBullishBar(0) && generator.pa.IsStrongFollowThroughBar(0);
 		}
 	}
 	#endregion
@@ -1112,8 +1180,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 	#endregion
 
-	#region CounterTrendWeakTrendCondition
-	public class CounterTrendWeakTrendCondition : ExitCondition
+	#region Indicators
+
+	#region RSIOutOfRangeCondition
+	public class RSIOutOfRangeCondition : ExitCondition
 	{
 		public override bool IsMet(SignalGenerator generator, Signal entry)
 		{
@@ -1122,21 +1192,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return false;
 			}
 
-			int barsAgo = generator.md.LegLong.BarsAgoStarts[0];
-			int previousSwing = entry.Direction == TrendDirection.Bearish
-				? generator.pa.BarsAgoHigh(0, barsAgo)
-				: generator.pa.BarsAgoLow(0, barsAgo);
-
 			if (entry.Direction == TrendDirection.Bullish)
 			{
-				return generator.pa.IsWeakBearishTrend(0, previousSwing);
+				return generator.rsi[0] < 30;
 			}
 
-			return generator.pa.IsWeakBullishTrend(0, previousSwing);
+			return generator.rsi[0] > 70;
 		}
 	}
 	#endregion
-
 
 	#region MovingAverageCrossoverCondition
 	public class MovingAverageCrossoverCondition : ExitCondition
@@ -1156,6 +1220,53 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			return generator.emaFast[0] > generator.emaSlow[0];
 		}
 	}
+	#endregion
+
+	#region ATR
+
+	#region AboveAverageATRExitCondition
+	public class AboveAverageATRExitCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			return generator.atr[0] > generator.avgAtr[0];
+		}
+	}
+	#endregion
+
+	#region BelowAverageATRExitCondition
+	public class BelowAverageATRExitCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			return generator.atr[0] < generator.avgAtr[0];
+		}
+	}
+	#endregion
+
+	#region AboveAverageATRByAStdDevExitCondition
+	public class AboveAverageATRByAStdDevExitCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			return (generator.atr[0] - generator.avgAtr[0]) > generator.stdDevAtr[0];
+		}
+	}
+	#endregion
+
+	#region BelowAverageATRByAStdDevExitCondition
+	public class BelowAverageATRByAStdDevExitCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			return (generator.avgAtr[0] - generator.atr[0]) < generator.stdDevAtr[0];
+		}
+	}
+	#endregion
+
+
+	#endregion
+
 	#endregion
 
 	#endregion
