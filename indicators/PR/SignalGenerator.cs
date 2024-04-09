@@ -195,12 +195,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			exitConditions.Add(new MovingAverageCrossoverCondition());
 			exitConditions.Add(new NoNewExtremeCondition());
 			exitConditions.Add(new ProfitTargetCondition());
+			exitConditions.Add(new StopLossCondition());
+			exitConditions.Add(new CounterTrendPressureCondition());
+			exitConditions.Add(new CounterTrendWeakTrendCondition());
 
 
-
-//			exitConditions.Add(new CounterTrendTightChannelCondition());
-//			exitConditions.Add(new CounterTrendTightChannelCondition());
-//			exitConditions.Add(new CounterTrendTightChannelCondition());
 //			exitConditions.Add(new CounterTrendTightChannelCondition());
 //			exitConditions.Add(new CounterTrendTightChannelCondition());
 //			exitConditions.Add(new CounterTrendTightChannelCondition());
@@ -842,6 +841,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 	#region Exit Conditions
 
+	#region Trend Direction/Type
+
 	#region TrendDirectionChangedCondition
 	public class TrendDirectionChangedCondition : ExitCondition
 	{
@@ -927,6 +928,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
+	#endregion
+
+	#region Chart Patterns
+
 	#region DoubleTopBottomCondition
 	public class DoubleTopBottomCondition : ExitCondition
 	{
@@ -967,6 +972,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
+	#endregion
+
+	#region Stop Loss / Take Profit
+
 	#region TrailingStopBeyondPreviousExtremeCondition
 	public class TrailingStopBeyondPreviousExtremeCondition : ExitCondition
 	{
@@ -983,26 +992,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			return generator.High[0] > entry.Indicators["SwingHigh"];
-		}
-	}
-	#endregion
-
-	#region MovingAverageCrossoverCondition
-	public class MovingAverageCrossoverCondition : ExitCondition
-	{
-		public override bool IsMet(SignalGenerator generator, Signal entry)
-		{
-			if (entry.Direction == TrendDirection.Flat)
-			{
-				return false;
-			}
-
-			if (entry.Direction == TrendDirection.Bullish)
-			{
-				return generator.emaFast[0] < generator.emaSlow[0];
-			}
-
-			return generator.emaFast[0] > generator.emaSlow[0];
 		}
 	}
 	#endregion
@@ -1087,6 +1076,84 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			return Math.Abs(distanceMoved) >= stopLoss;
+		}
+	}
+	#endregion
+
+	#endregion
+
+	#region Buy/Sell Pressure
+
+	#region CounterTrendPressureCondition
+	public class CounterTrendPressureCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			if (entry.Direction == TrendDirection.Flat)
+			{
+				return false;
+			}
+
+			int barsAgo = generator.md.LegLong.BarsAgoStarts[0];
+			int previousSwing = entry.Direction == TrendDirection.Bearish
+				? generator.pa.BarsAgoHigh(0, barsAgo)
+				: generator.pa.BarsAgoLow(0, barsAgo);
+			double currentBuySellPressure = generator.pa.GetBuySellPressure(0, previousSwing);
+
+			if (entry.Direction == TrendDirection.Bullish)
+			{
+				return currentBuySellPressure < 25;
+			}
+
+			return currentBuySellPressure > 75;
+		}
+	}
+	#endregion
+
+	#endregion
+
+	#region CounterTrendWeakTrendCondition
+	public class CounterTrendWeakTrendCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			if (entry.Direction == TrendDirection.Flat)
+			{
+				return false;
+			}
+
+			int barsAgo = generator.md.LegLong.BarsAgoStarts[0];
+			int previousSwing = entry.Direction == TrendDirection.Bearish
+				? generator.pa.BarsAgoHigh(0, barsAgo)
+				: generator.pa.BarsAgoLow(0, barsAgo);
+
+			if (entry.Direction == TrendDirection.Bullish)
+			{
+				return generator.pa.IsWeakBearishTrend(0, previousSwing);
+			}
+
+			return generator.pa.IsWeakBullishTrend(0, previousSwing);
+		}
+	}
+	#endregion
+
+
+	#region MovingAverageCrossoverCondition
+	public class MovingAverageCrossoverCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			if (entry.Direction == TrendDirection.Flat)
+			{
+				return false;
+			}
+
+			if (entry.Direction == TrendDirection.Bullish)
+			{
+				return generator.emaFast[0] < generator.emaSlow[0];
+			}
+
+			return generator.emaFast[0] > generator.emaSlow[0];
 		}
 	}
 	#endregion
