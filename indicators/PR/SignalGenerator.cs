@@ -157,6 +157,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			entryConditions.Add(new StrongFollowThroughCondition());
 			entryConditions.Add(new WithTrendPressureCondition());
 			entryConditions.Add(new StrongWithTrendPressureCondition());
+			entryConditions.Add(new EMADivergingCondition());
+			entryConditions.Add(new EMAConvergingCondition());
+			entryConditions.Add(new WithTrendEMACondition());
+			entryConditions.Add(new LeadsFastEMAByMoreThanATRCondition());
+			entryConditions.Add(new FastEMADirectionCondition());
+			entryConditions.Add(new SlowEMADirectionCondition());
 
 		}
 		#endregion
@@ -456,6 +462,99 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	#endregion
 
 	#region Entry Conditions
+
+	#region EMA
+
+	#region EMADivergingCondition
+	public class EMADivergingCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			if (generator.md.Direction[0] == TrendDirection.Bullish) {
+				return generator.pa.IsEMABullishDivergence(0, 1);
+			}
+
+			return generator.pa.IsEMABearishDivergence(0, 1);
+		}
+	}
+	#endregion
+
+	#region EMAConvergingCondition
+	public class EMAConvergingCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			if (generator.md.Direction[0] == TrendDirection.Bullish) {
+				return generator.pa.IsEMABullishConvergence(0, 1);
+			}
+
+			return generator.pa.IsEMABearishConvergence(0, 1);
+		}
+	}
+	#endregion
+
+	#region WithTrendEMACondition
+	public class WithTrendEMACondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			if (generator.md.Direction[0] == TrendDirection.Bullish) {
+				return generator.pa.IsEMABullish(0);
+			}
+
+			return generator.pa.IsEMABearish(0);
+		}
+	}
+	#endregion
+
+	#region LeadsFastEMAByMoreThanATRCondition
+	public class LeadsFastEMAByMoreThanATRCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			if (generator.md.Direction[0] == TrendDirection.Bullish) {
+				return generator.Low[0] > (generator.emaFast[0] + generator.atr[0]);
+			}
+
+			return generator.High[0] < (generator.emaFast[0] - generator.atr[0]);
+		}
+	}
+	#endregion
+
+	#region FastEMADirectionCondition
+	public class FastEMADirectionCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			TrendDirection FastEMADirection = generator.pa.IsEMAFastBullish(0)
+				? TrendDirection.Bullish
+				: generator.pa.IsEMAFastBearish(0)
+					? TrendDirection.Bearish
+					: TrendDirection.Flat;
+
+			return generator.md.Direction[0] == FastEMADirection;
+		}
+	}
+	#endregion
+
+	#region SlowEMADirectionCondition
+	public class SlowEMADirectionCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			TrendDirection SlowEMADirection = generator.pa.IsEMASlowBullish(0)
+				? TrendDirection.Bullish
+				: generator.pa.IsEMASlowBearish(0)
+					? TrendDirection.Bearish
+					: TrendDirection.Flat;
+
+			return generator.md.Direction[0] == SlowEMADirection;
+		}
+	}
+	#endregion
+
+	#endregion
+
 	#region RSI
 
 	#region RSIRangeCondition
