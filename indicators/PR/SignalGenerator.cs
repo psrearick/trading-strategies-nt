@@ -177,11 +177,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			exitConditions.Add(new DoubleTopBottomCondition());
 			exitConditions.Add(new CounterTrendLegAfterDoubleTopBottomCondition());
 			exitConditions.Add(new TrailingStopBeyondPreviousExtremeCondition());
+			exitConditions.Add(new MovingAverageCrossoverCondition());
+			exitConditions.Add(new NoNewExtremeCondition());
+			exitConditions.Add(new ProfitTargetCondition());
 
 
-//			exitConditions.Add(new CounterTrendTightChannelCondition());
-//			exitConditions.Add(new CounterTrendTightChannelCondition());
-//			exitConditions.Add(new CounterTrendTightChannelCondition());
+
 //			exitConditions.Add(new CounterTrendTightChannelCondition());
 //			exitConditions.Add(new CounterTrendTightChannelCondition());
 //			exitConditions.Add(new CounterTrendTightChannelCondition());
@@ -497,7 +498,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	{
 		public List<double> Parameters;
 
-	    public abstract bool IsMet(SignalGenerator generator, Signal entry);
+	    public abstract bool IsMet(SignalGenerator generator, Signal entry, double parameter = 0.0);
 	}
 	#endregion
 
@@ -817,7 +818,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	#region TrendDirectionChangedCondition
 	public class TrendDirectionChangedCondition : ExitCondition
 	{
-		public override bool IsMet(SignalGenerator generator, Signal entry)
+		public override bool IsMet(SignalGenerator generator, Signal entry, double parameter = 0.0)
 		{
 			return generator.md.Direction[0] != TrendDirection.Flat
 				&& generator.md.Direction[0] != entry.Direction;
@@ -825,10 +826,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
-	#region CounterTrendTightChannelCondition()
+	#region CounterTrendTightChannelCondition
 	public class CounterTrendTightChannelCondition : ExitCondition
 	{
-		public override bool IsMet(SignalGenerator generator, Signal entry)
+		public override bool IsMet(SignalGenerator generator, Signal entry, double parameter = 0.0)
 		{
 			return generator.md.TightChannels[0] != TrendDirection.Flat
 				&& generator.md.TightChannels[0] != entry.Direction;
@@ -836,10 +837,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
-	#region CounterBroadTightChannelCondition()
+	#region CounterBroadTightChannelCondition
 	public class CounterBroadTightChannelCondition : ExitCondition
 	{
-		public override bool IsMet(SignalGenerator generator, Signal entry)
+		public override bool IsMet(SignalGenerator generator, Signal entry, double parameter = 0.0)
 		{
 			return generator.md.BroadChannels[0] != TrendDirection.Flat
 				&& generator.md.BroadChannels[0] != entry.Direction;
@@ -847,10 +848,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
-	#region CounterTrendBreakoutsCondition()
+	#region CounterTrendBreakoutsCondition
 	public class CounterTrendBreakoutsCondition : ExitCondition
 	{
-		public override bool IsMet(SignalGenerator generator, Signal entry)
+		public override bool IsMet(SignalGenerator generator, Signal entry, double parameter = 0.0)
 		{
 			return generator.md.Breakouts[0] != TrendDirection.Flat
 				&& generator.md.Breakouts[0] != entry.Direction;
@@ -858,10 +859,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
-	#region CounterTrendBreakoutTrendCondition()
+	#region CounterTrendBreakoutTrendCondition
 	public class CounterTrendBreakoutTrendCondition : ExitCondition
 	{
-		public override bool IsMet(SignalGenerator generator, Signal entry)
+		public override bool IsMet(SignalGenerator generator, Signal entry, double parameter = 0.0)
 		{
 			if (generator.md.Direction[0] == TrendDirection.Flat)
 			{
@@ -877,10 +878,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
-	#region CounterTrendLegLongCondition()
+	#region CounterTrendLegLongCondition
 	public class CounterTrendLegLongCondition : ExitCondition
 	{
-		public override bool IsMet(SignalGenerator generator, Signal entry)
+		public override bool IsMet(SignalGenerator generator, Signal entry, double parameter = 0.0)
 		{
 			return generator.md.LegLong.LegDirectionAtBar(0) != TrendDirection.Flat
 					&& generator.md.LegLong.LegDirectionAtBar(0) != entry.Direction;
@@ -888,10 +889,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
-	#region CounterTrendLegShortCondition()
+	#region CounterTrendLegShortCondition
 	public class CounterTrendLegShortCondition : ExitCondition
 	{
-		public override bool IsMet(SignalGenerator generator, Signal entry)
+		public override bool IsMet(SignalGenerator generator, Signal entry, double parameter = 0.0)
 		{
 			return generator.md.LegShort.LegDirectionAtBar(0) != TrendDirection.Flat
 					&& generator.md.LegShort.LegDirectionAtBar(0) != entry.Direction;
@@ -899,10 +900,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
-	#region DoubleTopBottomCondition()
+	#region DoubleTopBottomCondition
 	public class DoubleTopBottomCondition : ExitCondition
 	{
-		public override bool IsMet(SignalGenerator generator, Signal entry)
+		public override bool IsMet(SignalGenerator generator, Signal entry, double parameter = 0.0)
 		{
 			if (entry.Direction == TrendDirection.Bullish) {
 				return generator.barsSinceDoubleTop[0] == 0;
@@ -917,10 +918,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
-	#region CounterTrendLegAfterDoubleTopBottomCondition()
+	#region CounterTrendLegAfterDoubleTopBottomCondition
 	public class CounterTrendLegAfterDoubleTopBottomCondition : ExitCondition
 	{
-		public override bool IsMet(SignalGenerator generator, Signal entry)
+		public override bool IsMet(SignalGenerator generator, Signal entry, double parameter = 0.0)
 		{
 			if (entry.Direction == TrendDirection.Bullish) {
 				return generator.barsSinceDoubleTop[0] > 0
@@ -939,10 +940,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
-	#region TrailingStopBeyondPreviousExtremeCondition()
+	#region TrailingStopBeyondPreviousExtremeCondition
 	public class TrailingStopBeyondPreviousExtremeCondition : ExitCondition
 	{
-		public override bool IsMet(SignalGenerator generator, Signal entry)
+		public override bool IsMet(SignalGenerator generator, Signal entry, double parameter = 0.0)
 		{
 			if (entry.Direction == TrendDirection.Flat)
 			{
@@ -955,6 +956,85 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			return generator.High[0] > entry.Indicators["SwingHigh"];
+		}
+	}
+	#endregion
+
+	#region MovingAverageCrossoverCondition
+	public class MovingAverageCrossoverCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry, double parameter = 0.0)
+		{
+			if (entry.Direction == TrendDirection.Flat)
+			{
+				return false;
+			}
+
+			if (entry.Direction == TrendDirection.Bullish)
+			{
+				return generator.emaFast[0] < generator.emaSlow[0];
+			}
+
+			return generator.emaFast[0] > generator.emaSlow[0];
+		}
+	}
+	#endregion
+
+	#region NoNewExtremeCondition
+	public class NoNewExtremeCondition : ExitCondition
+	{
+		public List<double> Parameters = Helpers.GenerateRangeOfValues(6, 20, 2);
+
+		double comparisonTolerance = 0.001;
+
+		public override bool IsMet(SignalGenerator generator, Signal entry, double parameter = 0.0)
+		{
+			if (entry.Direction == TrendDirection.Flat)
+			{
+				return false;
+			}
+
+			if (!Parameters.Any(p => Math.Abs(p - parameter) <= comparisonTolerance)) {
+				return false;
+			}
+
+			int threshold = (int) Parameters.First(p => Math.Abs(p - parameter) <= comparisonTolerance);
+			int barsAgo = generator.md.LegLong.BarsAgoStarts[0];
+
+			if (entry.Direction == TrendDirection.Bullish)
+			{
+				return generator.MAX(generator.High, threshold)[0] < generator.MAX(generator.High, barsAgo)[0];
+			}
+
+			return generator.MIN(generator.Low, threshold)[0] > generator.MIN(generator.Low, barsAgo)[0];
+		}
+	}
+	#endregion
+
+	#region ProfitTargetCondition
+	public class ProfitTargetCondition : ExitCondition
+	{
+		public List<double> Parameters = Helpers.GenerateRangeOfValues(0.5, 15, 0.5);
+
+		double comparisonTolerance = 0.001;
+
+		public override bool IsMet(SignalGenerator generator, Signal entry, double parameter = 0.0)
+		{
+			if (entry.Direction == TrendDirection.Flat)
+			{
+				return false;
+			}
+
+			if (!Parameters.Any(p => Math.Abs(p - parameter) <= comparisonTolerance)) {
+				return false;
+			}
+
+			double profitTargetMultiplier = Parameters.First(p => Math.Abs(p - parameter) <= comparisonTolerance);
+			double profitTarget = generator.avgAtrFast[0] * profitTargetMultiplier;
+			double distanceMoved = entry.Direction == TrendDirection.Bullish
+					? generator.Close[0] - entry.Price : entry.Price - generator.Close[0];
+
+			return distanceMoved >= profitTarget;
 		}
 	}
 	#endregion
