@@ -42,7 +42,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public Series<int> barsSinceDoubleTop;
 		public Series<int> barsSinceDoubleBottom;
 		private List<Condition> entryConditions;
-		private List<Condition> exitConditions;
+		private List<ExitCondition> exitConditions;
 		private ObjectPool<ParameterType> parameterTypes;
 		private ObjectPool<SimTrade> trades;
 		public ObjectPool<Parameter> optimizedParameters;
@@ -142,6 +142,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region SetConditions()
 		private void SetConditions()
 		{
+			#region Entry Conditions
 			entryConditions.Add(new RSIRangeCondition());
 			entryConditions.Add(new AboveAverageATRCondition());
 			entryConditions.Add(new BelowAverageATRCondition());
@@ -163,6 +164,34 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			entryConditions.Add(new LeadsFastEMAByMoreThanATRCondition());
 			entryConditions.Add(new FastEMADirectionCondition());
 			entryConditions.Add(new SlowEMADirectionCondition());
+			#endregion
+
+			#region Exit Conditions
+			exitConditions.Add(new TrendDirectionChangedCondition());
+			exitConditions.Add(new CounterTrendTightChannelCondition());
+			exitConditions.Add(new CounterBroadTightChannelCondition());
+			exitConditions.Add(new CounterTrendBreakoutsCondition());
+			exitConditions.Add(new CounterTrendBreakoutTrendCondition());
+			exitConditions.Add(new CounterTrendLegLongCondition());
+			exitConditions.Add(new CounterTrendLegShortCondition());
+			exitConditions.Add(new DoubleTopBottomCondition());
+			exitConditions.Add(new CounterTrendLegAfterDoubleTopBottomCondition());
+			exitConditions.Add(new TrailingStopBeyondPreviousExtremeCondition());
+
+
+//			exitConditions.Add(new CounterTrendTightChannelCondition());
+//			exitConditions.Add(new CounterTrendTightChannelCondition());
+//			exitConditions.Add(new CounterTrendTightChannelCondition());
+//			exitConditions.Add(new CounterTrendTightChannelCondition());
+//			exitConditions.Add(new CounterTrendTightChannelCondition());
+//			exitConditions.Add(new CounterTrendTightChannelCondition());
+//			exitConditions.Add(new CounterTrendTightChannelCondition());
+//			exitConditions.Add(new CounterTrendTightChannelCondition());
+//			exitConditions.Add(new CounterTrendTightChannelCondition());
+//			exitConditions.Add(new CounterTrendTightChannelCondition());
+//			exitConditions.Add(new CounterTrendTightChannelCondition());
+//			exitConditions.Add(new CounterTrendTightChannelCondition());
+			#endregion
 
 		}
 		#endregion
@@ -339,6 +368,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			Indicators["MaxATR"] = Source.maxATR[0];
 			Indicators["BarsSinceDoubleTop"] = Source.barsSinceDoubleTop[0];
 			Indicators["BarsSinceDoubleBottom"] = Source.barsSinceDoubleBottom[0];
+			Indicators["SwingLow"] = Source.md.LegLong.BarsAgoStarts[0] > 0
+				? Source.MIN(Source.Low, Source.md.LegLong.BarsAgoStarts[0])[0] : Source.Low[0];
+			Indicators["SwingHigh"] = Source.md.LegLong.BarsAgoStarts[0] > 0
+				? Source.MAX(Source.High, Source.md.LegLong.BarsAgoStarts[0])[0] : Source.High[0];
 		}
 		#endregion
 
@@ -455,9 +488,16 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	#region Condition
 	public abstract class Condition
 	{
+	    public abstract bool IsMet(SignalGenerator generator);
+	}
+	#endregion
+
+	#region Exit Condition
+	public abstract class ExitCondition
+	{
 		public List<double> Parameters;
 
-	    public abstract bool IsMet(SignalGenerator generator);
+	    public abstract bool IsMet(SignalGenerator generator, Signal entry);
 	}
 	#endregion
 
@@ -768,6 +808,155 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
+	#endregion
+
+	#endregion
+
+	#region Exit Conditions
+
+	#region TrendDirectionChangedCondition
+	public class TrendDirectionChangedCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			return generator.md.Direction[0] != TrendDirection.Flat
+				&& generator.md.Direction[0] != entry.Direction;
+		}
+	}
+	#endregion
+
+	#region CounterTrendTightChannelCondition()
+	public class CounterTrendTightChannelCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			return generator.md.TightChannels[0] != TrendDirection.Flat
+				&& generator.md.TightChannels[0] != entry.Direction;
+		}
+	}
+	#endregion
+
+	#region CounterBroadTightChannelCondition()
+	public class CounterBroadTightChannelCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			return generator.md.BroadChannels[0] != TrendDirection.Flat
+				&& generator.md.BroadChannels[0] != entry.Direction;
+		}
+	}
+	#endregion
+
+	#region CounterTrendBreakoutsCondition()
+	public class CounterTrendBreakoutsCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			return generator.md.Breakouts[0] != TrendDirection.Flat
+				&& generator.md.Breakouts[0] != entry.Direction;
+		}
+	}
+	#endregion
+
+	#region CounterTrendBreakoutTrendCondition()
+	public class CounterTrendBreakoutTrendCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			if (generator.md.Direction[0] == TrendDirection.Flat)
+			{
+				return false;
+			}
+
+			TrendDirection trendDirection = entry.Direction == TrendDirection.Bullish
+				? TrendDirection.Bearish : TrendDirection.Bullish;
+
+			return generator.pa.IsBreakoutTrend(
+				0, generator.md.LegLong.BarsAgoStarts[0], trendDirection);
+		}
+	}
+	#endregion
+
+	#region CounterTrendLegLongCondition()
+	public class CounterTrendLegLongCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			return generator.md.LegLong.LegDirectionAtBar(0) != TrendDirection.Flat
+					&& generator.md.LegLong.LegDirectionAtBar(0) != entry.Direction;
+		}
+	}
+	#endregion
+
+	#region CounterTrendLegShortCondition()
+	public class CounterTrendLegShortCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			return generator.md.LegShort.LegDirectionAtBar(0) != TrendDirection.Flat
+					&& generator.md.LegShort.LegDirectionAtBar(0) != entry.Direction;
+		}
+	}
+	#endregion
+
+	#region DoubleTopBottomCondition()
+	public class DoubleTopBottomCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			if (entry.Direction == TrendDirection.Bullish) {
+				return generator.barsSinceDoubleTop[0] == 0;
+			}
+
+			if (entry.Direction == TrendDirection.Bearish) {
+				return generator.barsSinceDoubleBottom[0] == 0;
+			}
+
+			return false;
+		}
+	}
+	#endregion
+
+	#region CounterTrendLegAfterDoubleTopBottomCondition()
+	public class CounterTrendLegAfterDoubleTopBottomCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			if (entry.Direction == TrendDirection.Bullish) {
+				return generator.barsSinceDoubleTop[0] > 0
+					&& generator.barsSinceDoubleTop[0] < 10
+					&& generator.md.LegLong.LegDirectionAtBar(0) == TrendDirection.Bearish;
+			}
+
+			if (entry.Direction == TrendDirection.Bearish) {
+				return generator.barsSinceDoubleBottom[0] > 0
+					&& generator.barsSinceDoubleBottom[0] < 10
+					&& generator.md.LegLong.LegDirectionAtBar(0) == TrendDirection.Bullish;
+			}
+
+			return false;
+		}
+	}
+	#endregion
+
+	#region TrailingStopBeyondPreviousExtremeCondition()
+	public class TrailingStopBeyondPreviousExtremeCondition : ExitCondition
+	{
+		public override bool IsMet(SignalGenerator generator, Signal entry)
+		{
+			if (entry.Direction == TrendDirection.Flat)
+			{
+				return false;
+			}
+
+			if (entry.Direction == TrendDirection.Bullish)
+			{
+				return generator.Low[0] < entry.Indicators["SwingLow"];
+			}
+
+			return generator.High[0] > entry.Indicators["SwingHigh"];
+		}
+	}
 	#endregion
 
 	#endregion
