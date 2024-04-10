@@ -236,12 +236,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			Dictionary<List<Condition>, PerformanceMetrics> bestEntryCombinations = GetBestEntryConditionCombinations(2, 4, 5);
-			Dictionary<List<ExitCondition>, PerformanceMetrics> bestExitCombinations = GetBestExitConditionCombinations(2, 4, 5);
+			Dictionary<List<Condition>, PerformanceMetrics> bestEntryCombinations = GetBestEntryConditionCombinations(1, 4, 5);
+			Dictionary<List<ExitCondition>, PerformanceMetrics> bestExitCombinations = GetBestExitConditionCombinations(1, 4, 5);
 
 			if (bestEntryCombinations.Count > 0)
 			{
 				optimalEntryCombinations = SelectOptimalCombinations(bestEntryCombinations);
+				Print(bestEntryCombinations.Count.ToString() + " -- " + optimalEntryCombinations.Count.ToString());
 			}
 
 			if (bestExitCombinations.Count > 0)
@@ -460,7 +461,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		            // Generate simulated trades for the entry condition combination
 		            List<SimTrade> trades = GenerateSimulatedTradesForEntryCombination(combinationList, minTradesRequired);
-
 		            if (trades.Count >= minTradesRequired)
 		            {
 		                // Calculate performance metrics for the trades
@@ -480,6 +480,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		    // Return the best entry combinations
 		    Dictionary<List<Condition>, PerformanceMetrics> bestEntryCombinations = new Dictionary<List<Condition>, PerformanceMetrics>();
+
 		    int count = Math.Min(10, sortedEntryCombinations.Count);
 		    for (int i = 0; i < count; i++)
 		    {
@@ -540,7 +541,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region GenerateSimulatedTradesForEntryCombination()
-		private List<SimTrade> GenerateSimulatedTradesForEntryCombination(List<Condition> entryConditions, int minTradesRequired)
+		private List<SimTrade> GenerateSimulatedTradesForEntryCombination(List<Condition> entries, int minTradesRequired)
 		{
 		    List<SimTrade> trades = new List<SimTrade>();
 
@@ -548,7 +549,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    {
 		        bool allConditionsMet = true;
 
-		        foreach (Condition condition in entryConditions)
+		        foreach (Condition condition in entries)
 		        {
 		            bool conditionMet = false;
 		            foreach (var entryConditionPair in entrySignal.EntryConditions)
@@ -564,7 +565,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		            {
 		                allConditionsMet = false;
 		                break;
-		            }
+					}
 		        }
 
 		        if (allConditionsMet)
@@ -573,7 +574,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		            {
 		                if (exitSignal.Bar > entrySignal.Bar)
 		                {
-							bool allExitConditionsMet = true;
+		                    bool allExitConditionsMet = true;
 		                    foreach (ExitCondition exitCondition in exitSignal.ExitConditions.Keys)
 		                    {
 		                        if (!exitConditions.Any(c => c.GetType() == exitCondition.GetType()))
@@ -585,8 +586,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		                    if (allExitConditionsMet)
 		                    {
+		                        // Create a SimTrade instance
 		                        SimTrade trade = new SimTrade();
-								trade.Activate();
+		                        trade.Activate();
 		                        trade.Set(this);
 		                        trade.EntrySignal = entrySignal;
 		                        trade.ExitSignal = exitSignal;
@@ -710,14 +712,23 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region SelectOptimalCombinations
+		#region SelectOptimalCombinations()
 		private List<List<T>> SelectOptimalCombinations<T>(Dictionary<List<T>, PerformanceMetrics> combinations)
 		{
+		    // Convert the combinations dictionary to a list
+		    List<List<T>> combinationList = combinations.Keys.ToList();
+
 		    // Define the fitness function for evaluating combinations
 		    Func<double[], double> fitnessFunction = position =>
 		    {
-		        // Map the particle's position to the corresponding combination
-		        List<T> combination = MapPositionToCombination<T>(position, combinations.Keys.ToList());
+		        // Map the particle's position to the corresponding combination index
+		        int combinationIndex = (int)Math.Floor(position[0] * combinationList.Count);
+
+		        // Ensure the combination index stays within the valid range
+		        combinationIndex = Math.Max(0, Math.Min(combinationIndex, combinationList.Count - 1));
+
+		        // Get the combination at the mapped index
+		        List<T> combination = combinationList[combinationIndex];
 
 		        // Get the performance metrics for the combination
 		        PerformanceMetrics metrics = combinations[combination];
@@ -732,32 +743,33 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    // Set up the PSO parameters
 		    int numParticles = 50;
 		    int maxIterations = 100;
-		    int dimensions = combinations.Count;
-		    double[] lowerBounds = new double[dimensions];
-		    double[] upperBounds = new double[dimensions];
-
-		    for (int i = 0; i < dimensions; i++)
-		    {
-		        lowerBounds[i] = 0.0;
-		        upperBounds[i] = 1.0;
-		    }
+		    int dimensions = 1; // Use a single dimension to represent the combination index
+		    double[] lowerBounds = new double[] { 0.0 };
+		    double[] upperBounds = new double[] { 1.0 };
 
 		    // Run PSO to optimize the selection of combinations
 		    double[] bestPosition = ParticleSwarmOptimization.Optimize(fitnessFunction, lowerBounds, upperBounds, numParticles, maxIterations);
 
-		    // Map the best position to the optimal combination
+		    // Map the best position to the optimal combination index
+		    int bestCombinationIndex = (int)Math.Floor(bestPosition[0] * combinationList.Count);
+
+		    // Ensure the best combination index stays within the valid range
+		    bestCombinationIndex = Math.Max(0, Math.Min(bestCombinationIndex, combinationList.Count - 1));
+
+		    // Get the optimal combination from the list
 		    List<List<T>> optimalCombinations = new List<List<T>>();
-		    optimalCombinations.Add(MapPositionToCombination<T>(bestPosition, combinations.Keys.ToList()));
+		    optimalCombinations.Add(combinationList[bestCombinationIndex]);
 
 		    return optimalCombinations;
 		}
 		#endregion
 
 		#region MapPositionToCombination
-		private List<T> MapPositionToCombination<T>(double[] position, List<List<T>> combinations)
+		private int MapPositionToCombinationIndex(double[] position, int combinationCount)
 		{
-		    int index = (int)Math.Floor(position[0] * combinations.Count);
-		    return combinations[index];
+		    // Map the particle's position to a combination index
+		    int combinationIndex = (int)Math.Floor(position[0] * combinationCount);
+		    return combinationIndex;
 		}
 		#endregion
 	}
