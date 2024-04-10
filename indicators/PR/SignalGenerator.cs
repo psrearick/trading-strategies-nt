@@ -45,12 +45,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public Series<int> barsSinceDoubleBottom;
 		private List<Condition> entryConditions = new List<Condition>();
 		private List<ExitCondition> exitConditions = new List<ExitCondition>();
-		public List<List<Condition>> optimalEntryCombinations = new List<List<Condition>>();
-		public List<List<ExitCondition>> optimalExitCombinations = new List<List<ExitCondition>>();
+		private List<List<Condition>> optimalEntryCombinations = new List<List<Condition>>();
+		private List<List<ExitCondition>> optimalExitCombinations = new List<List<ExitCondition>>();
 		private ObjectPool<Signal> entrySignals;
 		private ObjectPool<Signal> exitSignals;
 		private ObjectPool<SimTrade> trades;
 		private ObjectPool<ParameterType> parameterTypes;
+		public ObjectPool<Signal> entries;
+		public ObjectPool<Signal> exits;
 
 		public IEnumerable<Signal> ActiveEntrySignals
 		{
@@ -70,6 +72,16 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public IEnumerable<ParameterType> ActiveParameterTypes
 		{
 		    get { return parameterTypes.ActiveItems; }
+		}
+
+		public IEnumerable<Signal> CurrentEntries
+		{
+		    get { return entries.ActiveItems; }
+		}
+
+		public IEnumerable<Signal> CurrentExits
+		{
+		    get { return exits.ActiveItems; }
 		}
 
 		#endregion
@@ -118,6 +130,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				trades = new ObjectPool<SimTrade>(200, () => new SimTrade());
 				exitSignals = new ObjectPool<Signal>(200, () => new Signal());
 				entrySignals = new ObjectPool<Signal>(200, () => new Signal());
+				exits = new ObjectPool<Signal>(200, () => new Signal());
+				entries = new ObjectPool<Signal>(200, () => new Signal());
 
 				optimalEntryCombinations = new List<List<Condition>>();
 				optimalExitCombinations = new List<List<ExitCondition>>();
@@ -139,6 +153,51 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			UpdateBarsSinceDoubleTopBottom();
 			AnalyzeConditionPerformance();
 
+			foreach (List<Condition> entryCombination in optimalEntryCombinations)
+		    {
+		        bool allConditionsMet = true;
+		        foreach (Condition condition in entryCombination)
+		        {
+		            if (!condition.IsMet(this))
+		            {
+		                allConditionsMet = false;
+		                break;
+		            }
+		        }
+
+		        if (allConditionsMet)
+		        {
+		            // Generate entry signal
+		            Signal entrySignal = entries.Get();
+		            entrySignal.Set(md.Direction[0], this, SignalType.Entry);
+		            // Add additional signal processing logic as needed
+		        }
+		    }
+
+		    // Check optimal exit combinations
+		    foreach (List<ExitCondition> exitCombination in optimalExitCombinations)
+		    {
+		        foreach (Signal entrySignal in entrySignals.ActiveItems)
+		        {
+		            bool allConditionsMet = true;
+		            foreach (ExitCondition condition in exitCombination)
+		            {
+		                if (!condition.IsMet(this, entrySignal))
+		                {
+		                    allConditionsMet = false;
+		                    break;
+		                }
+		            }
+
+		            if (allConditionsMet)
+		            {
+		                // Generate exit signal and execute trade
+		                Signal exitSignal = exits.Get();
+		                exitSignal.Set(entrySignal.Direction, this, SignalType.Exit);
+		                // Add trade execution logic here
+		            }
+		        }
+		    }
 		}
 		#endregion
 
@@ -236,8 +295,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			Dictionary<List<Condition>, PerformanceMetrics> bestEntryCombinations = GetBestEntryConditionCombinations(1, 4, 5);
-			Dictionary<List<ExitCondition>, PerformanceMetrics> bestExitCombinations = GetBestExitConditionCombinations(1, 4, 5);
+			Dictionary<List<Condition>, PerformanceMetrics> bestEntryCombinations = GetBestEntryConditionCombinations(2, 4, 5);
+			Dictionary<List<ExitCondition>, PerformanceMetrics> bestExitCombinations = GetBestExitConditionCombinations(2, 4, 5);
 
 			if (bestEntryCombinations.Count > 0)
 			{
