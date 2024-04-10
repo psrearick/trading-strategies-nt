@@ -27,6 +27,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	public class SignalGenerator : Indicator
 	{
 		#region Variables
+
+		private Utils utils = new Utils();
 		public PriceActionUtils pa;
 		public PriceActionPatterns paPatterns;
 		public MarketDirection md;
@@ -41,14 +43,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public MAX maxATR;
 		public Series<int> barsSinceDoubleTop;
 		public Series<int> barsSinceDoubleBottom;
-		private List<Condition> entryConditions;
-		private List<ExitCondition> exitConditions;
+		private List<Condition> entryConditions = new List<Condition>();
+		private List<ExitCondition> exitConditions = new List<ExitCondition>();
+		public List<List<Condition>> optimalEntryCombinations = new List<List<Condition>>();
+		public List<List<ExitCondition>> optimalExitCombinations = new List<List<ExitCondition>>();
 		private ObjectPool<Signal> entrySignals;
 		private ObjectPool<Signal> exitSignals;
 		private ObjectPool<SimTrade> trades;
 		private ObjectPool<ParameterType> parameterTypes;
-		public ObjectPool<Parameter> optimizedParameters;
-		#endregion
 
 		public IEnumerable<Signal> ActiveEntrySignals
 		{
@@ -70,10 +72,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    get { return parameterTypes.ActiveItems; }
 		}
 
-		public IEnumerable<Parameter> ActiveOptimizedParameters
-		{
-		    get { return optimizedParameters.ActiveItems; }
-		}
+		#endregion
 
 		#region OnStateChange()
 		protected override void OnStateChange()
@@ -101,29 +100,30 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				rsi						= RSI(14, 3);
 				emaFast					= EMA(9);
 				emaSlow					= EMA(21);
-				stdDevAtr				= StdDev(atr, 21);
-				avgAtr					= SMA(atr, 21);
-				avgAtrFast				= SMA(atr, 9);
-				minATR					= MIN(atr, 50);
-				maxATR					= MAX(atr, 50);
 
-				barsSinceDoubleTop		= new Series<int>(this);
-				barsSinceDoubleBottom	= new Series<int>(this);
-
-				parameterTypes = new ObjectPool<ParameterType>(5, () => new ParameterType());
-				optimizedParameters = new ObjectPool<Parameter>(5, () => new Parameter());
-				trades = new ObjectPool<SimTrade>(200, () => new SimTrade());
-				exitSignals = new ObjectPool<Signal>(200, () => new Signal());
-				entrySignals = new ObjectPool<Signal>(200, () => new Signal());
-
-				SetParameterTypes();
-				SetConditions();
 			}
 			#endregion
 			#region State.DataLoaded
 			if (State == State.DataLoaded)
 			{
+				stdDevAtr				= StdDev(atr, 21);
+				avgAtr					= SMA(atr, 21);
+				avgAtrFast				= SMA(atr, 9);
+				minATR					= MIN(atr, 50);
+				maxATR					= MAX(atr, 50);
+				barsSinceDoubleTop		= new Series<int>(this);
+				barsSinceDoubleBottom	= new Series<int>(this);
 
+				parameterTypes = new ObjectPool<ParameterType>(5, () => new ParameterType());
+				trades = new ObjectPool<SimTrade>(200, () => new SimTrade());
+				exitSignals = new ObjectPool<Signal>(200, () => new Signal());
+				entrySignals = new ObjectPool<Signal>(200, () => new Signal());
+
+				optimalEntryCombinations = new List<List<Condition>>();
+				optimalExitCombinations = new List<List<ExitCondition>>();
+
+				SetParameterTypes();
+				SetConditions();
 			}
 			#endregion
 		}
@@ -137,6 +137,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			UpdateBarsSinceDoubleTopBottom();
+			AnalyzeConditionPerformance();
+
 		}
 		#endregion
 
@@ -229,13 +231,23 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private void AnalyzeConditionPerformance()
 		{
 			TestIndividualConditions();
-			Dictionary<List<Condition>, PerformanceMetrics> bestEntryCombinations = GetBestEntryConditionCombinations(2, 4, 2);
-			Dictionary<List<ExitCondition>, PerformanceMetrics> bestExitCombinations = GetBestExitConditionCombinations(2, 4, 2);
 
-//			Dictionary<Condition, PerformanceMetrics> topPerformingEntryMetrics = GetTopPerformingEntryConditions();
-//			Dictionary<ExitCondition, PerformanceMetrics> topPerformingExitMetrics = GetTopPerformingExitConditions();
+			if (CurrentBar % 10 != 0) {
+				return;
+			}
 
+			Dictionary<List<Condition>, PerformanceMetrics> bestEntryCombinations = GetBestEntryConditionCombinations(2, 4, 100);
+			Dictionary<List<ExitCondition>, PerformanceMetrics> bestExitCombinations = GetBestExitConditionCombinations(2, 4, 100);
 
+			if (bestEntryCombinations.Count > 0)
+			{
+				optimalEntryCombinations = SelectOptimalCombinations(bestEntryCombinations);
+			}
+
+			if (bestExitCombinations.Count > 0)
+			{
+	        	optimalExitCombinations = SelectOptimalCombinations(bestExitCombinations);
+			}
 		}
 		#endregion
 
@@ -262,7 +274,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		            {
 		                // Generate all possible parameter combinations for the exit condition
 		                List<List<Parameter>> parameterCombinations = GenerateParameterCombinations(exitCondition.ParameterTypes);
-
 		                foreach (List<Parameter> parameterCombination in parameterCombinations)
 		                {
 		                    exitCondition.Reset();
@@ -419,8 +430,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private void UpdatePerformanceMetrics(PerformanceMetrics metrics, TradePerformance performance)
 		{
 		    metrics.NetProfit += performance.NetProfit;
-		    metrics.MaxAdverseExcursion = Math.Max(metrics.MaxAdverseExcursion, performance.MaxAdverseExcursion);
-		    metrics.MaxFavorableExcursion = Math.Max(metrics.MaxFavorableExcursion, performance.MaxFavorableExcursion);
+		    metrics.MaxAdverseExcursion = performance.MaxAdverseExcursion > 0
+				? Math.Max(metrics.MaxAdverseExcursion, performance.MaxAdverseExcursion)
+				: 0;
+		    metrics.MaxFavorableExcursion = performance.MaxFavorableExcursion > 0
+				? Math.Max(metrics.MaxFavorableExcursion, performance.MaxFavorableExcursion)
+				: 0;
 		    // Update other performance metrics as needed
 		}
 		#endregion
@@ -668,76 +683,65 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				trade.CalculatePerformance();
 
 				metrics.NetProfit += trade.Performance.NetProfit;
-		    	metrics.MaxAdverseExcursion = Math.Max(metrics.MaxAdverseExcursion, trade.Performance.MaxAdverseExcursion);
-		    	metrics.MaxFavorableExcursion = Math.Max(metrics.MaxFavorableExcursion, trade.Performance.MaxFavorableExcursion);
+		    	metrics.MaxAdverseExcursion = trade.Performance.MaxAdverseExcursion > 0
+					? Math.Max(metrics.MaxAdverseExcursion, trade.Performance.MaxAdverseExcursion) : 0;
+		    	metrics.MaxFavorableExcursion = trade.Performance.MaxFavorableExcursion > 0
+					? Math.Max(metrics.MaxFavorableExcursion, trade.Performance.MaxFavorableExcursion) : 0;
 			}
 
 			return metrics;
 		}
 		#endregion
 
-		#region OptimizeParameters()
-//		public void OptimizeParameters()
-//		{
-//		    int numParticles = 50;
-//		    int maxIterations = 100;
+		#region SelectOptimalCombinations
+		private List<List<T>> SelectOptimalCombinations<T>(Dictionary<List<T>, PerformanceMetrics> combinations)
+		{
+		    // Define the fitness function for evaluating combinations
+		    Func<double[], double> fitnessFunction = position =>
+		    {
+		        // Map the particle's position to the corresponding combination
+		        List<T> combination = MapPositionToCombination<T>(position, combinations.Keys.ToList());
 
-//			Func<double[], double> fitnessFunction = CalculateFitness;
+		        // Get the performance metrics for the combination
+		        PerformanceMetrics metrics = combinations[combination];
 
-//			double[] lowerBounds = ActiveParameterTypes.Select(p => p.LowerBound).ToArray();
-//			double[] upperBounds = ActiveParameterTypes.Select(p => p.UpperBound).ToArray();
-//			string[] names = ActiveParameterTypes.Select(p => p.Name).ToArray();
+		        // Calculate the fitness score based on the performance metrics
+		        // Example: Maximize net profit and minimize drawdown
+		        double fitnessScore = metrics.NetProfit / (metrics.MaxAdverseExcursion + 1);
 
-//		    double[] bestPosition = ParticleSwarmOptimization.Optimize(fitnessFunction, lowerBounds, upperBounds, numParticles, maxIterations);
+		        return fitnessScore;
+		    };
 
-//			foreach (var optimized in optimizedParameters.ActiveItems)
-//			{
-//				optimizedParameters.Release(optimized);
-//			}
+		    // Set up the PSO parameters
+		    int numParticles = 50;
+		    int maxIterations = 100;
+		    int dimensions = combinations.Count;
+		    double[] lowerBounds = new double[dimensions];
+		    double[] upperBounds = new double[dimensions];
 
-//			for (int i = 0; i < bestPosition.Count(); i++)
-//			{
-//				Parameter optimized = optimizedParameters.Get();
-//				optimized.Set(ActiveParameterTypes.First(p => p.Name == names[i]), bestPosition[i]);
-//			}
-//		}
+		    for (int i = 0; i < dimensions; i++)
+		    {
+		        lowerBounds[i] = 0.0;
+		        upperBounds[i] = 1.0;
+		    }
+
+		    // Run PSO to optimize the selection of combinations
+		    double[] bestPosition = ParticleSwarmOptimization.Optimize(fitnessFunction, lowerBounds, upperBounds, numParticles, maxIterations);
+
+		    // Map the best position to the optimal combination
+		    List<List<T>> optimalCombinations = new List<List<T>>();
+		    optimalCombinations.Add(MapPositionToCombination<T>(bestPosition, combinations.Keys.ToList()));
+
+		    return optimalCombinations;
+		}
 		#endregion
 
-		#region CalculateFitness()
-//		private double CalculateFitness(double[] position)
-//		{
-//		    double fitnessScore = 0;
-
-//		    foreach (var trade in ActiveTrades)
-//		    {
-//				double tradeScore = 0;
-
-//				for (int i = 0; i < ActiveParameterTypes.Count(); i++)
-//				{
-//					ParameterType paramType = ActiveParameterTypes.ToArray()[i];
-//					Parameter tradeParam = trade.Parameters.FirstOrDefault(p => p.Type.Name == paramType.Name);
-
-//					if (tradeParam == null)
-//					{
-//						continue;
-//					}
-
-//					tradeScore += 1.0 - Math.Abs(tradeParam.Value - position[i]) / (paramType.UpperBound - paramType.LowerBound);
-//				}
-
-//		        double netProfitScore = trade.Performance.NetProfit;
-//		        double maxAdverseExcursionScore = 1.0 - trade.Performance.MaxAdverseExcursion / trade.Indicators["ATR"];
-//		        double tradeDurationScore = 1.0 - trade.Performance.TradeDuration / (24 * 60 * 60);
-
-//		        tradeScore += netProfitScore + maxAdverseExcursionScore + tradeDurationScore;
-
-//		        fitnessScore += tradeScore;
-//		    }
-
-//		    fitnessScore /= ActiveTrades.Count();
-
-//		    return fitnessScore;
-//		}
+		#region MapPositionToCombination
+		private List<T> MapPositionToCombination<T>(double[] position, List<List<T>> combinations)
+		{
+		    int index = (int)Math.Floor(position[0] * combinations.Count);
+		    return combinations[index];
+		}
 		#endregion
 	}
 
@@ -890,8 +894,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		{
 			BarsInTrade = exit.Bar - entry.Bar;
 			int barsAgoEntry = entry.Source.CurrentBar - entry.Bar;
-			double highestHigh = entry.Source.MAX(entry.Source.High, BarsInTrade)[barsAgoEntry];
-			double lowestLow = entry.Source.MIN(entry.Source.Low, BarsInTrade)[barsAgoEntry];
+			double highestHigh = BarsInTrade > 0 ? entry.Source.MAX(entry.Source.High, BarsInTrade)[barsAgoEntry] : entry.Source.High[barsAgoEntry];
+			double lowestLow = BarsInTrade > 0 ? entry.Source.MIN(entry.Source.Low, BarsInTrade)[barsAgoEntry] : entry.Source.Low[barsAgoEntry];
 			MaxAdverseExcursion = entry.Direction == TrendDirection.Bullish ? lowestLow : highestHigh;
 			MaxFavorableExcursion = entry.Direction == TrendDirection.Bullish ? highestHigh : lowestLow;
 			NetProfit = entry.Direction == TrendDirection.Bullish ? exit.Price - entry.Price : entry.Price - exit.Price;
@@ -971,7 +975,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	#region Condition
 	public abstract class Condition
 	{
-		public List<ParameterType> ParameterTypes;
+		public List<ParameterType> ParameterTypes = new List<ParameterType>();
 
 		public Dictionary<string, double> ParameterValues = new Dictionary<string, double>();
 
@@ -992,7 +996,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	#region Exit Condition
 	public abstract class ExitCondition
 	{
-		public List<ParameterType> ParameterTypes;
+		public List<ParameterType> ParameterTypes = new List<ParameterType>();
 
 		public Dictionary<string, double> ParameterValues = new Dictionary<string, double>();
 
@@ -1564,6 +1568,16 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			int threshold = (int) ParameterValues["NewExtremeLength"];
 			int barsAgo = generator.md.LegLong.BarsAgoStarts[0];
+
+			if (threshold == 0)
+			{
+				return false;
+			}
+
+			if (barsAgo == 0)
+			{
+				return false;
+			}
 
 			if (entry.Direction == TrendDirection.Bullish)
 			{
