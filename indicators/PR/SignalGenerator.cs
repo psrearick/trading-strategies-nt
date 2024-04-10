@@ -242,7 +242,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			if (bestEntryCombinations.Count > 0)
 			{
 				optimalEntryCombinations = SelectOptimalCombinations(bestEntryCombinations);
-				Print(bestEntryCombinations.Count.ToString() + " -- " + optimalEntryCombinations.Count.ToString());
 			}
 
 			if (bestExitCombinations.Count > 0)
