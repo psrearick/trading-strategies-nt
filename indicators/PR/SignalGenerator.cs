@@ -74,14 +74,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    get { return parameterTypes.ActiveItems; }
 		}
 
-		public IEnumerable<Signal> CurrentEntries
+		public List<Signal> CurrentEntries
 		{
-		    get { return entries.ActiveItems; }
+		    get { return entries.ActiveItems.ToList(); }
 		}
 
-		public IEnumerable<Signal> CurrentExits
+		public List<Signal> CurrentExits
 		{
-		    get { return exits.ActiveItems; }
+		    get { return exits.ActiveItems.ToList(); }
 		}
 
 		#endregion
@@ -295,17 +295,19 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			Dictionary<List<Condition>, PerformanceMetrics> bestEntryCombinations = GetBestEntryConditionCombinations(2, 4, 5);
-			Dictionary<List<ExitCondition>, PerformanceMetrics> bestExitCombinations = GetBestExitConditionCombinations(2, 4, 5);
+			Dictionary<List<Condition>, PerformanceMetrics> bestEntryCombinations = GetBestEntryConditionCombinations(1, 4, 5);
+			Dictionary<List<ExitCondition>, PerformanceMetrics> bestExitCombinations = GetBestExitConditionCombinations(1, 4, 5);
 
 			if (bestEntryCombinations.Count > 0)
 			{
-				optimalEntryCombinations = SelectOptimalCombinations(bestEntryCombinations);
+				List<List<Condition>> optimal = SelectOptimalCombinations(bestEntryCombinations);
+				optimalEntryCombinations = optimal.Count > 0 ? optimal : optimalEntryCombinations;
 			}
 
 			if (bestExitCombinations.Count > 0)
 			{
-	        	optimalExitCombinations = SelectOptimalCombinations(bestExitCombinations);
+				List<List<ExitCondition>> optimal = SelectOptimalCombinations(bestExitCombinations);
+				optimalExitCombinations = optimal.Count > 0 ? optimal : optimalExitCombinations;
 			}
 		}
 		#endregion
