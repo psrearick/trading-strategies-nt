@@ -236,8 +236,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			Dictionary<List<Condition>, PerformanceMetrics> bestEntryCombinations = GetBestEntryConditionCombinations(2, 4, 100);
-			Dictionary<List<ExitCondition>, PerformanceMetrics> bestExitCombinations = GetBestExitConditionCombinations(2, 4, 100);
+			Dictionary<List<Condition>, PerformanceMetrics> bestEntryCombinations = GetBestEntryConditionCombinations(2, 4, 5);
+			Dictionary<List<ExitCondition>, PerformanceMetrics> bestExitCombinations = GetBestExitConditionCombinations(2, 4, 5);
 
 			if (bestEntryCombinations.Count > 0)
 			{
@@ -312,8 +312,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        }
 		    }
 
-			entrySignals.LimitSize(200);
-			exitSignals.LimitSize(200);
+//			entrySignals.LimitSize(200);
+//			exitSignals.LimitSize(200);
 		}
 		#endregion
 
@@ -539,7 +539,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region GenerateSimulatedTradesForEntryCombination
+		#region GenerateSimulatedTradesForEntryCombination()
 		private List<SimTrade> GenerateSimulatedTradesForEntryCombination(List<Condition> entryConditions, int minTradesRequired)
 		{
 		    List<SimTrade> trades = new List<SimTrade>();
@@ -547,9 +547,20 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    foreach (Signal entrySignal in entrySignals.ActiveItems)
 		    {
 		        bool allConditionsMet = true;
+
 		        foreach (Condition condition in entryConditions)
 		        {
-		            if (!entrySignal.EntryConditions.ContainsKey(condition))
+		            bool conditionMet = false;
+		            foreach (var entryConditionPair in entrySignal.EntryConditions)
+		            {
+		                if (entryConditionPair.Key.GetType() == condition.GetType())
+		                {
+		                    conditionMet = true;
+		                    break;
+		                }
+		            }
+
+		            if (!conditionMet)
 		            {
 		                allConditionsMet = false;
 		                break;
@@ -558,15 +569,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		        if (allConditionsMet)
 		        {
-		            // Find matching exit signals
 		            foreach (Signal exitSignal in exitSignals.ActiveItems)
 		            {
 		                if (exitSignal.Bar > entrySignal.Bar)
 		                {
-		                    bool allExitConditionsMet = true;
+							bool allExitConditionsMet = true;
 		                    foreach (ExitCondition exitCondition in exitSignal.ExitConditions.Keys)
 		                    {
-		                        if (!exitConditions.Contains(exitCondition))
+		                        if (!exitConditions.Any(c => c.GetType() == exitCondition.GetType()))
 		                        {
 		                            allExitConditionsMet = false;
 		                            break;
@@ -575,7 +585,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		                    if (allExitConditionsMet)
 		                    {
-		                        // Create a SimTrade instance
 		                        SimTrade trade = new SimTrade();
 								trade.Activate();
 		                        trade.Set(this);
@@ -607,7 +616,17 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        bool allConditionsMet = true;
 		        foreach (ExitCondition condition in exitConditions)
 		        {
-		            if (!exitSignal.ExitConditions.ContainsKey(condition))
+		            bool conditionMet = false;
+		            foreach (var exitConditionPair in exitSignal.ExitConditions)
+		            {
+		                if (exitConditionPair.Key.GetType() == condition.GetType())
+		                {
+		                    conditionMet = true;
+		                    break;
+		                }
+		            }
+
+		            if (!conditionMet)
 		            {
 		                allConditionsMet = false;
 		                break;
@@ -616,7 +635,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		        if (allConditionsMet)
 		        {
-		            // Find matching exit signals
 		            foreach (Signal entrySignal in entrySignals.ActiveItems)
 		            {
 		                if (exitSignal.Bar > entrySignal.Bar)
@@ -624,7 +642,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		                    bool allEntryConditionsMet = true;
 		                    foreach (Condition entryCondition in entrySignal.EntryConditions.Keys)
 		                    {
-		                        if (!entryConditions.Contains(entryCondition))
+								if (!entryConditions.Any(c => c.GetType() == entryCondition.GetType()))
 		                        {
 		                            allEntryConditionsMet = false;
 		                            break;
@@ -633,7 +651,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		                    if (allEntryConditionsMet)
 		                    {
-		                        // Create a SimTrade instance
 		                        SimTrade trade = new SimTrade();
 								trade.Activate();
 		                        trade.Set(this);
