@@ -59,7 +59,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public ObjectPool<Signal> exits;
 		private int lastUpdateBar = -1;
 		private int lastSignalBar = -1;
-		private int rollingWindowSize = 80;
+		private int rollingWindowSize = 15;
 		private int crossValidationFolds = 3;
 		private double regularization = 0.1;
 
@@ -147,14 +147,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    {
 		        AnalyzeConditionPerformance();
 				lastUpdateBar = CurrentBar;
+
+				foreach (SimTrade trade in windowTrades.ActiveItems.Where(t => t.EntrySignal.Bar < CurrentBar - rollingWindowSize).ToList())
+				{
+					windowTrades.Release(trade);
+				}
 		    }
 
-		    if (CurrentBar > lastSignalBar + 10)
-		    {
-		        GenerateSignals();
-
-		        lastSignalBar = CurrentBar;
-		    }
+		    GenerateSignals();
 
 		}
 		#endregion
@@ -289,6 +289,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		        Dictionary<List<ExitCondition>, PerformanceMetrics> bestExitCombinations = GetBestExitConditionCombinations(foldStart, foldEnd, 1, 4, 2);
 
+				windowTrades.ReleaseAll();
+
 				if (bestEntryCombinations.Count > 0)
 				{
 					// Apply regularization and select the optimal combinations
@@ -390,18 +392,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			cachedEntrySignals.RemoveAll(s => s.Bar < startIndex);
 			cachedExitSignals.RemoveAll(s => s.Bar < startIndex);
-
-			foreach (SimTrade trade in windowTrades.ActiveItems.Where(t => t.EntrySignal.Bar < startIndex).ToList())
-			{
-				windowTrades.Release(trade);
-			}
 		}
 		#endregion
 
 		#region TestIndividualConditions()
 		private void TestIndividualConditions()
 		{
-			TestIndividualEntries();
+			if (CurrentBar % 20 == 0) {
+				TestIndividualEntries();
+			}
 
 			TestIndividualExits();
 
@@ -434,6 +433,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
+//			Print(entrySignals.GetPools().Values.Count());
 			foreach (ObjectPool<Signal> entrySignalPool in entrySignals.GetPools().Values) {
 				// Test exit conditions for each entry signal
 			    foreach (Signal entrySignal in entrySignalPool.ActiveItems)
