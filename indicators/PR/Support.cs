@@ -310,6 +310,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	#endregion
 
 	#region Object Pool
+
 	public interface IPoolable
 	{
 	    bool IsActive { get; set; }
@@ -319,165 +320,155 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 	public class ObjectPool<T> where T : IPoolable, new()
 	{
-	    public List<T> items = new List<T>();
+	    private List<T> items = new List<T>();
 	    private Func<T> createFunc;
-		public int MaxSize;
+	    public int MaxSize;
 
 	    public ObjectPool(int maxSize, Func<T> createFunc)
 	    {
 	        this.createFunc = createFunc;
-
-			MaxSize = maxSize;
+	        MaxSize = maxSize;
 	    }
-
-		public T At(int position)
-		{
-			return items[position];
-		}
-
-		public int Count()
-		{
-			return items.Count();
-		}
 
 	    public T Get()
 	    {
 	        T item = items.FirstOrDefault(x => !x.IsActive);
-	        if (item == null)
+	        if (item == null && items.Count < MaxSize)
 	        {
 	            item = createFunc();
 	            items.Add(item);
 	        }
 	        item.Activate();
-
-			if (items.Count > MaxSize)
-			{
-				items.RemoveAt(0);
-			}
-
 	        return item;
 	    }
 
 	    public void Release(T item)
 	    {
-			items.Remove(item);
 	        item.Deactivate();
 	    }
 
-		public IEnumerable<T> ActiveItems
+		public void ReleaseAll()
 		{
-		    get { return items.Where(x => x.IsActive); }
-		}
-
-		public void SetMaxSize(int maxSize)
-		{
-			MaxSize = maxSize;
-		}
-
-		public void Prune(bool inactiveOnly = false)
-		{
-			if (inactiveOnly) {
-				items.RemoveAll(x => !x.IsActive);
-
-				return;
+			foreach (T item in items)
+			{
+				Release(item);
 			}
-
-			items.Clear();
 		}
+
+	    public IEnumerable<T> ActiveItems
+		{
+			get { return items.Where(x => x.IsActive); }
+		}
+
+	    public void Prune(bool inactiveOnly = false)
+	    {
+	        if (inactiveOnly)
+	        {
+	            items = items.Where(x => x.IsActive).ToList();
+	        }
+	        else
+	        {
+	            items.Clear();
+	        }
+	    }
 	}
 
-//	public class ObjectPool<T> where T : IPoolable, new()
-//	{
-//	    public List<T> items = new List<T>();
-//	    private Func<T> createFunc;
-//		public int MaxSize;
+	public class GroupedObjectPool<TKey, T> where T : IPoolable, new()
+	{
+	    private Dictionary<TKey, ObjectPool<T>> pools;
+	    private Func<T> createFunc;
+	    private int maxGroupSize;
 
-//	    public ObjectPool(int initialSize, Func<T> createFunc, int maxSize = 0)
-//	    {
-//	        this.createFunc = createFunc;
+	    public GroupedObjectPool(int maxGroupSize, Func<T> createFunc)
+	    {
+	        this.pools = new Dictionary<TKey, ObjectPool<T>>();
+	        this.createFunc = createFunc;
+	        this.maxGroupSize = maxGroupSize;
+	    }
 
-////	        for (int i = 0; i < initialSize; i++)
-////	        {
-////	            items.Add(createFunc());
-////	        }
+	    public T Get(TKey key)
+	    {
+	        return GetPool(key).Get();
+	    }
 
-//			MaxSize = initialSize;
+		public ObjectPool<T> GetPool(TKey key)
+		{
+			ObjectPool<T> pool = null;
 
-////			MaxSize = maxSize;
-//	    }
+			if (!pools.TryGetValue(key, out pool))
+	        {
+	            pool = new ObjectPool<T>(maxGroupSize, createFunc);
+	            pools[key] = pool;
+	        }
 
-//		public T At(int position)
-//		{
-//			return items[position];
-//		}
+			return pool;
+		}
 
-//		public int Count()
-//		{
-//			return items.Count();
-//		}
+		public Dictionary<TKey, ObjectPool<T>> GetPools()
+		{
+			return pools;
+		}
 
-//	    public T Get()
-//	    {
-////	        T item = items.FirstOrDefault(x => !x.IsActive);
-////	        if (item == null)
-////	        {
-//	            T item = createFunc();
-//	            items.Add(item);
-////				LimitSize();
-////	        }
-//	        item.Activate();
+	    public void Release(TKey key, T item)
+	    {
+			ObjectPool<T> pool = null;
 
-//			if (items.Count > MaxSize)
-//			{
-//				items.RemoveAt(0);
-//			}
+	        if (pools.TryGetValue(key, out pool))
+	        {
+	            pool.Release(item);
+	        }
+	    }
 
-//	        return item;
-//	    }
+	    public void ActivateAll(TKey key)
+	    {
+			ObjectPool<T> pool = null;
 
-//	    public void Release(T item)
-//	    {
-//			items.Remove(item);
-////	        item.Deactivate();
-//	    }
+	        if (pools.TryGetValue(key, out pool))
+	        {
+	            foreach (var item in pool.ActiveItems)
+	            {
+	                item.Activate();
+	            }
+	        }
+	    }
 
-//		public IEnumerable<T> ActiveItems
-//		{
-//			get { return items; }
-////		    get { return items.Where(x => x.IsActive); }
-//		}
+	    public void DeactivateAll(TKey key)
+	    {
+			ObjectPool<T> pool = null;
 
-//		public void SetMaxSize(int maxSize)
-//		{
-//			MaxSize = maxSize;
-//		}
+	        if (pools.TryGetValue(key, out pool))
+	        {
+	            foreach (var item in pool.ActiveItems)
+	            {
+	                item.Deactivate();
+	            }
+	        }
+	    }
 
-//		public void Prune()
-//		{
-////			items.RemoveAll(x => !x.IsActive);
-//			items.Clear();
-//		}
+	    public void PruneAll(bool inactiveOnly = false)
+	    {
+	        foreach (var pool in pools.Values)
+	        {
+	            pool.Prune(inactiveOnly);
+	        }
 
-//		public void LimitSize(int maxSize = 0)
-//		{
-////			int size = maxSize > 0 ? maxSize : MaxSize;
+			if (!inactiveOnly) {
+				pools.Clear();
+			}
+	    }
 
-////			if (size < 0)
-////			{
-////				return;
-////			}
+	    public void PruneGroup(TKey key, bool inactiveOnly = false)
+	    {
+			ObjectPool<T> pool = null;
 
-////		    while (ActiveItems.Count() > size)
-////		    {
-////		        T itemToRelease = ActiveItems.FirstOrDefault();
-////		        if (itemToRelease != null)
-////		        {
-////		            Release(itemToRelease);
-////		        }
-////		    }
-//		}
-//	}
+	        if (pools.TryGetValue(key, out pool))
+	        {
+	            pool.Prune(inactiveOnly);
 
+				pools.Remove(key);
+	        }
+	    }
+	}
 	#endregion
 }
 

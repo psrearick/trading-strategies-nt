@@ -1,28 +1,57 @@
-public class Parent
-{
-	public List<Child> children = new List<Child>();
+#region CombineOptimalCombinations()
+		private List<List<ICondition>> CombineOptimalCombinations<ICondition>(List<List<List<ICondition>>> optimalSet)
+		{
+		    Dictionary<List<ICondition>, int> combinationVotes = new Dictionary<List<ICondition>, int>();
+		    Dictionary<List<ICondition>, double> combinationScores = new Dictionary<List<ICondition>, double>();
 
-	public Parent()
-	{
-		children.Add(new Child(1));
-		children.Add(new Child(2));
-		children.Add(new Child(3));
-	}
+		    // Voting ensemble
+		    foreach (List<List<ICondition>> fold in optimalSet)
+		    {
+		        foreach (List<ICondition> combination in fold)
+		        {
+		            if (!combinationVotes.ContainsKey(combination))
+		            {
+		                combinationVotes[combination] = 0;
+		            }
+		            combinationVotes[combination]++;
+		        }
+		    }
 
-	public void replace()
-	{
-		List<Child> newChildren = new List<Child>();
-		newChildren.Add(new Child(4));
-		newChildren.Add(new Child(5));
-		children = newChildren;
-	}
-}
+		    // Averaging ensemble
+		    foreach (List<List<ICondition>> fold in optimalSet)
+		    {
+		        foreach (List<ICondition> combination in fold)
+		        {
+		            if (!combinationScores.ContainsKey(combination))
+		            {
+		                combinationScores[combination] = 0;
+		            }
+		            combinationScores[combination] += 1.0 / fold.Count;
+		        }
+		    }
 
-public class Child {
-	public int childID;
+		    // Combine voting and averaging scores
+		    Dictionary<List<ICondition>, double> combinedScores = new Dictionary<List<ICondition>, double>();
+		    foreach (var combination in combinationVotes.Keys)
+		    {
+		        double votingScore = (double)combinationVotes[combination] / optimalSet.Count;
+		        double averagingScore = combinationScores[combination];
+		        double combinedScore = (votingScore + averagingScore) / 2;
+		        combinedScores[combination] = combinedScore;
+		    }
 
-	public Child(int id)
-	{
-		childID = id;
-	}
-}
+		    // Select the top combinations based on combined scores
+		    List<KeyValuePair<List<ICondition>, double>> sortedCombinations = combinedScores
+		        .OrderByDescending(x => x.Value)
+		        .ToList();
+
+		    List<List<ICondition>> optimalCombinations = new List<List<ICondition>>();
+		    int count = Math.Min(10, sortedCombinations.Count);
+		    for (int i = 0; i < count; i++)
+		    {
+		        optimalCombinations.Add(sortedCombinations[i].Key);
+		    }
+
+		    return optimalCombinations;
+		}
+		#endregion
