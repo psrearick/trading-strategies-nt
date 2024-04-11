@@ -475,6 +475,182 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	    }
 	}
 	#endregion
+
+	#region Genetic Optimization
+	public class GeneticAlgorithm
+	{
+	    private readonly Random random = new Random();
+
+	    public List<List<T>> Optimize<T>(
+	        Func<List<T>, double> fitnessFunction,
+	        List<T> initialPopulation,
+	        int populationSize,
+	        int maxGenerations,
+	        double mutationRate,
+	        double crossoverRate)
+	    {
+	        List<List<T>> population = InitializePopulation(initialPopulation, populationSize);
+
+	        for (int generation = 0; generation < maxGenerations; generation++)
+	        {
+	            List<double> fitnessScores = EvaluateFitness(population, fitnessFunction);
+	            List<List<T>> parents = SelectParents(population, fitnessScores);
+	            List<List<T>> offspring = CrossoverOffspring(parents, crossoverRate);
+	            MutateOffspring(offspring, mutationRate);
+	            population = SelectSurvivors(population, offspring, fitnessScores, populationSize);
+	        }
+
+	        return population;
+	    }
+
+	    // Initialize the population with random individuals
+	    private List<List<T>> InitializePopulation<T>(List<T> initialPopulation, int populationSize)
+	    {
+	        List<List<T>> population = new List<List<T>>();
+
+	        for (int i = 0; i < populationSize; i++)
+	        {
+	            List<T> individual = new List<T>(initialPopulation);
+	            Shuffle(individual);
+	            population.Add(individual);
+	        }
+
+	        return population;
+	    }
+
+	    // Evaluate the fitness of each individual in the population
+	    private List<double> EvaluateFitness<T>(List<List<T>> population, Func<List<T>, double> fitnessFunction)
+	    {
+	        List<double> fitnessScores = new List<double>();
+
+	        foreach (List<T> individual in population)
+	        {
+	            double fitness = fitnessFunction(individual);
+	            fitnessScores.Add(fitness);
+	        }
+
+	        return fitnessScores;
+	    }
+
+	    // Select parents for crossover based on their fitness scores
+	    private List<List<T>> SelectParents<T>(List<List<T>> population, List<double> fitnessScores)
+	    {
+	        List<List<T>> parents = new List<List<T>>();
+
+	        for (int i = 0; i < population.Count; i++)
+	        {
+	            int parent1Index = SelectParentIndex(fitnessScores);
+	            int parent2Index = SelectParentIndex(fitnessScores);
+	            parents.Add(population[parent1Index]);
+	            parents.Add(population[parent2Index]);
+	        }
+
+	        return parents;
+	    }
+
+	    // Perform crossover between parents to create offspring
+	    private List<List<T>> CrossoverOffspring<T>(List<List<T>> parents, double crossoverRate)
+	    {
+	        List<List<T>> offspring = new List<List<T>>();
+
+	        for (int i = 0; i < parents.Count; i += 2)
+	        {
+	            List<T> parent1 = parents[i];
+	            List<T> parent2 = parents[i + 1];
+	            List<T> child1 = new List<T>(parent1);
+	            List<T> child2 = new List<T>(parent2);
+
+	            if (random.NextDouble() < crossoverRate)
+	            {
+	                int crossoverPoint = random.Next(1, parent1.Count);
+	                for (int j = crossoverPoint; j < parent1.Count; j++)
+	                {
+	                    T temp = child1[j];
+	                    child1[j] = child2[j];
+	                    child2[j] = temp;
+	                }
+	            }
+
+	            offspring.Add(child1);
+	            offspring.Add(child2);
+	        }
+
+	        return offspring;
+	    }
+
+	    // Mutate the offspring based on the mutation rate
+	    private void MutateOffspring<T>(List<List<T>> offspring, double mutationRate)
+	    {
+	        foreach (List<T> individual in offspring)
+	        {
+	            for (int i = 0; i < individual.Count; i++)
+	            {
+	                if (random.NextDouble() < mutationRate)
+	                {
+	                    int swapIndex = random.Next(individual.Count);
+	                    T temp = individual[i];
+	                    individual[i] = individual[swapIndex];
+	                    individual[swapIndex] = temp;
+	                }
+	            }
+	        }
+	    }
+
+	    // Select survivors for the next generation based on fitness scores
+	    private List<List<T>> SelectSurvivors<T>(
+	        List<List<T>> population,
+	        List<List<T>> offspring,
+	        List<double> fitnessScores,
+	        int populationSize)
+	    {
+	        List<List<T>> survivors = new List<List<T>>();
+	        survivors.AddRange(population);
+	        survivors.AddRange(offspring);
+
+	        survivors = survivors
+	            .Zip(fitnessScores, (individual, fitness) => new { Individual = individual, Fitness = fitness })
+	            .OrderByDescending(x => x.Fitness)
+	            .Select(x => x.Individual)
+	            .Take(populationSize)
+	            .ToList();
+
+	        return survivors;
+	    }
+
+	    // Select a parent index based on fitness scores using roulette wheel selection
+	    private int SelectParentIndex(List<double> fitnessScores)
+	    {
+	        double totalFitness = fitnessScores.Sum();
+	        double rouletteValue = random.NextDouble() * totalFitness;
+	        double cumulativeFitness = 0;
+
+	        for (int i = 0; i < fitnessScores.Count; i++)
+	        {
+	            cumulativeFitness += fitnessScores[i];
+	            if (cumulativeFitness >= rouletteValue)
+	            {
+	                return i;
+	            }
+	        }
+
+	        return fitnessScores.Count - 1;
+	    }
+
+	    // Shuffle a list randomly
+	    private void Shuffle<T>(List<T> list)
+	    {
+	        int n = list.Count;
+	        while (n > 1)
+	        {
+	            n--;
+	            int k = random.Next(n + 1);
+	            T value = list[k];
+	            list[k] = list[n];
+	            list[n] = value;
+	        }
+	    }
+	}
+	#endregion
 }
 
 #region NinjaScript generated code. Neither change nor remove.
