@@ -323,14 +323,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	    private Func<T> createFunc;
 		public int MaxSize;
 
-	    public ObjectPool(int initialSize, Func<T> createFunc, int maxSize = 0)
+	    public ObjectPool(int maxSize, Func<T> createFunc)
 	    {
 	        this.createFunc = createFunc;
-
-	        for (int i = 0; i < initialSize; i++)
-	        {
-	            items.Add(createFunc());
-	        }
 
 			MaxSize = maxSize;
 	    }
@@ -352,14 +347,20 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	        {
 	            item = createFunc();
 	            items.Add(item);
-				LimitSize();
 	        }
 	        item.Activate();
+
+			if (items.Count > MaxSize)
+			{
+				items.RemoveAt(0);
+			}
+
 	        return item;
 	    }
 
 	    public void Release(T item)
 	    {
+			items.Remove(item);
 	        item.Deactivate();
 	    }
 
@@ -373,30 +374,109 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			MaxSize = maxSize;
 		}
 
-		public void Prune()
+		public void Prune(bool inactiveOnly = false)
 		{
-			items.RemoveAll(x => !x.IsActive);
-		}
+			if (inactiveOnly) {
+				items.RemoveAll(x => !x.IsActive);
 
-		public void LimitSize(int maxSize = 0)
-		{
-			int size = maxSize > 0 ? maxSize : MaxSize;
-
-			if (size < 0)
-			{
 				return;
 			}
 
-		    while (ActiveItems.Count() > size)
-		    {
-		        T itemToRelease = ActiveItems.FirstOrDefault();
-		        if (itemToRelease != null)
-		        {
-		            Release(itemToRelease);
-		        }
-		    }
+			items.Clear();
 		}
 	}
+
+//	public class ObjectPool<T> where T : IPoolable, new()
+//	{
+//	    public List<T> items = new List<T>();
+//	    private Func<T> createFunc;
+//		public int MaxSize;
+
+//	    public ObjectPool(int initialSize, Func<T> createFunc, int maxSize = 0)
+//	    {
+//	        this.createFunc = createFunc;
+
+////	        for (int i = 0; i < initialSize; i++)
+////	        {
+////	            items.Add(createFunc());
+////	        }
+
+//			MaxSize = initialSize;
+
+////			MaxSize = maxSize;
+//	    }
+
+//		public T At(int position)
+//		{
+//			return items[position];
+//		}
+
+//		public int Count()
+//		{
+//			return items.Count();
+//		}
+
+//	    public T Get()
+//	    {
+////	        T item = items.FirstOrDefault(x => !x.IsActive);
+////	        if (item == null)
+////	        {
+//	            T item = createFunc();
+//	            items.Add(item);
+////				LimitSize();
+////	        }
+//	        item.Activate();
+
+//			if (items.Count > MaxSize)
+//			{
+//				items.RemoveAt(0);
+//			}
+
+//	        return item;
+//	    }
+
+//	    public void Release(T item)
+//	    {
+//			items.Remove(item);
+////	        item.Deactivate();
+//	    }
+
+//		public IEnumerable<T> ActiveItems
+//		{
+//			get { return items; }
+////		    get { return items.Where(x => x.IsActive); }
+//		}
+
+//		public void SetMaxSize(int maxSize)
+//		{
+//			MaxSize = maxSize;
+//		}
+
+//		public void Prune()
+//		{
+////			items.RemoveAll(x => !x.IsActive);
+//			items.Clear();
+//		}
+
+//		public void LimitSize(int maxSize = 0)
+//		{
+////			int size = maxSize > 0 ? maxSize : MaxSize;
+
+////			if (size < 0)
+////			{
+////				return;
+////			}
+
+////		    while (ActiveItems.Count() > size)
+////		    {
+////		        T itemToRelease = ActiveItems.FirstOrDefault();
+////		        if (itemToRelease != null)
+////		        {
+////		            Release(itemToRelease);
+////		        }
+////		    }
+//		}
+//	}
 
 	#endregion
 }

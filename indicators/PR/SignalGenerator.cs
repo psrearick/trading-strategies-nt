@@ -132,10 +132,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 				parameterTypes = new ObjectPool<ParameterType>(5, () => new ParameterType());
 				trades = new ObjectPool<SimTrade>(200, () => new SimTrade());
-				exitSignals = new ObjectPool<Signal>(200, () => new Signal());
-				entrySignals = new ObjectPool<Signal>(200, () => new Signal());
-				exits = new ObjectPool<Signal>(200, () => new Signal());
-				entries = new ObjectPool<Signal>(200, () => new Signal());
+				exitSignals = new ObjectPool<Signal>(80, () => new Signal());
+				entrySignals = new ObjectPool<Signal>(80, () => new Signal());
+				exits = new ObjectPool<Signal>(20, () => new Signal());
+				entries = new ObjectPool<Signal>(20, () => new Signal());
 
 				optimalEntryCombinations = new List<List<Condition>>();
 				optimalExitCombinations = new List<List<ExitCondition>>();
@@ -308,7 +308,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    // Generate exit signals
 		    foreach (List<ExitCondition> exitCombination in optimalExitCombinations)
 		    {
-		        foreach (Signal entrySignal in entrySignals.ActiveItems)
+		        foreach (Signal entrySignal in ActiveEntrySignals)
 		        {
 		            if (IsExitCombinationMet(exitCombination, entrySignal))
 		            {
@@ -348,6 +348,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region IsSignificantChange()
 		private bool IsSignificantChange()
 		{
 			if (lastSignalBar < 0) {
@@ -356,25 +357,24 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			return md.Direction[CurrentBar - lastSignalBar] == md.Direction[0];
 		}
+		#endregion
 
 		#region TestIndividualConditions()
 		private void TestIndividualConditions()
 		{
-			if (CurrentBar % 100 == 0) {
+
+			TestIndividualEntries();
+			TestIndividualExits();
+
+			if (CurrentBar % 40 < 5 || IsSignificantChange())
+			{
 				TestIndividualEntries();
+//				TestIndividualExits();
+//				entrySignals.Prune();
+//				exitSignals.Prune();
 			}
 
 			TestIndividualExits();
-
-
-			entrySignals.LimitSize(200);
-			entrySignals.Prune();
-
-			exitSignals.LimitSize(200);
-			exitSignals.Prune();
-
-			// Print(entrySignals.Count());
-			// Print(exitSignals.Count());
 		}
 		#endregion
 
@@ -397,7 +397,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private void TestIndividualExits()
 		{
 			// Test exit conditions for each entry signal
-		    foreach (Signal entrySignal in entrySignals.ActiveItems)
+		    foreach (Signal entrySignal in ActiveEntrySignals)
 		    {
 		        foreach (ExitCondition exitCondition in exitConditions)
 		        {
@@ -672,7 +672,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		{
 		    List<SimTrade> trades = new List<SimTrade>();
 
-		    foreach (Signal entrySignal in entrySignals.ActiveItems)
+		    foreach (Signal entrySignal in ActiveEntrySignals)
 		    {
 		        bool allConditionsMet = true;
 
@@ -697,7 +697,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		        if (allConditionsMet)
 		        {
-		            foreach (Signal exitSignal in exitSignals.ActiveItems)
+		            foreach (Signal exitSignal in ActiveExitSignals)
 		            {
 		                if (exitSignal.Bar > entrySignal.Bar)
 		                {
@@ -740,7 +740,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		{
 		    List<SimTrade> trades = new List<SimTrade>();
 
-		    foreach (Signal exitSignal in exitSignals.ActiveItems)
+		    foreach (Signal exitSignal in ActiveExitSignals)
 		    {
 		        bool allConditionsMet = true;
 		        foreach (ExitCondition condition in exitConditions)
@@ -764,7 +764,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		        if (allConditionsMet)
 		        {
-		            foreach (Signal entrySignal in entrySignals.ActiveItems)
+		            foreach (Signal entrySignal in ActiveEntrySignals)
 		            {
 		                if (exitSignal.Bar > entrySignal.Bar)
 		                {
