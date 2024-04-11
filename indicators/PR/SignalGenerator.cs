@@ -157,10 +157,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		    UpdateBarsSinceDoubleTopBottom();
 
+			if (CurrentBar % 100 == 0) {
+				TestIndividualConditions();
+			}
+
 		    // Perform incremental updates
 		    if (CurrentBar % 50 == 0 || IsSignificantChange())
 		    {
-				TestIndividualConditions();
 		        AnalyzeConditionPerformance();
 		        lastUpdateBar = CurrentBar;
 		    }
@@ -418,8 +421,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        }
 		    }
 
-			entrySignals.LimitSize(500);
-			exitSignals.LimitSize(500);
+			entrySignals.LimitSize(300);
+			exitSignals.LimitSize(300);
 		}
 		#endregion
 
