@@ -333,7 +333,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	    public T Get()
 	    {
 	        T item = items.FirstOrDefault(x => !x.IsActive);
-	        if (item == null && items.Count < MaxSize)
+	        if (item == null)
 	        {
 	            item = createFunc();
 	            items.Add(item);
