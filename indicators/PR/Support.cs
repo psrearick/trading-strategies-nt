@@ -319,7 +319,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 	public class ObjectPool<T> where T : IPoolable, new()
 	{
-	    private List<T> items = new List<T>();
+	    public List<T> items = new List<T>();
 	    private Func<T> createFunc;
 		public int MaxSize;
 
@@ -338,6 +338,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public T At(int position)
 		{
 			return items[position];
+		}
+
+		public int Count()
+		{
+			return items.Count();
 		}
 
 	    public T Get()
@@ -366,6 +371,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public void SetMaxSize(int maxSize)
 		{
 			MaxSize = maxSize;
+		}
+
+		public void Prune()
+		{
+			items.RemoveAll(x => !x.IsActive);
 		}
 
 		public void LimitSize(int maxSize = 0)

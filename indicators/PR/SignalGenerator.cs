@@ -156,10 +156,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    }
 
 		    UpdateBarsSinceDoubleTopBottom();
-
-			if (CurrentBar % 100 == 0) {
-				TestIndividualConditions();
-			}
+			TestIndividualConditions();
 
 		    // Perform incremental updates
 		    if (CurrentBar % 50 == 0 || IsSignificantChange())
@@ -363,7 +360,27 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region TestIndividualConditions()
 		private void TestIndividualConditions()
 		{
-		    // Test entry conditions
+			if (CurrentBar % 100 == 0) {
+				TestIndividualEntries();
+			}
+
+			TestIndividualExits();
+
+
+			entrySignals.LimitSize(200);
+			entrySignals.Prune();
+
+			exitSignals.LimitSize(200);
+			exitSignals.Prune();
+
+			// Print(entrySignals.Count());
+			// Print(exitSignals.Count());
+		}
+		#endregion
+
+		#region TestIndividualEntries()
+		private void TestIndividualEntries()
+		{
 		    foreach (Condition entryCondition in entryConditions)
 		    {
 		        if (entryCondition.IsMet(this))
@@ -373,8 +390,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		            entrySignal.EntryConditions[entryCondition] = new List<Parameter>();
 		        }
 		    }
+		}
+		#endregion
 
-		    // Test exit conditions for each entry signal
+		#region TestIndividualExits()
+		private void TestIndividualExits()
+		{
+			// Test exit conditions for each entry signal
 		    foreach (Signal entrySignal in entrySignals.ActiveItems)
 		    {
 		        foreach (ExitCondition exitCondition in exitConditions)
@@ -420,9 +442,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		            }
 		        }
 		    }
-
-			entrySignals.LimitSize(300);
-			exitSignals.LimitSize(300);
 		}
 		#endregion
 
