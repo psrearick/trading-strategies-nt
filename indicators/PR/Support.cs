@@ -339,6 +339,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	            items.Add(item);
 	        }
 	        item.Activate();
+
+			if (MaxSize > 0 && items.Count() > MaxSize) {
+				items.RemoveAt(0);
+			}
+
 	        return item;
 	    }
 

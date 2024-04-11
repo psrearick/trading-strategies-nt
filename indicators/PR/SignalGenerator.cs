@@ -115,12 +115,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				barsSinceDoubleTop		= new Series<int>(this);
 				barsSinceDoubleBottom	= new Series<int>(this);
 
-				parameterTypes = new ObjectPool<ParameterType>(5, () => new ParameterType());
-				windowTrades = new ObjectPool<SimTrade>(200, () => new SimTrade());
-				exitSignals = new GroupedObjectPool<int, Signal>(300, () => new Signal());
-				entrySignals = new GroupedObjectPool<int, Signal>(300, () => new Signal());
-				exits = new ObjectPool<Signal>(20, () => new Signal());
-				entries = new ObjectPool<Signal>(20, () => new Signal());
+				parameterTypes = new ObjectPool<ParameterType>(0, () => new ParameterType());
+				windowTrades = new ObjectPool<SimTrade>(0, () => new SimTrade());
+				exitSignals = new GroupedObjectPool<int, Signal>(0, () => new Signal());
+				entrySignals = new GroupedObjectPool<int, Signal>(0, () => new Signal());
+				exits = new ObjectPool<Signal>(0, () => new Signal());
+				entries = new ObjectPool<Signal>(0, () => new Signal());
 
 				optimalEntryCombinations = new List<List<Condition>>();
 				optimalExitCombinations = new List<List<ExitCondition>>();
