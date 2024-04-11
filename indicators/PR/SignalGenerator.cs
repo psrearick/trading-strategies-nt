@@ -141,39 +141,20 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    }
 
 		    UpdateBarsSinceDoubleTopBottom();
-
-			utils.PrintMessage();
-
 			TestIndividualConditions();
-
-			utils.PrintMessage();
-
 
 			if (CurrentBar % rollingWindowSize == 0)
 		    {
-
-			utils.PrintMessage();
-
 		        AnalyzeConditionPerformance();
-
-			utils.PrintMessage();
-
 				lastUpdateBar = CurrentBar;
 		    }
 
 		    if (CurrentBar > lastSignalBar + 10)
 		    {
-
-			utils.PrintMessage();
-
 		        GenerateSignals();
-
-			utils.PrintMessage();
 
 		        lastSignalBar = CurrentBar;
 		    }
-
-			utils.PrintMessage();
 
 		}
 		#endregion
