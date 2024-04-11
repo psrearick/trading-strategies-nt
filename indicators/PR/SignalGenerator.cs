@@ -53,6 +53,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private ObjectPool<ParameterType> parameterTypes;
 		public ObjectPool<Signal> entries;
 		public ObjectPool<Signal> exits;
+		private int lastUpdateBar = -1;
+		private int lastSignalBar = -1;
+		private Dictionary<List<Condition>, PerformanceMetrics> cachedEntryCombinations = new Dictionary<List<Condition>, PerformanceMetrics>();
+		private Dictionary<List<ExitCondition>, PerformanceMetrics> cachedExitCombinations = new Dictionary<List<ExitCondition>, PerformanceMetrics>();
 
 		public IEnumerable<Signal> ActiveEntrySignals
 		{
@@ -146,57 +150,26 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			if (CurrentBar < 200) {
-				return;
-			}
-
-			UpdateBarsSinceDoubleTopBottom();
-			AnalyzeConditionPerformance();
-
-			foreach (List<Condition> entryCombination in optimalEntryCombinations)
+			if (CurrentBar < 200)
 		    {
-		        bool allConditionsMet = true;
-		        foreach (Condition condition in entryCombination)
-		        {
-		            if (!condition.IsMet(this))
-		            {
-		                allConditionsMet = false;
-		                break;
-		            }
-		        }
-
-		        if (allConditionsMet)
-		        {
-		            // Generate entry signal
-		            Signal entrySignal = entries.Get();
-		            entrySignal.Set(md.Direction[0], this, SignalType.Entry);
-		            // Add additional signal processing logic as needed
-		        }
+		        return;
 		    }
 
-		    // Check optimal exit combinations
-		    foreach (List<ExitCondition> exitCombination in optimalExitCombinations)
-		    {
-		        foreach (Signal entrySignal in entrySignals.ActiveItems)
-		        {
-		            bool allConditionsMet = true;
-		            foreach (ExitCondition condition in exitCombination)
-		            {
-		                if (!condition.IsMet(this, entrySignal))
-		                {
-		                    allConditionsMet = false;
-		                    break;
-		                }
-		            }
+		    UpdateBarsSinceDoubleTopBottom();
 
-		            if (allConditionsMet)
-		            {
-		                // Generate exit signal and execute trade
-		                Signal exitSignal = exits.Get();
-		                exitSignal.Set(entrySignal.Direction, this, SignalType.Exit);
-		                // Add trade execution logic here
-		            }
-		        }
+		    // Perform incremental updates
+		    if (CurrentBar % 50 == 0 || IsSignificantChange())
+		    {
+				TestIndividualConditions();
+		        AnalyzeConditionPerformance();
+		        lastUpdateBar = CurrentBar;
+		    }
+
+		    // Generate signals based on the optimal combinations
+		    if (CurrentBar > lastSignalBar + 10)
+		    {
+		        GenerateSignals();
+		        lastSignalBar = CurrentBar;
 		    }
 		}
 		#endregion
@@ -289,28 +262,100 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region AnalyzeConditionPerformance()
 		private void AnalyzeConditionPerformance()
 		{
-			TestIndividualConditions();
+			// Check if the cached results are still valid
+		    if (cachedEntryCombinations.Count > 0 && cachedExitCombinations.Count > 0)
+		    {
+		        // Retrieve the cached results
+		        optimalEntryCombinations = cachedEntryCombinations.Keys.ToList();
+		        optimalExitCombinations = cachedExitCombinations.Keys.ToList();
+		    }
+		    else
+		    {
+		        // Perform the analysis and update the cache
+		        Dictionary<List<Condition>, PerformanceMetrics> bestEntryCombinations = GetBestEntryConditionCombinations(1, 4, 5);
+		        Dictionary<List<ExitCondition>, PerformanceMetrics> bestExitCombinations = GetBestExitConditionCombinations(1, 4, 5);
 
-			if (CurrentBar % 10 != 0) {
-				return;
-			}
+		        if (bestEntryCombinations.Count > 0)
+		        {
+		            List<List<Condition>> optimal = SelectOptimalCombinations(bestEntryCombinations);
+		            optimalEntryCombinations = optimal.Count > 0 ? optimal : optimalEntryCombinations;
+		            cachedEntryCombinations = bestEntryCombinations;
+		        }
 
-			Dictionary<List<Condition>, PerformanceMetrics> bestEntryCombinations = GetBestEntryConditionCombinations(1, 4, 5);
-			Dictionary<List<ExitCondition>, PerformanceMetrics> bestExitCombinations = GetBestExitConditionCombinations(1, 4, 5);
-
-			if (bestEntryCombinations.Count > 0)
-			{
-				List<List<Condition>> optimal = SelectOptimalCombinations(bestEntryCombinations);
-				optimalEntryCombinations = optimal.Count > 0 ? optimal : optimalEntryCombinations;
-			}
-
-			if (bestExitCombinations.Count > 0)
-			{
-				List<List<ExitCondition>> optimal = SelectOptimalCombinations(bestExitCombinations);
-				optimalExitCombinations = optimal.Count > 0 ? optimal : optimalExitCombinations;
-			}
+		        if (bestExitCombinations.Count > 0)
+		        {
+		            List<List<ExitCondition>> optimal = SelectOptimalCombinations(bestExitCombinations);
+		            optimalExitCombinations = optimal.Count > 0 ? optimal : optimalExitCombinations;
+		            cachedExitCombinations = bestExitCombinations;
+		        }
+		    }
 		}
 		#endregion
+
+		#region GenerateSignals()
+		private void GenerateSignals()
+		{
+		    // Generate entry signals
+		    foreach (List<Condition> entryCombination in optimalEntryCombinations)
+		    {
+		        if (IsEntryCombinationMet(entryCombination))
+		        {
+		            Signal entrySignal = entries.Get();
+		            entrySignal.Set(md.Direction[0], this, SignalType.Entry);
+		        }
+		    }
+
+		    // Generate exit signals
+		    foreach (List<ExitCondition> exitCombination in optimalExitCombinations)
+		    {
+		        foreach (Signal entrySignal in entrySignals.ActiveItems)
+		        {
+		            if (IsExitCombinationMet(exitCombination, entrySignal))
+		            {
+		                Signal exitSignal = exits.Get();
+		                exitSignal.Set(entrySignal.Direction, this, SignalType.Exit);
+		            }
+		        }
+		    }
+		}
+		#endregion
+
+		#region IsEntryCombinationMet()
+		private bool IsEntryCombinationMet(List<Condition> entryCombination)
+		{
+		    foreach (Condition condition in entryCombination)
+		    {
+		        if (!condition.IsMet(this))
+		        {
+		            return false;
+		        }
+		    }
+		    return true;
+		}
+		#endregion
+
+		#region IsExitCombinationMet()
+		private bool IsExitCombinationMet(List<ExitCondition> exitCombination, Signal entrySignal)
+		{
+		    foreach (ExitCondition condition in exitCombination)
+		    {
+		        if (!condition.IsMet(this, entrySignal))
+		        {
+		            return false;
+		        }
+		    }
+		    return true;
+		}
+		#endregion
+
+		private bool IsSignificantChange()
+		{
+			if (lastSignalBar < 0) {
+				return false;
+			}
+
+			return md.Direction[CurrentBar - lastSignalBar] == md.Direction[0];
+		}
 
 		#region TestIndividualConditions()
 		private void TestIndividualConditions()
@@ -373,8 +418,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        }
 		    }
 
-//			entrySignals.LimitSize(200);
-//			exitSignals.LimitSize(200);
+			entrySignals.LimitSize(500);
+			exitSignals.LimitSize(500);
 		}
 		#endregion
 
