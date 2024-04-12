@@ -488,18 +488,38 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    List<List<T>> initialPopulation,
 		    int populationSize,
 		    int maxGenerations,
-		    double mutationRate,
-		    double crossoverRate)
+		    double initialMutationRate,
+		    double crossoverRate,
+			int eliteCount)
 		{
 		    List<List<T>> population = initialPopulation;
+			double mutationRate = initialMutationRate;
 
 		    for (int generation = 0; generation < maxGenerations; generation++)
 		    {
 		        List<double> fitnessScores = EvaluateFitness(population, fitnessFunction);
 			    List<List<T>> parents = SelectParents(population, fitnessScores);
 			    List<List<T>> offspring = CrossoverOffspring(parents, crossoverRate);
+
+				// Calculate population diversity
+		        double diversity = CalculatePopulationDiversity(population);
+
+		        // Adjust mutation rate based on diversity
+		        if (diversity < 0.2)
+		        {
+		            mutationRate = 0.1; // Increase mutation rate for low diversity
+		        }
+		        else if (diversity > 0.8)
+		        {
+		            mutationRate = 0.01; // Decrease mutation rate for high diversity
+		        }
+		        else
+		        {
+		            mutationRate = initialMutationRate; // Use initial mutation rate for medium diversity
+		        }
+
 			    MutateOffspring(offspring, mutationRate);
-			    population = SelectSurvivors(population, offspring, fitnessScores, populationSize);
+			    population = SelectSurvivors(population, offspring, fitnessScores, populationSize, eliteCount);
 			}
 
 		    return population;
@@ -612,26 +632,84 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	        }
 	    }
 
+		private double CalculatePopulationDiversity<T>(List<List<T>> population)
+		{
+		    // Calculate the average Hamming distance between individuals in the population
+		    double totalDistance = 0;
+		    int numComparisons = 0;
+
+		    for (int i = 0; i < population.Count - 1; i++)
+		    {
+		        for (int j = i + 1; j < population.Count; j++)
+		        {
+		            double distance = CalculateHammingDistance(population[i], population[j]);
+		            totalDistance += distance;
+		            numComparisons++;
+		        }
+		    }
+
+		    return totalDistance / numComparisons;
+		}
+
+		private double CalculateHammingDistance<T>(List<T> individual1, List<T> individual2)
+		{
+		    int maxLength = Math.Max(individual1.Count, individual2.Count);
+		    int distance = 0;
+
+		    for (int i = 0; i < maxLength; i++)
+		    {
+		        if (i >= individual1.Count || i >= individual2.Count || !individual1[i].Equals(individual2[i]))
+		        {
+		            distance++;
+		        }
+		    }
+
+		    return (double)distance / maxLength;
+		}
+
+
 	    // Select survivors for the next generation based on fitness scores
 	    private List<List<T>> SelectSurvivors<T>(
-	        List<List<T>> population,
-	        List<List<T>> offspring,
-	        List<double> fitnessScores,
-	        int populationSize)
-	    {
-	        List<List<T>> survivors = new List<List<T>>();
-	        survivors.AddRange(population);
-	        survivors.AddRange(offspring);
+		    List<List<T>> population,
+		    List<List<T>> offspring,
+		    List<double> fitnessScores,
+		    int populationSize,
+		    int eliteCount)
+		{
+		    List<List<T>> survivors = new List<List<T>>();
 
-	        survivors = survivors
-	            .Zip(fitnessScores, (individual, fitness) => new { Individual = individual, Fitness = fitness })
-	            .OrderByDescending(x => x.Fitness)
-	            .Select(x => x.Individual)
-	            .Take(populationSize)
-	            .ToList();
+		    // Select the elite individuals from the current population
+		    var eliteIndividuals = population
+		        .Zip(fitnessScores, (individual, fitness) => new { Individual = individual, Fitness = fitness })
+		        .OrderByDescending(x => x.Fitness)
+		        .Take(eliteCount)
+		        .Select(x => x.Individual)
+		        .ToList();
 
-	        return survivors;
-	    }
+		    // Add the elite individuals to the survivors
+		    survivors.AddRange(eliteIndividuals);
+
+		    // Combine the remaining individuals from the current population and offspring
+		    List<List<T>> remainingIndividuals = new List<List<T>>();
+		    remainingIndividuals.AddRange(population);
+		    remainingIndividuals.AddRange(offspring);
+
+		    // Remove the elite individuals from the remaining individuals
+		    remainingIndividuals = remainingIndividuals.Except(eliteIndividuals).ToList();
+
+		    // Select the best individuals from the remaining individuals to fill the population
+		    var selectedIndividuals = remainingIndividuals
+		        .Zip(fitnessScores, (individual, fitness) => new { Individual = individual, Fitness = fitness })
+		        .OrderByDescending(x => x.Fitness)
+		        .Select(x => x.Individual)
+		        .Take(populationSize - eliteCount)
+		        .ToList();
+
+		    // Add the selected individuals to the survivors
+		    survivors.AddRange(selectedIndividuals);
+
+		    return survivors;
+		}
 
 	    // Select a parent index based on fitness scores using roulette wheel selection
 	    private int SelectParentIndex(List<double> fitnessScores)
