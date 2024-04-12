@@ -51,6 +51,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private List<Signal> cachedExitSignals = new List<Signal>();
 		private List<Signal> foldEntrySignals = new List<Signal>();
 		private List<Signal> foldExitSignals = new List<Signal>();
+		List<List<Condition>> entryInitialPopulation = new List<List<Condition>>();
+		List<List<ExitCondition>> exitInitialPopulation = new List<List<ExitCondition>>();
 		private GroupedObjectPool<int, Signal> entrySignals;
 		private GroupedObjectPool<int, Signal> exitSignals;
 		private ObjectPool<SimTrade> windowTrades;
@@ -241,6 +243,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			exitConditions.Add(new StrongCounterTrendFollowThroughCondition());
 			#endregion
 
+			#region Condition Combinations
+			// Generate the initial population for entry conditions
+			entryInitialPopulation = GenerateConditionCombinations(entryConditions, 1, 3);
+
+			// Generate the initial population for exit conditions
+			exitInitialPopulation = GenerateConditionCombinations(exitConditions, 1, 3);
+			#endregion
 		}
 		#endregion
 
@@ -299,7 +308,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        {
 		            List<SimTrade> trades = GenerateSimulatedTradesForEntryCombination(foldStart, foldEnd, combination, 2);
 		            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades);
-		            return metrics.NetProfit;
+		            double fitnessScore = metrics.TradeScore;
+					double regularizationTerm = regularization * combination.Count;
+					return fitnessScore - regularizationTerm;
 		        };
 
 		        // Define the fitness function for evaluating exit combinations
@@ -307,13 +318,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        {
 		            List<SimTrade> trades = GenerateSimulatedTradesForExitCombination(foldStart, foldEnd, combination, 2);
 		            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades);
-		            return metrics.NetProfit;
+		            double fitnessScore = metrics.TradeScore;
+					double regularizationTerm = regularization * combination.Count;
+					return fitnessScore - regularizationTerm;
 		        };
 
 		        // Run the genetic algorithm to optimize entry combinations
 		        List<List<Condition>> optimalEntryFold = ga.Optimize(
 		            entryFitnessFunction,
-		            entryConditions,
+		            entryInitialPopulation,
 		            populationSize,
 		            maxGenerations,
 		            mutationRate,
@@ -322,7 +335,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        // Run the genetic algorithm to optimize exit combinations
 		        List<List<ExitCondition>> optimalExitFold = ga.Optimize(
 		            exitFitnessFunction,
-		            exitConditions,
+		            exitInitialPopulation,
 		            populationSize,
 		            maxGenerations,
 		            mutationRate,
@@ -337,6 +350,39 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    // Combine the optimal combinations from all folds
 		    optimalEntryCombinations = CombineOptimalCombinations<Condition>(optimalEntrySet);
 		    optimalExitCombinations = CombineOptimalCombinations<ExitCondition>(optimalExitSet);
+		}
+		#endregion
+
+		#region Generate Condition Combinations
+		private List<List<T>> GenerateConditionCombinations<T>(List<T> conditions, int minSize, int maxSize)
+		{
+		    List<List<T>> combinations = new List<List<T>>();
+
+		    for (int size = minSize; size <= maxSize; size++)
+		    {
+		        combinations.AddRange(GetCombinations(conditions, size));
+		    }
+
+		    return combinations;
+		}
+
+		private IEnumerable<List<T>> GetCombinations<T>(List<T> items, int size)
+		{
+		    if (size == 0)
+		        yield return new List<T>();
+		    else
+		    {
+		        for (int i = 0; i < items.Count; i++)
+		        {
+		            T item = items[i];
+		            List<T> remaining = items.Skip(i + 1).ToList();
+		            foreach (List<T> combination in GetCombinations(remaining, size - 1))
+		            {
+		                combination.Insert(0, item);
+		                yield return combination;
+		            }
+		        }
+		    }
 		}
 		#endregion
 
@@ -463,7 +509,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-//			Print(entrySignals.GetPools().Values.Count());
 			foreach (ObjectPool<Signal> entrySignalPool in entrySignals.GetPools().Values) {
 				// Test exit conditions for each entry signal
 			    foreach (Signal entrySignal in entrySignalPool.ActiveItems)
@@ -956,6 +1001,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				trade.CalculatePerformance();
 
 				metrics.NetProfit += trade.Performance.NetProfit;
+		    	metrics.TradeScore += trade.Performance.TradeScore;
 		    	metrics.MaxAdverseExcursion = trade.Performance.MaxAdverseExcursion > 0
 					? Math.Max(metrics.MaxAdverseExcursion, trade.Performance.MaxAdverseExcursion) : 0;
 		    	metrics.MaxFavorableExcursion = trade.Performance.MaxFavorableExcursion > 0
@@ -967,67 +1013,67 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region SelectOptimalCombinations()
-		private List<List<T>> SelectOptimalCombinations<T>(Dictionary<List<T>, PerformanceMetrics> combinations, double regularizationTerm)
-		{
-		    // Convert the combinations dictionary to a list
-		    List<List<T>> combinationList = combinations.Keys.ToList();
+//		private List<List<T>> SelectOptimalCombinations<T>(Dictionary<List<T>, PerformanceMetrics> combinations, double regularizationTerm)
+//		{
+//		    // Convert the combinations dictionary to a list
+//		    List<List<T>> combinationList = combinations.Keys.ToList();
 
-		    // Define the fitness function for evaluating combinations
-		    Func<double[], double> fitnessFunction = position =>
-		    {
-		        // Map the particle's position to the corresponding combination index
-		        int combinationIndex = (int)Math.Floor(position[0] * combinationList.Count);
+//		    // Define the fitness function for evaluating combinations
+//		    Func<double[], double> fitnessFunction = position =>
+//		    {
+//		        // Map the particle's position to the corresponding combination index
+//		        int combinationIndex = (int)Math.Floor(position[0] * combinationList.Count);
 
-		        // Ensure the combination index stays within the valid range
-		        combinationIndex = Math.Max(0, Math.Min(combinationIndex, combinationList.Count - 1));
+//		        // Ensure the combination index stays within the valid range
+//		        combinationIndex = Math.Max(0, Math.Min(combinationIndex, combinationList.Count - 1));
 
-		        // Get the combination at the mapped index
-		        List<T> combination = combinationList[combinationIndex];
+//		        // Get the combination at the mapped index
+//		        List<T> combination = combinationList[combinationIndex];
 
-		        // Get the performance metrics for the combination
-		        PerformanceMetrics metrics = combinations[combination];
+//		        // Get the performance metrics for the combination
+//		        PerformanceMetrics metrics = combinations[combination];
 
-		        // Calculate the fitness score based on the performance metrics
-		        // Example: Maximize net profit and minimize drawdown
-		        double fitnessScore = metrics.NetProfit / (metrics.MaxAdverseExcursion + 1);
+//		        // Calculate the fitness score based on the performance metrics
+//		        // Example: Maximize net profit and minimize drawdown
+//		        double fitnessScore = metrics.NetProfit / (metrics.MaxAdverseExcursion + 1);
 
-				// Apply regularization to the fitness score
-		        double regularizedFitnessScore = fitnessScore - regularizationTerm * combination.Count;
+//				// Apply regularization to the fitness score
+//		        double regularizedFitnessScore = fitnessScore - regularizationTerm * combination.Count;
 
-		        return regularizedFitnessScore;
-		    };
+//		        return regularizedFitnessScore;
+//		    };
 
-		    // Set up the PSO parameters
-		    int numParticles = 25;
-		    int maxIterations = 200;
-		    int dimensions = 1; // Use a single dimension to represent the combination index
-		    double[] lowerBounds = new double[] { 0.0 };
-		    double[] upperBounds = new double[] { 1.0 };
+//		    // Set up the PSO parameters
+//		    int numParticles = 25;
+//		    int maxIterations = 200;
+//		    int dimensions = 1; // Use a single dimension to represent the combination index
+//		    double[] lowerBounds = new double[] { 0.0 };
+//		    double[] upperBounds = new double[] { 1.0 };
 
-		    // Run PSO to optimize the selection of combinations
-		    double[] bestPosition = ParticleSwarmOptimization.Optimize(fitnessFunction, lowerBounds, upperBounds, numParticles, maxIterations);
+//		    // Run PSO to optimize the selection of combinations
+//		    double[] bestPosition = ParticleSwarmOptimization.Optimize(fitnessFunction, lowerBounds, upperBounds, numParticles, maxIterations);
 
-		    // Map the best position to the optimal combination index
-		    int bestCombinationIndex = (int)Math.Floor(bestPosition[0] * combinationList.Count);
+//		    // Map the best position to the optimal combination index
+//		    int bestCombinationIndex = (int)Math.Floor(bestPosition[0] * combinationList.Count);
 
-		    // Ensure the best combination index stays within the valid range
-		    bestCombinationIndex = Math.Max(0, Math.Min(bestCombinationIndex, combinationList.Count - 1));
+//		    // Ensure the best combination index stays within the valid range
+//		    bestCombinationIndex = Math.Max(0, Math.Min(bestCombinationIndex, combinationList.Count - 1));
 
-		    // Get the optimal combination from the list
-		    List<List<T>> optimalCombinations = new List<List<T>>();
-		    optimalCombinations.Add(combinationList[bestCombinationIndex]);
+//		    // Get the optimal combination from the list
+//		    List<List<T>> optimalCombinations = new List<List<T>>();
+//		    optimalCombinations.Add(combinationList[bestCombinationIndex]);
 
-		    return optimalCombinations;
-		}
+//		    return optimalCombinations;
+//		}
 		#endregion
 
 		#region MapPositionToCombination
-		private int MapPositionToCombinationIndex(double[] position, int combinationCount)
-		{
-		    // Map the particle's position to a combination index
-		    int combinationIndex = (int)Math.Floor(position[0] * combinationCount);
-		    return combinationIndex;
-		}
+//		private int MapPositionToCombinationIndex(double[] position, int combinationCount)
+//		{
+//		    // Map the particle's position to a combination index
+//		    int combinationIndex = (int)Math.Floor(position[0] * combinationCount);
+//		    return combinationIndex;
+//		}
 		#endregion
 	}
 
@@ -1177,6 +1223,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	    public double MaxFavorableExcursion { get; set; }
 		public double NetProfit { get; set; }
 	    public int TradeDuration { get; set; }
+		public double TradeScore { get; set; }
 		#endregion
 
 		#region Calculate()
@@ -1190,6 +1237,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			MaxFavorableExcursion = entry.Direction == TrendDirection.Bullish ? highestHigh : lowestLow;
 			NetProfit = entry.Direction == TrendDirection.Bullish ? exit.Price - entry.Price : entry.Price - exit.Price;
 			TradeDuration = (exit.Time - entry.Time).Seconds;
+
+			double netProfitScore = NetProfit;
+		    double maxAdverseExcursionScore = 1.0 - MaxAdverseExcursion / entry.Indicators["ATR"];
+		    double tradeDurationScore = 1.0 - TradeDuration / (24 * 60 * 60);
+			double maxFavorableExcursionScore = 1.0 - (MaxFavorableExcursion - netProfitScore);
+			TradeScore = netProfitScore + maxAdverseExcursionScore + tradeDurationScore + maxFavorableExcursionScore;
 		}
 		#endregion
 	}
@@ -1199,6 +1252,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	    public double MaxAdverseExcursion { get; set; }
 	    public double MaxFavorableExcursion { get; set; }
 		public double NetProfit { get; set; }
+		public double TradeScore { get; set; }
 	}
 	#endregion
 

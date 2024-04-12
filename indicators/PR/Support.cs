@@ -481,27 +481,29 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	{
 	    private readonly Random random = new Random();
 
-	    public List<List<T>> Optimize<T>(
-	        Func<List<T>, double> fitnessFunction,
-	        List<T> initialPopulation,
-	        int populationSize,
-	        int maxGenerations,
-	        double mutationRate,
-	        double crossoverRate)
-	    {
-	        List<List<T>> population = InitializePopulation(initialPopulation, populationSize);
+		private Utils utils = new Utils();
 
-	        for (int generation = 0; generation < maxGenerations; generation++)
-	        {
-	            List<double> fitnessScores = EvaluateFitness(population, fitnessFunction);
-	            List<List<T>> parents = SelectParents(population, fitnessScores);
-	            List<List<T>> offspring = CrossoverOffspring(parents, crossoverRate);
-	            MutateOffspring(offspring, mutationRate);
-	            population = SelectSurvivors(population, offspring, fitnessScores, populationSize);
-	        }
+	   public List<List<T>> Optimize<T>(
+		    Func<List<T>, double> fitnessFunction,
+		    List<List<T>> initialPopulation,
+		    int populationSize,
+		    int maxGenerations,
+		    double mutationRate,
+		    double crossoverRate)
+		{
+		    List<List<T>> population = initialPopulation;
 
-	        return population;
-	    }
+		    for (int generation = 0; generation < maxGenerations; generation++)
+		    {
+		        List<double> fitnessScores = EvaluateFitness(population, fitnessFunction);
+			    List<List<T>> parents = SelectParents(population, fitnessScores);
+			    List<List<T>> offspring = CrossoverOffspring(parents, crossoverRate);
+			    MutateOffspring(offspring, mutationRate);
+			    population = SelectSurvivors(population, offspring, fitnessScores, populationSize);
+			}
+
+		    return population;
+		}
 
 	    // Initialize the population with random individuals
 	    private List<List<T>> InitializePopulation<T>(List<T> initialPopulation, int populationSize)
@@ -534,49 +536,63 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 	    // Select parents for crossover based on their fitness scores
 	    private List<List<T>> SelectParents<T>(List<List<T>> population, List<double> fitnessScores)
-	    {
-	        List<List<T>> parents = new List<List<T>>();
+		{
+		    List<List<T>> parents = new List<List<T>>();
 
-	        for (int i = 0; i < population.Count; i++)
-	        {
-	            int parent1Index = SelectParentIndex(fitnessScores);
-	            int parent2Index = SelectParentIndex(fitnessScores);
-	            parents.Add(population[parent1Index]);
-	            parents.Add(population[parent2Index]);
-	        }
+		    for (int i = 0; i < population.Count; i++)
+		    {
+		        int parent1Index = SelectParentIndex(fitnessScores);
+		        int parent2Index = SelectParentIndex(fitnessScores);
+		        parents.Add(population[parent1Index]);
+		        parents.Add(population[parent2Index]);
+		    }
 
-	        return parents;
-	    }
+		    // If the number of parents is odd, remove the last parent
+		    if (parents.Count % 2 != 0)
+		    {
+		        parents.RemoveAt(parents.Count - 1);
+		    }
+
+		    return parents;
+		}
 
 	    // Perform crossover between parents to create offspring
 	    private List<List<T>> CrossoverOffspring<T>(List<List<T>> parents, double crossoverRate)
-	    {
-	        List<List<T>> offspring = new List<List<T>>();
+		{
+		    List<List<T>> offspring = new List<List<T>>();
 
-	        for (int i = 0; i < parents.Count; i += 2)
-	        {
-	            List<T> parent1 = parents[i];
-	            List<T> parent2 = parents[i + 1];
-	            List<T> child1 = new List<T>(parent1);
-	            List<T> child2 = new List<T>(parent2);
+		    for (int i = 0; i < parents.Count - 1; i += 2)
+		    {
+		        List<T> parent1 = parents[i];
+		        List<T> parent2 = parents[i + 1];
+		        List<T> child1 = new List<T>(parent1);
+		        List<T> child2 = new List<T>(parent2);
 
-	            if (random.NextDouble() < crossoverRate)
-	            {
-	                int crossoverPoint = random.Next(1, parent1.Count);
-	                for (int j = crossoverPoint; j < parent1.Count; j++)
-	                {
-	                    T temp = child1[j];
-	                    child1[j] = child2[j];
-	                    child2[j] = temp;
-	                }
-	            }
+		        if (random.NextDouble() < crossoverRate)
+		        {
+		            int minLength = Math.Min(parent1.Count, parent2.Count);
+		            int crossoverPoint = random.Next(1, minLength);
 
-	            offspring.Add(child1);
-	            offspring.Add(child2);
-	        }
+		            for (int j = crossoverPoint; j < minLength; j++)
+		            {
+		                T temp = child1[j];
+		                child1[j] = child2[j];
+		                child2[j] = temp;
+		            }
+		        }
 
-	        return offspring;
-	    }
+		        offspring.Add(child1);
+		        offspring.Add(child2);
+		    }
+
+		    // If the number of parents is odd, add the last parent to the offspring
+		    if (parents.Count % 2 != 0)
+		    {
+		        offspring.Add(parents[parents.Count - 1]);
+		    }
+
+		    return offspring;
+		}
 
 	    // Mutate the offspring based on the mutation rate
 	    private void MutateOffspring<T>(List<List<T>> offspring, double mutationRate)
