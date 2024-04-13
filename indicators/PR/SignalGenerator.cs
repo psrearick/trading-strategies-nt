@@ -94,6 +94,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				DrawOnPricePanel							= false;
 				ScaleJustification							= NinjaTrader.Gui.Chart.ScaleJustification.Right;
 				IsSuspendedWhileInactive					= true;
+
+				PrintTo = PrintTo.OutputTab2;
 			}
 			#endregion
 			#region State.Configure
