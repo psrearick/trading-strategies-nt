@@ -745,6 +745,68 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	    }
 	}
 	#endregion
+
+	#region Has Set Comparer
+	public class HashSetComparer<T> : IEqualityComparer<HashSet<T>>
+	{
+	    public bool Equals(HashSet<T> x, HashSet<T> y)
+	    {
+	        if (x == null && y == null)
+	            return true;
+	        if (x == null || y == null)
+	            return false;
+	        if (x.Count != y.Count)
+	            return false;
+
+	        return x.SetEquals(y);
+	    }
+
+	    public int GetHashCode(HashSet<T> obj)
+	    {
+	        if (obj == null)
+	            return 0;
+
+	        int hash = 17;
+	        foreach (var item in obj)
+	        {
+	            hash = hash * 23 + item.GetHashCode();
+	        }
+
+	        return hash;
+	    }
+	}
+	#endregion
+
+	#region ListComparer
+	public class ListComparer<T> : IEqualityComparer<List<T>>
+	{
+	    public bool Equals(List<T> x, List<T> y)
+	    {
+	        if (x == null && y == null)
+	            return true;
+	        if (x == null || y == null)
+	            return false;
+	        if (x.Count != y.Count)
+	            return false;
+
+	        return x.SequenceEqual(y);
+	    }
+
+	    public int GetHashCode(List<T> obj)
+	    {
+	        if (obj == null)
+	            return 0;
+
+	        int hash = 17;
+	        foreach (var item in obj)
+	        {
+	            hash = hash * 23 + (item != null ? item.GetHashCode() : 0);
+	        }
+
+	        return hash;
+	    }
+	}
+	#endregion
 }
 
 #region NinjaScript generated code. Neither change nor remove.
