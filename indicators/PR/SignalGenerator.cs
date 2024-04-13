@@ -51,11 +51,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private List<Signal> cachedExitSignals = new List<Signal>();
 		private List<Signal> foldEntrySignals = new List<Signal>();
 		private List<Signal> foldExitSignals = new List<Signal>();
-//		List<List<Condition>> entryInitialPopulation = new List<List<Condition>>();
-//		List<List<ExitCondition>> exitInitialPopulation = new List<List<ExitCondition>>();
 		private GroupedObjectPool<int, Signal> entrySignals;
 		private GroupedObjectPool<int, Signal> exitSignals;
-//		private ObjectPool<SimTrade> windowTrades;
 		private ObjectPool<ParameterType> parameterTypes;
 		public ObjectPool<Signal> entries;
 		public ObjectPool<Signal> exits;
@@ -94,8 +91,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				DrawOnPricePanel							= false;
 				ScaleJustification							= NinjaTrader.Gui.Chart.ScaleJustification.Right;
 				IsSuspendedWhileInactive					= true;
-
-				PrintTo = PrintTo.OutputTab2;
 			}
 			#endregion
 			#region State.Configure
@@ -124,7 +119,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 				entriesOnBar = new ObjectPool<Signal>(0, () => new Signal());
 				parameterTypes = new ObjectPool<ParameterType>(0, () => new ParameterType());
-//				windowTrades = new ObjectPool<SimTrade>(0, () => new SimTrade());
 				exitSignals = new GroupedObjectPool<int, Signal>(0, () => new Signal());
 				entrySignals = new GroupedObjectPool<int, Signal>(0, () => new Signal());
 				exits = new ObjectPool<Signal>(0, () => new Signal());
@@ -162,11 +156,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		        AnalyzeConditionPerformance();
 				lastUpdateBar = CurrentBar;
-
-//				foreach (SimTrade trade in windowTrades.ActiveItems.Where(t => t.EntrySignal.Bar < CurrentBar - rollingWindowSize).ToList())
-//				{
-//					windowTrades.Release(trade);
-//				}
 		    }
 
 		    GenerateSignals();
@@ -337,7 +326,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		            }
 		        }
 
-		        // Define the fitness function for evaluating entry combinations
 		        Func<List<Condition>, double> entryFitnessFunction = combination =>
 		        {
 					double cachedScore;
@@ -348,25 +336,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		            List<SimTrade> trades = GenerateSimulatedTradesForEntryCombination(foldStart, foldEnd, combination, 3);
 		            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades);
-//		            double fitnessScore = metrics.TradeScore;
-//					double regularizationTerm = regularization * combination.Count;
-//					fitnessScore = fitnessScore - regularizationTerm;
 					double fitnessScore = metrics.AverageProfit;
-
-					if (trades.Count() > 0) {
-						string bars = String.Join(", ", trades.Select(t => t.EntrySignal.Bar).ToList());
-						string exitbars = String.Join(", ", trades.Select(t => t.ExitSignal.Bar).ToList());
-						Print(metrics.NetProfit + " - " + combination.Count() + "-" + trades.Count() + " - " + CurrentBar);// + " - " + exitbars + " - " + bars);
-//						string combis = String.Join(", ", combination.Select(c => c.ToString()));
-//						Print(combination.Count() + " - "  + fitnessScore + " - " + metrics.NetProfit + " - " + trades.Count() + " - " + metrics.MaxAdverseExcursion + " - " + exitbars + " - " + bars +  " - " + combis);
-					}
 
 					entryCombinationCache[combination] = fitnessScore;
 
 					return fitnessScore;
 		        };
 
-		        // Define the fitness function for evaluating exit combinations
 		        Func<List<ExitCondition>, double> exitFitnessFunction = combination =>
 		        {
 					double cachedScore;
@@ -379,26 +355,17 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades);
 					double fitnessScore = metrics.AverageProfit;
 
-//		            double fitnessScore = metrics.TradeScore;
-//					double regularizationTerm = regularization * combination.Count;
-//					return fitnessScore - regularizationTerm;
-
-//					return metrics.AverageProfit;
-
-
-
 					exitCombinationCache[combination] = fitnessScore;
 
 					return fitnessScore;
 		        };
 
-				int numRuns = 1; // Number of times to run the optimizer for each fold
+				int numRuns = 1;
 			    List<List<List<Condition>>> optimalEntryFoldRuns = new List<List<List<Condition>>>();
 			    List<List<List<ExitCondition>>> optimalExitFoldRuns = new List<List<List<ExitCondition>>>();
 
 				for (int run = 0; run < numRuns; run++)
 				{
-					// Run the genetic algorithm to optimize entry combinations
 			        List<List<Condition>> optimalEntryFold = ga.Optimize(
 			            entryFitnessFunction,
 			            entryInitialPopulation,
@@ -408,7 +375,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			            crossoverRate,
 						eliteCount);
 
-			        // Run the genetic algorithm to optimize exit combinations
 			        List<List<ExitCondition>> optimalExitFold = ga.Optimize(
 			            exitFitnessFunction,
 			            exitInitialPopulation,
@@ -422,29 +388,23 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			        optimalExitFoldRuns.Add(optimalExitFold);
 				}
 
-		         // Select consistent entry and exit combinations across multiple runs
 			    List<List<Condition>> consistentEntryFold = GetConsistentCombinations(optimalEntryFoldRuns);
 			    List<List<ExitCondition>> consistentExitFold = GetConsistentCombinations(optimalExitFoldRuns);
 
 			    optimalEntrySet.AddRange(consistentEntryFold);
 			    optimalExitSet.AddRange(consistentExitFold);
-
-//		        windowTrades.ReleaseAll();
 		    }
 
-		    // Combine the optimal combinations from all folds
 		    optimalEntryCombinations = CombineOptimalCombinations<Condition>(optimalEntrySet);
 		    optimalExitCombinations = CombineOptimalCombinations<ExitCondition>(optimalExitSet);
 		}
 		#endregion
 
 		#region GetConsistentCombinations()
-		// Helper method to get consistent combinations across multiple runs
 		private List<List<T>> GetConsistentCombinations<T>(List<List<List<T>>> combinationRuns)
 		{
 		    List<List<T>> consistentCombinations = new List<List<T>>();
 
-		    // Compare combinations across runs and select the ones that appear in all runs
 		    foreach (List<T> combination in combinationRuns[0])
 		    {
 		        bool isConsistent = true;
@@ -500,43 +460,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region Generate Condition Combinations
-		private List<List<T>> GenerateConditionCombinations<T>(List<T> conditions, int minSize, int maxSize)
-		{
-		    List<List<T>> combinations = new List<List<T>>();
-
-		    for (int size = minSize; size <= maxSize; size++)
-		    {
-		        combinations.AddRange(GetCombinations(conditions, size));
-		    }
-
-		    return combinations;
-		}
-
-		private IEnumerable<List<T>> GetCombinations<T>(List<T> items, int size)
-		{
-		    if (size == 0)
-		        yield return new List<T>();
-		    else
-		    {
-		        for (int i = 0; i < items.Count; i++)
-		        {
-		            T item = items[i];
-		            List<T> remaining = items.Skip(i + 1).ToList();
-		            foreach (List<T> combination in GetCombinations(remaining, size - 1))
-		            {
-		                combination.Insert(0, item);
-		                yield return combination;
-		            }
-		        }
-		    }
-		}
-		#endregion
-
 		#region GenerateSignals()
 		private void GenerateSignals()
 		{
-		    // Generate entry signals
 		    foreach (List<Condition> entryCombination in optimalEntryCombinations)
 		    {
 		        if (IsEntryCombinationMet(entryCombination))
@@ -546,7 +472,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        }
 		    }
 
-		    // Generate exit signals
 		    foreach (List<ExitCondition> exitCombination in optimalExitCombinations)
 		    {
 		        foreach (Signal entrySignal in cachedEntrySignals)
@@ -648,7 +573,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region TestIndividualEntries()
 		private void TestIndividualEntries()
 		{
-			if (entrySignals.GetPool(CurrentBar).ActiveItems.Count() > 0) {
+			if (entrySignals.GetPool(CurrentBar).ActiveItems.Count() > 0)
+			{
 				return;
 			}
 
@@ -669,7 +595,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region TestIndividualExits()
 		private void TestIndividualExits()
 		{
-			if (exitSignals.GetPool(CurrentBar).ActiveItems.Count() > 0) {
+			if (exitSignals.GetPool(CurrentBar).ActiveItems.Count() > 0)
+			{
 				return;
 			}
 
@@ -677,7 +604,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			foreach (ExitCondition exitCondition in exitConditionsRandomized)
 			{
-				foreach (Signal entryOnBar in entriesOnBar.ActiveItems) {
+				foreach (Signal entryOnBar in entriesOnBar.ActiveItems)
+				{
 					if (exitCondition.IsMet(this, entryOnBar))
 	                {
 	                    Signal exitSignal = exitSignals.Get(CurrentBar);
@@ -693,67 +621,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 						}
 
 	                    exitSignal.ExitConditions[exitCondition] = parameters;
-
 	                }
-
 				}
 			}
-
-
-
-
-//			foreach (ObjectPool<Signal> entrySignalPool in entrySignals.GetPools().Values) {
-//				// Test exit conditions for each entry signal
-//			    foreach (Signal entrySignal in entrySignalPool.ActiveItems)
-//			    {
-//			        foreach (ExitCondition exitCondition in exitConditionsRandomized)
-//			        {
-//			            if (exitCondition.ParameterTypes.Count > 0)
-//			            {
-//			                // Generate all possible parameter combinations for the exit condition
-//			                List<List<Parameter>> parameterCombinations = GenerateParameterCombinations(exitCondition.ParameterTypes);
-
-//			                foreach (List<Parameter> parameterCombination in parameterCombinations)
-//			                {
-//			                    exitCondition.Reset();
-//			                    foreach (Parameter parameter in parameterCombination)
-//			                    {
-
-//			                        exitCondition.SetParameterValue(parameter.Type, parameter.Value);
-//			                    }
-
-//			                    if (exitCondition.IsMet(this, entrySignal))
-//			                    {
-//			                        Signal exitSignal = exitSignals.Get(CurrentBar);
-//			                        exitSignal.Set(entrySignal.Direction, this, SignalType.Exit);
-//			                        exitSignal.ExitConditions[exitCondition] = parameterCombination;
-
-//			                        SimTrade trade = windowTrades.Get();
-//			                        trade.Set(this);
-//			                        trade.EntrySignal = entrySignal;
-//			                        trade.ExitSignal = exitSignal;
-//			                    }
-//			                }
-//			            }
-//			            else
-//			            {
-//			                if (exitCondition.IsMet(this, entrySignal))
-//			                {
-//			                    Signal exitSignal = exitSignals.Get(CurrentBar);
-//			                    exitSignal.Set(entrySignal.Direction, this, SignalType.Exit);
-//			                    exitSignal.ExitConditions[exitCondition] = new List<Parameter>();
-
-//			                    SimTrade trade = windowTrades.Get();
-
-//			                    trade.Set(this);
-//			                    trade.EntrySignal = entrySignal;
-//			                    trade.ExitSignal = exitSignal;
-
-//			                }
-//			            }
-//			        }
-//			    }
-//			}
 		}
 		#endregion
 		#endregion
@@ -782,7 +652,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    Dictionary<List<T>, int> combinationVotes = new Dictionary<List<T>, int>();
 		    Dictionary<List<T>, double> combinationScores = new Dictionary<List<T>, double>();
 
-		    // Voting ensemble
 		    foreach (List<T> combination in optimalSet)
 		    {
 		        if (!combinationVotes.ContainsKey(combination))
@@ -792,7 +661,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        combinationVotes[combination]++;
 		    }
 
-		    // Averaging ensemble
 		    foreach (List<T> combination in optimalSet)
 		    {
 		        if (!combinationScores.ContainsKey(combination))
@@ -802,7 +670,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        combinationScores[combination] += 1.0 / optimalSet.Count;
 		    }
 
-		    // Combine voting and averaging scores
 		    Dictionary<List<T>, double> combinedScores = new Dictionary<List<T>, double>();
 		    foreach (var combination in combinationVotes.Keys)
 		    {
@@ -812,7 +679,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        combinedScores[combination] = combinedScore;
 		    }
 
-		    // Select the top combinations based on combined scores
 		    List<KeyValuePair<List<T>, double>> sortedCombinations = combinedScores
 		        .OrderByDescending(x => x.Value)
 		        .ToList();
@@ -828,6 +694,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region Generate Parameter Combinations
 		#region GenerateParameterCombinations()
 		private List<List<Parameter>> GenerateParameterCombinations(List<ParameterType> parameterTypes)
 		{
@@ -835,7 +702,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    GenerateCombinationsHelper(parameterTypes, 0, new List<Parameter>(), combinations);
 		    return combinations;
 		}
+		#endregion
 
+		#region GenerateCombinationsHelper()
 		private void GenerateCombinationsHelper(List<ParameterType> parameterTypes, int depth, List<Parameter> currentCombination, List<List<Parameter>> combinations)
 		{
 		    if (depth == parameterTypes.Count)
@@ -854,200 +723,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        }
 		    }
 		}
-		#endregion
-
-		#region Top Performing Conditions
-		#region GetTopPerformingEntryConditions()
-//		private Dictionary<Condition, PerformanceMetrics> GetTopPerformingEntryConditions()
-//		{
-//		    Dictionary<Condition, PerformanceMetrics> entryConditionPerformance = new Dictionary<Condition, PerformanceMetrics>();
-
-//		    foreach (SimTrade trade in windowTrades.ActiveItems)
-//		    {
-//		        trade.CalculatePerformance();
-
-//		        // Update performance metrics for entry conditions
-//		        foreach (KeyValuePair<Condition, List<Parameter>> entry in trade.EntrySignal.EntryConditions)
-//		        {
-//		            Condition entryCondition = entry.Key;
-//		            if (!entryConditionPerformance.ContainsKey(entryCondition))
-//		            {
-//		                entryConditionPerformance[entryCondition] = new PerformanceMetrics();
-//		            }
-//		            UpdatePerformanceMetrics(entryConditionPerformance[entryCondition], trade.Performance);
-//		        }
-//		    }
-
-//		    // Sort entry conditions based on the desired performance metric
-//		    List<KeyValuePair<Condition, PerformanceMetrics>> sortedEntryConditions = entryConditionPerformance
-//		        .OrderByDescending(x => x.Value.NetProfit)
-//		        .ThenByDescending(x => x.Value.MaxFavorableExcursion)
-//		        .ThenBy(x => x.Value.MaxAdverseExcursion)
-//		        .ToList();
-
-//		    // Return the top performing entry conditions
-//		    Dictionary<Condition, PerformanceMetrics> topEntryConditions = new Dictionary<Condition, PerformanceMetrics>();
-//		    int count = Math.Min(10, sortedEntryConditions.Count);
-//		    for (int i = 0; i < count; i++)
-//		    {
-//		        topEntryConditions[sortedEntryConditions[i].Key] = sortedEntryConditions[i].Value;
-//		    }
-
-//		    return topEntryConditions;
-//		}
-		#endregion
-
-		#region GetTopPerformingExitConditions()
-//		private Dictionary<ExitCondition, PerformanceMetrics> GetTopPerformingExitConditions()
-//		{
-//		    Dictionary<ExitCondition, PerformanceMetrics> exitConditionPerformance = new Dictionary<ExitCondition, PerformanceMetrics>();
-
-//		    foreach (SimTrade trade in windowTrades.ActiveItems)
-//		    {
-//		        trade.CalculatePerformance();
-
-//		        // Update performance metrics for exit conditions
-//		        foreach (KeyValuePair<ExitCondition, List<Parameter>> exit in trade.ExitSignal.ExitConditions)
-//		        {
-//		            ExitCondition exitCondition = exit.Key;
-//		            if (!exitConditionPerformance.ContainsKey(exitCondition))
-//		            {
-//		                exitConditionPerformance[exitCondition] = new PerformanceMetrics();
-//		            }
-//		            UpdatePerformanceMetrics(exitConditionPerformance[exitCondition], trade.Performance);
-//		        }
-//		    }
-
-//		    // Sort exit conditions based on the desired performance metric
-//		    List<KeyValuePair<ExitCondition, PerformanceMetrics>> sortedExitConditions = exitConditionPerformance
-//		        .OrderByDescending(x => x.Value.NetProfit)
-//		        .ThenByDescending(x => x.Value.MaxFavorableExcursion)
-//		        .ThenBy(x => x.Value.MaxAdverseExcursion)
-//		        .ToList();
-
-//		    // Return the top performing exit conditions
-//		    Dictionary<ExitCondition, PerformanceMetrics> topExitConditions = new Dictionary<ExitCondition, PerformanceMetrics>();
-//		    int count = Math.Min(10, sortedExitConditions.Count);
-//		    for (int i = 0; i < count; i++)
-//		    {
-//		        topExitConditions[sortedExitConditions[i].Key] = sortedExitConditions[i].Value;
-//		    }
-
-//		    return topExitConditions;
-//		}
-		#endregion
-
-		#region UpdatePerformanceMetrics()
-//		private void UpdatePerformanceMetrics(PerformanceMetrics metrics, TradePerformance performance)
-//		{
-//		    metrics.NetProfit += performance.NetProfit;
-//		    metrics.MaxAdverseExcursion = performance.MaxAdverseExcursion > 0
-//				? Math.Max(metrics.MaxAdverseExcursion, performance.MaxAdverseExcursion)
-//				: 0;
-//		    metrics.MaxFavorableExcursion = performance.MaxFavorableExcursion > 0
-//				? Math.Max(metrics.MaxFavorableExcursion, performance.MaxFavorableExcursion)
-//				: 0;
-//		}
-		#endregion
-		#endregion
-
-		#region Get Best Condition Combinations
-		#region GetBestEntryConditionCombinations()
-//		private Dictionary<List<Condition>, PerformanceMetrics> GetBestEntryConditionCombinations(int foldStart, int foldEnd, int minCombinationSize, int maxCombinationSize, int minTradesRequired)
-//		{
-//		    Dictionary<Condition, PerformanceMetrics> topEntryConditions = GetTopPerformingEntryConditions();
-//		    List<Condition> entryConditionKeys = new List<Condition>(topEntryConditions.Keys);
-
-//		    Dictionary<List<Condition>, PerformanceMetrics> entryCombinationPerformance = new Dictionary<List<Condition>, PerformanceMetrics>();
-
-//		    // Generate combinations of entry conditions
-//		    for (int i = minCombinationSize; i <= maxCombinationSize && i <= entryConditionKeys.Count; i++)
-//		    {
-//		        IEnumerable<IEnumerable<Condition>> combinations = GetCombinations(entryConditionKeys, i);
-
-//		        foreach (IEnumerable<Condition> combination in combinations)
-//		        {
-//		            List<Condition> combinationList = combination.ToList();
-
-//		            // Generate simulated trades for the entry condition combination within the fold range
-//		            List<SimTrade> trades = GenerateSimulatedTradesForEntryCombination(foldStart, foldEnd, combinationList, minTradesRequired);
-//		            if (trades.Count >= minTradesRequired)
-//		            {
-//		                // Calculate performance metrics for the trades
-//		                PerformanceMetrics combinationMetrics = CalculatePerformanceMetrics(trades);
-
-//		                entryCombinationPerformance[combinationList] = combinationMetrics;
-//		            }
-//		        }
-//		    }
-
-//		    // Sort entry combinations based on the desired performance metric
-//		    List<KeyValuePair<List<Condition>, PerformanceMetrics>> sortedEntryCombinations = entryCombinationPerformance
-//		        .OrderByDescending(x => x.Value.NetProfit)
-//		        .ThenByDescending(x => x.Value.MaxFavorableExcursion)
-//		        .ThenBy(x => x.Value.MaxAdverseExcursion)
-//		        .ToList();
-
-//		    // Return the best entry combinations
-//		    Dictionary<List<Condition>, PerformanceMetrics> bestEntryCombinations = new Dictionary<List<Condition>, PerformanceMetrics>();
-
-//		    int count = Math.Min(10, sortedEntryCombinations.Count);
-//		    for (int i = 0; i < count; i++)
-//		    {
-//		        bestEntryCombinations[sortedEntryCombinations[i].Key] = sortedEntryCombinations[i].Value;
-//		    }
-
-//		    return bestEntryCombinations;
-//		}
-		#endregion
-
-		#region GetBestExitConditionCombinations()
-//		private Dictionary<List<ExitCondition>, PerformanceMetrics> GetBestExitConditionCombinations(int foldStart, int foldEnd, int minCombinationSize, int maxCombinationSize, int minTradesRequired)
-//		{
-//		    Dictionary<ExitCondition, PerformanceMetrics> topExitConditions = GetTopPerformingExitConditions();
-//		    List<ExitCondition> exitConditionKeys = new List<ExitCondition>(topExitConditions.Keys);
-
-//		    Dictionary<List<ExitCondition>, PerformanceMetrics> exitCombinationPerformance = new Dictionary<List<ExitCondition>, PerformanceMetrics>();
-
-//		    // Generate combinations of exit conditions
-//		    for (int i = minCombinationSize; i <= maxCombinationSize && i <= exitConditionKeys.Count; i++)
-//		    {
-//		        IEnumerable<IEnumerable<ExitCondition>> combinations = GetCombinations(exitConditionKeys, i);
-
-//		        foreach (IEnumerable<ExitCondition> combination in combinations)
-//		        {
-//		            List<ExitCondition> combinationList = combination.ToList();
-
-//		            // Generate simulated trades for the exit condition combination within the fold range
-//		            List<SimTrade> trades = GenerateSimulatedTradesForExitCombination(foldStart, foldEnd, combinationList, minTradesRequired);
-
-//		            if (trades.Count >= minTradesRequired)
-//		            {
-//		                // Calculate performance metrics for the trades
-//		                PerformanceMetrics combinationMetrics = CalculatePerformanceMetrics(trades);
-
-//		                exitCombinationPerformance[combinationList] = combinationMetrics;
-//		            }
-//		        }
-//		    }
-
-//		    // Sort exit combinations based on the desired performance metric
-//		    List<KeyValuePair<List<ExitCondition>, PerformanceMetrics>> sortedExitCombinations = exitCombinationPerformance
-//		        .OrderByDescending(x => x.Value.NetProfit)
-//		        .ThenByDescending(x => x.Value.MaxFavorableExcursion)
-//		        .ThenBy(x => x.Value.MaxAdverseExcursion)
-//		        .ToList();
-
-//		    // Return the best exit combinations
-//		    Dictionary<List<ExitCondition>, PerformanceMetrics> bestExitCombinations = new Dictionary<List<ExitCondition>, PerformanceMetrics>();
-//		    int count = Math.Min(10, sortedExitCombinations.Count);
-//		    for (int i = 0; i < count; i++)
-//		    {
-//		        bestExitCombinations[sortedExitCombinations[i].Key] = sortedExitCombinations[i].Value;
-//		    }
-
-//		    return bestExitCombinations;
-//		}
 		#endregion
 		#endregion
 
@@ -1187,24 +862,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 		#endregion
 
-		#region GetCombinations()
-		private IEnumerable<IEnumerable<T>> GetCombinations<T>(IEnumerable<T> items, int count)
-		{
-		    if (count == 0)
-		        yield return new T[0];
-		    else
-		    {
-		        int startPosition = 0;
-		        foreach (T item in items)
-		        {
-		            IEnumerable<T> remainingItems = items.Skip(++startPosition);
-		            foreach (IEnumerable<T> combination in GetCombinations(remainingItems, count - 1))
-		                yield return new T[] { item }.Concat(combination);
-		        }
-		    }
-		}
-		#endregion
-
 		#region CalculatePerformanceMetrics()
 		private PerformanceMetrics CalculatePerformanceMetrics(List<SimTrade> trades)
 		{
@@ -1229,70 +886,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			return metrics;
 		}
-		#endregion
-
-		#region SelectOptimalCombinations()
-//		private List<List<T>> SelectOptimalCombinations<T>(Dictionary<List<T>, PerformanceMetrics> combinations, double regularizationTerm)
-//		{
-//		    // Convert the combinations dictionary to a list
-//		    List<List<T>> combinationList = combinations.Keys.ToList();
-
-//		    // Define the fitness function for evaluating combinations
-//		    Func<double[], double> fitnessFunction = position =>
-//		    {
-//		        // Map the particle's position to the corresponding combination index
-//		        int combinationIndex = (int)Math.Floor(position[0] * combinationList.Count);
-
-//		        // Ensure the combination index stays within the valid range
-//		        combinationIndex = Math.Max(0, Math.Min(combinationIndex, combinationList.Count - 1));
-
-//		        // Get the combination at the mapped index
-//		        List<T> combination = combinationList[combinationIndex];
-
-//		        // Get the performance metrics for the combination
-//		        PerformanceMetrics metrics = combinations[combination];
-
-//		        // Calculate the fitness score based on the performance metrics
-//		        // Example: Maximize net profit and minimize drawdown
-//		        double fitnessScore = metrics.NetProfit / (metrics.MaxAdverseExcursion + 1);
-
-//				// Apply regularization to the fitness score
-//		        double regularizedFitnessScore = fitnessScore - regularizationTerm * combination.Count;
-
-//		        return regularizedFitnessScore;
-//		    };
-
-//		    // Set up the PSO parameters
-//		    int numParticles = 25;
-//		    int maxIterations = 200;
-//		    int dimensions = 1; // Use a single dimension to represent the combination index
-//		    double[] lowerBounds = new double[] { 0.0 };
-//		    double[] upperBounds = new double[] { 1.0 };
-
-//		    // Run PSO to optimize the selection of combinations
-//		    double[] bestPosition = ParticleSwarmOptimization.Optimize(fitnessFunction, lowerBounds, upperBounds, numParticles, maxIterations);
-
-//		    // Map the best position to the optimal combination index
-//		    int bestCombinationIndex = (int)Math.Floor(bestPosition[0] * combinationList.Count);
-
-//		    // Ensure the best combination index stays within the valid range
-//		    bestCombinationIndex = Math.Max(0, Math.Min(bestCombinationIndex, combinationList.Count - 1));
-
-//		    // Get the optimal combination from the list
-//		    List<List<T>> optimalCombinations = new List<List<T>>();
-//		    optimalCombinations.Add(combinationList[bestCombinationIndex]);
-
-//		    return optimalCombinations;
-//		}
-		#endregion
-
-		#region MapPositionToCombination
-//		private int MapPositionToCombinationIndex(double[] position, int combinationCount)
-//		{
-//		    // Map the particle's position to a combination index
-//		    int combinationIndex = (int)Math.Floor(position[0] * combinationCount);
-//		    return combinationIndex;
-//		}
 		#endregion
 	}
 
