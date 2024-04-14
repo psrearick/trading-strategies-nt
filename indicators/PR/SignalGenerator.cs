@@ -59,11 +59,23 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public ObjectPool<Signal> entriesOnBar;
 		private int lastUpdateBar = -1;
 		private int lastSignalBar = -1;
-		private int rollingWindowSize = 81;
-		private int crossValidationFolds = 3;
-		private double regularization = 0.1;
 		private Dictionary<List<Condition>, double> entryCombinationCache = new Dictionary<List<Condition>, double>(new ListComparer<Condition>());
 		private Dictionary<List<ExitCondition>, double> exitCombinationCache = new Dictionary<List<ExitCondition>, double>(new ListComparer<ExitCondition>());
+
+		private int rollingWindowSize = 21;
+		private int crossValidationFolds = 1;
+		private double regularization = 0.1;
+		private int numRuns = 1;
+		private int populationSize = 100;
+		private int maxGenerations = 200;
+	    private double mutationRate = 0.2;
+		private double crossoverRate = 0.6;
+		private int individualPopulation = 5;
+		private int individualConditionInterval = 4;
+		private int minTrades = 5;
+
+		private DateTime initTime = DateTime.Now;
+		private DateTime start = DateTime.Now;
 
 		public List<Signal> CurrentEntries
 		{
@@ -144,7 +156,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			if (CurrentBar % 20 == 0)
 			{
-				Print(CurrentBar);
+//				Print(CurrentBar);
 			}
 
 		    UpdateBarsSinceDoubleTopBottom();
@@ -152,6 +164,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			if (CurrentBar % rollingWindowSize == 0)
 		    {
+				Print(CurrentBar + " ==================== " + (DateTime.Now - start).TotalSeconds + " -- " + (DateTime.Now - initTime).TotalSeconds);
+				start = DateTime.Now;
 				entriesOnBar.ReleaseAll();
 
 		        AnalyzeConditionPerformance();
@@ -289,11 +303,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		    GeneticAlgorithm ga = new GeneticAlgorithm();
 
-		    int populationSize = 200;
-		    int maxGenerations = 200;
-		    double mutationRate = 0.1;
-		    double crossoverRate = 0.7;
-			int eliteCount = (int) Math.Floor((double) populationSize * 0.05);
+			int eliteCount = (int) Math.Floor((double) populationSize * 0.1);
 
 			List<List<Condition>> entryInitialPopulation = InitializePopulation(entryConditions, populationSize, 1, 2);
 			List<List<ExitCondition>> exitInitialPopulation = InitializePopulation(exitConditions, populationSize, 1, 2);
@@ -334,9 +344,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				        return cachedScore;
 				    }
 
-		            List<SimTrade> trades = GenerateSimulatedTradesForEntryCombination(foldStart, foldEnd, combination, 3);
-		            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades);
-					double fitnessScore = metrics.AverageProfit;
+		            List<SimTrade> trades = GenerateSimulatedTradesForEntryCombination(foldStart, foldEnd, combination);
+		            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades, minTrades);
+					double fitnessScore = metrics.FitnessScore;
+
+					if (trades.Count() > 0) {
+						Print(trades.Count() + " - " + fitnessScore);
+					}
 
 					entryCombinationCache[combination] = fitnessScore;
 
@@ -351,16 +365,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				        return cachedScore;
 				    }
 
-		            List<SimTrade> trades = GenerateSimulatedTradesForExitCombination(foldStart, foldEnd, combination, 3);
-		            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades);
-					double fitnessScore = metrics.AverageProfit;
+		            List<SimTrade> trades = GenerateSimulatedTradesForExitCombination(foldStart, foldEnd, combination);
+		            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades, minTrades);
+					double fitnessScore = metrics.FitnessScore;
 
 					exitCombinationCache[combination] = fitnessScore;
 
 					return fitnessScore;
 		        };
 
-				int numRuns = 1;
 			    List<List<List<Condition>>> optimalEntryFoldRuns = new List<List<List<Condition>>>();
 			    List<List<List<ExitCondition>>> optimalExitFoldRuns = new List<List<List<ExitCondition>>>();
 
@@ -514,17 +527,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region IsSignificantChange()
-		private bool IsSignificantChange()
-		{
-			if (lastSignalBar < 0) {
-				return false;
-			}
-
-			return md.Direction[CurrentBar - lastSignalBar] == md.Direction[0];
-		}
-		#endregion
-
 		#region PruneSignals()
 		private void PruneSignals(int startIndex, int endIndex)
 		{
@@ -549,11 +551,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		{
 			GenerateEntrySignals();
 
-			if (CurrentBar % 10 == 0) {
+			if (CurrentBar % individualConditionInterval == 0) {
 				TestIndividualEntries();
+				TestIndividualExits();
 			}
-
-			TestIndividualExits();
 		}
 		#endregion
 
@@ -578,9 +579,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			List<Condition> entryConditionsRandomized = InitializePopulation(entryConditions, 8, 1, 1).Select(c => c[0]).ToList();
+			List<Condition> entryConditionsRandomized = InitializePopulation(entryConditions, individualPopulation, 1, 1).Select(c => c[0]).ToList();
 
-		    foreach (Condition entryCondition in entryConditionsRandomized)
+			foreach (Condition entryCondition in entryConditionsRandomized)
 		    {
 		        if (entryCondition.IsMet(this))
 		        {
@@ -600,7 +601,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			List<ExitCondition> exitConditionsRandomized = InitializePopulation(exitConditions, 8, 1, 1).Select(c => c[0]).ToList();
+			List<ExitCondition> exitConditionsRandomized = InitializePopulation(exitConditions, individualPopulation, 1, 1).Select(c => c[0]).ToList();
 
 			foreach (ExitCondition exitCondition in exitConditionsRandomized)
 			{
@@ -728,7 +729,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		#region Generate Simulated Trades
 		#region GenerateSimulatedTradesForEntryCombination()
-		private List<SimTrade> GenerateSimulatedTradesForEntryCombination(int foldStart, int foldEnd, List<Condition> combination, int minTradesRequired)
+		private List<SimTrade> GenerateSimulatedTradesForEntryCombination(int foldStart, int foldEnd, List<Condition> combination)
 		{
 		    List<SimTrade> trades = new List<SimTrade>();
 			Dictionary<Signal, bool> barEntrySignals = new Dictionary<Signal, bool>();
@@ -793,17 +794,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				}
 		    }
 
-			if (trades.Count < minTradesRequired)
-			{
-				trades.Clear();
-			}
-
 		    return trades;
 		}
 		#endregion
 
 		#region GenerateSimulatedTradesForExitCombination()
-		private List<SimTrade> GenerateSimulatedTradesForExitCombination(int foldStart, int foldEnd, List<ExitCondition> combination, int minTradesRequired)
+		private List<SimTrade> GenerateSimulatedTradesForExitCombination(int foldStart, int foldEnd, List<ExitCondition> combination)
 		{
 		    List<SimTrade> trades = new List<SimTrade>();
 			Dictionary<Signal, bool> barExitSignals = new Dictionary<Signal, bool>();
@@ -852,39 +848,81 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				}
 		    }
 
-			if (trades.Count < minTradesRequired)
-			{
-				trades.Clear();
-			}
-
 		    return trades;
 		}
 		#endregion
 		#endregion
 
 		#region CalculatePerformanceMetrics()
-		private PerformanceMetrics CalculatePerformanceMetrics(List<SimTrade> trades)
+		private PerformanceMetrics CalculatePerformanceMetrics(List<SimTrade> trades, int minTradesThreshold = 10)
 		{
-			PerformanceMetrics metrics = new PerformanceMetrics();
+		    PerformanceMetrics metrics = new PerformanceMetrics();
 
-			double tradeScore = 0;
+		    double tradeScore = 0;
+		    double maxAdverseExcursionScore = 0;
+		    double netProfitScore = 0;
+		    double consistencyScore = 0;
 
-			foreach (SimTrade trade in trades)
-			{
-				trade.CalculatePerformance();
+		    if (trades.Count < minTradesThreshold)
+		    {
+		        return metrics;
+		    }
 
-				metrics.NetProfit += trade.Performance.NetProfit;
-		    	tradeScore += trade.Performance.TradeScore;
-		    	metrics.MaxAdverseExcursion = trade.Performance.MaxAdverseExcursion > 0
-					? Math.Max(metrics.MaxAdverseExcursion, trade.Performance.MaxAdverseExcursion) : 0;
-		    	metrics.MaxFavorableExcursion = trade.Performance.MaxFavorableExcursion > 0
-					? Math.Max(metrics.MaxFavorableExcursion, trade.Performance.MaxFavorableExcursion) : 0;
-			}
+		    double totalNetProfit = 0;
+		    double totalMaxFavorableExcursion = 0;
+		    double totalMaxAdverseExcursion = 0;
+		    double totalTradeScore = 0;
 
-			metrics.TradeScore = trades.Count() > 0 ? tradeScore / trades.Count() : 0;
-			metrics.AverageProfit = trades.Count() > 0 ? metrics.NetProfit / trades.Count() : 0;
+		    foreach (SimTrade trade in trades)
+		    {
+		        trade.CalculatePerformance();
 
-			return metrics;
+		        totalNetProfit += trade.Performance.NetProfit;
+		        totalMaxFavorableExcursion += trade.Performance.MaxFavorableExcursion;
+		        totalMaxAdverseExcursion += trade.Performance.MaxAdverseExcursion;
+		        totalTradeScore += trade.Performance.TradeScore;
+		    }
+
+		    double averageNetProfit = totalNetProfit / trades.Count;
+		    double averageMaxAdverseExcursion = totalMaxAdverseExcursion / trades.Count;
+		    double averageTradeScore = totalTradeScore / trades.Count;
+
+		    // Calculate the consistency score based on the variability of net profit
+		    double netProfitVariance = trades.Sum(t => Math.Pow(t.Performance.NetProfit - averageNetProfit, 2)) / trades.Count;
+		    double netProfitStdDev = Math.Sqrt(netProfitVariance);
+		    consistencyScore = 1.0 - (netProfitStdDev / Math.Abs(averageNetProfit));
+
+		    // Normalize the scores based on predefined ranges or thresholds
+		    netProfitScore = NormalizeScore(averageNetProfit, -100, 100); // Adjust the range as per your expectations
+		    maxAdverseExcursionScore = 1.0 - NormalizeScore(averageMaxAdverseExcursion, 0, 20); // Adjust the range as per your expectations
+		    consistencyScore = NormalizeScore(consistencyScore, 0, 1);
+
+		    // Assign weights to each score based on their importance
+		    double netProfitWeight = 0.6;
+		    double maxAdverseExcursionWeight = 0.2;
+		    double consistencyWeight = 0.1;
+		    double tradeScoreWeight = 0.1;
+
+		    // Calculate the final fitness score
+		    double fitnessScore = (netProfitScore * netProfitWeight) +
+		                          (maxAdverseExcursionScore * maxAdverseExcursionWeight) +
+		                          (consistencyScore * consistencyWeight) +
+		                          (averageTradeScore * tradeScoreWeight);
+
+		    metrics.FitnessScore = fitnessScore;
+		    metrics.AverageNetProfit = averageNetProfit;
+		    metrics.AverageMaxAdverseExcursion = averageMaxAdverseExcursion;
+		    metrics.ConsistencyScore = consistencyScore;
+			metrics.NetProfit = totalNetProfit;
+			metrics.MaxAdverseExcursion = totalMaxAdverseExcursion;
+			metrics.MaxFavorableExcursion = totalMaxFavorableExcursion;
+
+		    return metrics;
+		}
+
+		private double NormalizeScore(double value, double min, double max)
+		{
+		    return (value - min) / (max - min);
 		}
 		#endregion
 	}
@@ -1046,8 +1084,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int barsAgoEntry = entry.Source.CurrentBar - entry.Bar;
 			double highestHigh = BarsInTrade > 0 ? entry.Source.MAX(entry.Source.High, BarsInTrade)[barsAgoEntry] : entry.Source.High[barsAgoEntry];
 			double lowestLow = BarsInTrade > 0 ? entry.Source.MIN(entry.Source.Low, BarsInTrade)[barsAgoEntry] : entry.Source.Low[barsAgoEntry];
-			MaxAdverseExcursion = entry.Direction == TrendDirection.Bullish ? lowestLow : highestHigh;
-			MaxFavorableExcursion = entry.Direction == TrendDirection.Bullish ? highestHigh : lowestLow;
+			MaxAdverseExcursion = entry.Direction == TrendDirection.Bullish ? entry.Price - lowestLow : highestHigh - entry.Price;
+			MaxFavorableExcursion = entry.Direction == TrendDirection.Bullish ? highestHigh - entry.Price : entry.Price - lowestLow;
 			NetProfit = entry.Direction == TrendDirection.Bullish ? exit.Price - entry.Price : entry.Price - exit.Price;
 			TradeDuration = (exit.Time - entry.Time).Seconds;
 
@@ -1066,7 +1104,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	    public double MaxFavorableExcursion { get; set; }
 		public double NetProfit { get; set; }
 		public double TradeScore { get; set; }
-		public double AverageProfit { get; set; }
+		public double AverageNetProfit { get; set; }
+		public double FitnessScore { get; set; }
+		public double AverageMaxAdverseExcursion { get; set; }
+		public double ConsistencyScore { get; set; }
 	}
 	#endregion
 

@@ -507,7 +507,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        // Adjust mutation rate based on diversity
 		        if (diversity < 0.2)
 		        {
-		            mutationRate = 0.1; // Increase mutation rate for low diversity
+		            mutationRate = 0.2; // Increase mutation rate for low diversity
 		        }
 		        else if (diversity > 0.8)
 		        {
