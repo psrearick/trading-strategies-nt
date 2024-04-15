@@ -77,7 +77,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private double bestFitness = double.MinValue;
 
 		private int minIndividualPopulation = 4;
-    	private int maxIndividualPopulation = 20;
+    	private int maxIndividualPopulation = 16;
     	private int minIndividualConditionInterval = 1;
     	private int maxIndividualConditionInterval = 10;
 	    private int minPopulationSize = 50;
@@ -86,13 +86,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	    private int maxGenerations = 500;
 	    private double minMutationRate = 0.01;
 	    private double maxMutationRate = 0.2;
-	    private double minCrossoverRate = 0.4;
+	    private double minCrossoverRate = 0.5;
 	    private double maxCrossoverRate = 0.8;
 		private double convergenceThreshold = 75;
 
 		private double atrMultiplier = 15.0;
 		private double minTradeThresholdMultiplier = 0.2;
-		private double numFoldMultiplier = 3.5;
+		private double numFoldMultiplier = 3;
 		private int numRuns = 2;
 
 		private DateTime initTime = DateTime.Now;
