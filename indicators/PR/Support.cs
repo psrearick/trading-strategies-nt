@@ -486,44 +486,82 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	   public List<List<T>> Optimize<T>(
 		    Func<List<T>, double> fitnessFunction,
 		    List<List<T>> initialPopulation,
-		    int populationSize,
-		    int maxGenerations,
-		    double initialMutationRate,
-		    double crossoverRate,
+			double convergenceThreshold,
+	        int minPopulationSize,
+	        int maxPopulationSize,
+	        int minGenerations,
+	        int maxGenerations,
+	        double minMutationRate,
+	        double maxMutationRate,
+	        double minCrossoverRate,
+	        double maxCrossoverRate,
 			int eliteCount)
 		{
 		    List<List<T>> population = initialPopulation;
-			double mutationRate = initialMutationRate;
+	        int populationSize = initialPopulation.Count;
+	        double mutationRate = (minMutationRate + maxMutationRate) / 2;
+	        double crossoverRate = (minCrossoverRate + maxCrossoverRate) / 2;
+	        int generationsSinceImprovement = 0;
+	        double bestFitness = double.MinValue;
 
-		    for (int generation = 0; generation < maxGenerations; generation++)
-		    {
-		        List<double> fitnessScores = EvaluateFitness(population, fitnessFunction);
-			    List<List<T>> parents = SelectParents(population, fitnessScores);
-			    List<List<T>> offspring = CrossoverOffspring(parents, crossoverRate);
+	        for (int generation = 0; generation < maxGenerations; generation++)
+	        {
+	            List<double> fitnessScores = EvaluateFitness(population, fitnessFunction);
+	            double currentBestFitness = fitnessScores.Max();
 
-				// Calculate population diversity
-		        double diversity = CalculatePopulationDiversity(population);
+	            if (currentBestFitness > bestFitness)
+	            {
+	                bestFitness = currentBestFitness;
+	                generationsSinceImprovement = 0;
+	            }
+	            else
+	            {
+	                generationsSinceImprovement++;
+	            }
 
-		        // Adjust mutation rate based on diversity
-		        if (diversity < 0.2)
-		        {
-		            mutationRate = 0.2; // Increase mutation rate for low diversity
-		        }
-		        else if (diversity > 0.8)
-		        {
-		            mutationRate = 0.01; // Decrease mutation rate for high diversity
-		        }
-		        else
-		        {
-		            mutationRate = initialMutationRate; // Use initial mutation rate for medium diversity
-		        }
+	            if (generationsSinceImprovement >= convergenceThreshold)
+	            {
+	                break; // Early stopping condition met
+	            }
 
-			    MutateOffspring(offspring, mutationRate);
-			    population = SelectSurvivors(population, offspring, fitnessScores, populationSize, eliteCount);
-			}
+	            // Adjust population size based on fitness improvement
+	            if (generationsSinceImprovement > 10 && populationSize < maxPopulationSize)
+	            {
+	                populationSize = Math.Min(populationSize * 2, maxPopulationSize);
+	            }
+	            else if (generationsSinceImprovement < 5 && populationSize > minPopulationSize)
+	            {
+	                populationSize = Math.Max(populationSize / 2, minPopulationSize);
+	            }
 
-		    return population;
-		}
+	            // Adjust mutation rate based on fitness improvement
+	            if (generationsSinceImprovement > 10)
+	            {
+	                mutationRate = Math.Min(mutationRate * 1.2, maxMutationRate);
+	            }
+	            else if (generationsSinceImprovement < 5)
+	            {
+	                mutationRate = Math.Max(mutationRate * 0.8, minMutationRate);
+	            }
+
+	            // Adjust crossover rate based on fitness improvement
+	            if (generationsSinceImprovement > 10)
+	            {
+	                crossoverRate = Math.Min(crossoverRate * 1.2, maxCrossoverRate);
+	            }
+	            else if (generationsSinceImprovement < 5)
+	            {
+	                crossoverRate = Math.Max(crossoverRate * 0.8, minCrossoverRate);
+	            }
+
+	            List<List<T>> parents = SelectParents(population, fitnessScores);
+	            List<List<T>> offspring = CrossoverOffspring(parents, crossoverRate);
+	            MutateOffspring(offspring, mutationRate);
+	            population = SelectSurvivors(population, offspring, fitnessScores, populationSize, eliteCount);
+	        }
+
+	        return population;
+	    }
 
 	    // Initialize the population with random individuals
 	    private List<List<T>> InitializePopulation<T>(List<T> initialPopulation, int populationSize)
