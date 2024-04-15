@@ -67,8 +67,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private int foldStart = 0;
 		private int foldEnd = 0;
 
-		private int rollingWindowSize = 40;
-		private int crossValidationFolds = 2;
+		private int rollingWindowSize = 60;
+		private int crossValidationFolds = 1;
 		private int numRuns = 3;
 		private int populationSize = 100;
 		private int maxGenerations = 200;
@@ -76,7 +76,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private double crossoverRate = 0.6;
 		private int individualPopulation = 8;
 		private int individualConditionInterval = 3;
-		private int minTrades = 10;
+		private int minTrades = 5;
 
 		private DateTime initTime = DateTime.Now;
 		private DateTime start = DateTime.Now;
@@ -298,10 +298,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			optimalSets[SignalType.Entry] = new List<List<ICondition>>();
 			optimalSets[SignalType.Exit] = new List<List<ICondition>>();
-			combinationCache.Clear();
+
 
 			entryInitialPopulation = InitializePopulation(entryConditions, populationSize, 1, 3);
 			exitInitialPopulation = InitializePopulation(exitConditions, populationSize, 1, 3);
+
+			combinationCache.Clear();
 
 		    foreach (var fold in folds)
 		    {
@@ -310,7 +312,14 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        AnalyzeFoldPerformance(optimalSets);
 		    }
 
-		    List<List<ICondition>> entries = CombineOptimalCombinations<ICondition>(optimalSets[SignalType.Entry]);
+		    CalculateOptimalCombinationPerformance(startIndex, endIndex, optimalSets);
+		}
+		#endregion
+
+		#region CalculateOptimalCombinationPerformance()
+		private void CalculateOptimalCombinationPerformance(int startIndex, int endIndex, Dictionary<SignalType, List<List<ICondition>>> optimalSets)
+		{
+			List<List<ICondition>> entries = CombineOptimalCombinations<ICondition>(optimalSets[SignalType.Entry]);
 		    List<List<ICondition>> exits = CombineOptimalCombinations<ICondition>(optimalSets[SignalType.Exit]);
 
 			optimalEntryCombinations.Clear();
@@ -425,7 +434,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		{
 	        foldExitSignals.Clear();
 	        foldEntrySignals.Clear();
-
 	        PopulateFoldSignals();
 
 		    List<List<List<ICondition>>> optimalEntryFoldRuns = new List<List<List<ICondition>>>();
@@ -457,11 +465,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        optimalExitFoldRuns.Add(optimalExitFold);
 			}
 
-		    List<List<ICondition>> consistentEntryFold = GetConsistentCombinations(optimalEntryFoldRuns);
-		    List<List<ICondition>> consistentExitFold = GetConsistentCombinations(optimalExitFoldRuns);
-
-		    optimalSets[SignalType.Entry].AddRange(consistentEntryFold);
-		    optimalSets[SignalType.Exit].AddRange(consistentExitFold);
+		    optimalSets[SignalType.Entry].AddRange(GetConsistentCombinations(optimalEntryFoldRuns));
+		    optimalSets[SignalType.Exit].AddRange(GetConsistentCombinations(optimalExitFoldRuns));
 		}
 		#endregion
 
