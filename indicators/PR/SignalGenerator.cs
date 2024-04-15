@@ -64,11 +64,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private GeneticAlgorithm ga = new GeneticAlgorithm();
 		List<List<ICondition>> entryInitialPopulation = new List<List<ICondition>>();
 		List<List<ICondition>> exitInitialPopulation = new List<List<ICondition>>();
+
+		private int rollingWindowSize = 0;
+		private int windowStart = 0;
+		private int windowEnd = 0;
+		private int numFolds = 0;
 		private int foldStart = 0;
 		private int foldEnd = 0;
 
-		private int rollingWindowSize = 60;
-		private int crossValidationFolds = 1;
+		private double atrMultiplier = 10.0;
 		private int numRuns = 3;
 		private int populationSize = 100;
 		private int maxGenerations = 200;
@@ -157,13 +161,16 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		    UpdateBarsSinceDoubleTopBottom();
 			TestIndividualConditions();
+			CalculateAdaptiveRollingWindowSize();
+			CalculateWindowPosition();
+			PruneSignals();
 
 			if (CurrentBar % rollingWindowSize == 0)
 		    {
-				Print(CurrentBar + " ==================== " + (DateTime.Now - start).TotalSeconds + " -- " + (DateTime.Now - initTime).TotalSeconds);
+				Print(CurrentBar + " ==================== " + rollingWindowSize + " - " + numFolds + " -- " + (DateTime.Now - start).TotalSeconds + " -- " + (DateTime.Now - initTime).TotalSeconds);
 				start = DateTime.Now;
-				entriesOnBar.ReleaseAll();
 
+				entriesOnBar.ReleaseAll();
 		        AnalyzeConditionPerformance();
 				lastUpdateBar = CurrentBar;
 		    }
@@ -185,6 +192,24 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			if (paPatterns.IsDoubleTop(0, 30, 3)) {
 				barsSinceDoubleTop[0] = 0;
 			}
+		}
+		#endregion
+
+		#region CalculateAdaptiveRollingWindowSize()
+		private void CalculateAdaptiveRollingWindowSize()
+		{
+		    double currentATR = avgAtrFast[0];
+		    int adaptiveRollingWindowSize = (int)Math.Round(currentATR * atrMultiplier);
+		    rollingWindowSize = Math.Max(adaptiveRollingWindowSize, 1);
+		}
+		#endregion
+
+		#region CalculateWindowPosition()
+		private void CalculateWindowPosition()
+		{
+			windowStart = CurrentBar - rollingWindowSize;
+		    windowEnd = CurrentBar - 1;
+			numFolds = Math.Min(4, Math.Max(1, (int) Math.Round(rollingWindowSize /(double) (2 * atrMultiplier), 0)));
 		}
 		#endregion
 
@@ -287,12 +312,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region AnalyzeConditionPerformance()
 		private void AnalyzeConditionPerformance()
 		{
-		    int startIndex = CurrentBar - rollingWindowSize;
-		    int endIndex = CurrentBar - 1;
-
-		    PruneSignals(startIndex, endIndex);
-
-		    List<Tuple<int, int>> folds = SplitDataIntoFolds(startIndex, endIndex, crossValidationFolds);
+		    List<Tuple<int, int>> folds = SplitDataIntoFolds();
 
 			Dictionary<SignalType, List<List<ICondition>>> optimalSets = new Dictionary<SignalType, List<List<ICondition>>>();
 
@@ -312,12 +332,12 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        AnalyzeFoldPerformance(optimalSets);
 		    }
 
-		    CalculateOptimalCombinationPerformance(startIndex, endIndex, optimalSets);
+		    CalculateOptimalCombinationPerformance(optimalSets);
 		}
 		#endregion
 
 		#region CalculateOptimalCombinationPerformance()
-		private void CalculateOptimalCombinationPerformance(int startIndex, int endIndex, Dictionary<SignalType, List<List<ICondition>>> optimalSets)
+		private void CalculateOptimalCombinationPerformance(Dictionary<SignalType, List<List<ICondition>>> optimalSets)
 		{
 			List<List<ICondition>> entries = CombineOptimalCombinations<ICondition>(optimalSets[SignalType.Entry]);
 		    List<List<ICondition>> exits = CombineOptimalCombinations<ICondition>(optimalSets[SignalType.Exit]);
@@ -329,7 +349,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			{
 				Combination combination = new Combination();
 				combination.Conditions = entryCombination.Select(c => (ICondition)c).ToList();
-				List<SimTrade> trades = GenerateSimulatedTradesForEntryCombination(startIndex, endIndex, entryCombination);
+				List<SimTrade> trades = GenerateSimulatedTradesForEntryCombination(windowStart, windowEnd, entryCombination);
 	            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades, minTrades);
 				combination.FitnessScore = metrics.FitnessScore;
 
@@ -343,7 +363,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			{
 			    Combination combination = new Combination();
 				combination.Conditions = exitCombination.Select(c => (ICondition)c).ToList();
-				List<SimTrade> trades = GenerateSimulatedTradesForExitCombination(startIndex, endIndex, exitCombination);
+				List<SimTrade> trades = GenerateSimulatedTradesForExitCombination(windowStart, windowEnd, exitCombination);
 	            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades, minTrades);
 				combination.FitnessScore = metrics.FitnessScore;
 
@@ -607,20 +627,20 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region PruneSignals()
-		private void PruneSignals(int startIndex, int endIndex)
+		private void PruneSignals()
 		{
-			foreach (int key in entrySignals.GetPools().Keys.Where(k => k < startIndex).ToList())
+			foreach (int key in entrySignals.GetPools().Keys.Where(k => k < windowStart).ToList())
 			{
 				entrySignals.PruneGroup(key);
 			}
 
-			foreach (int key in exitSignals.GetPools().Keys.Where(k => k < startIndex).ToList())
+			foreach (int key in exitSignals.GetPools().Keys.Where(k => k < windowStart).ToList())
 			{
 				exitSignals.PruneGroup(key);
 			}
 
-			cachedEntrySignals.RemoveAll(s => s.Bar < startIndex);
-			cachedExitSignals.RemoveAll(s => s.Bar < startIndex);
+			cachedEntrySignals.RemoveAll(s => s.Bar < windowStart);
+			cachedExitSignals.RemoveAll(s => s.Bar < windowStart);
 		}
 		#endregion
 
@@ -709,16 +729,17 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region SplitDataIntoFolds()
-		private List<Tuple<int, int>> SplitDataIntoFolds(int startIndex, int endIndex, int numFolds)
+		private List<Tuple<int, int>> SplitDataIntoFolds()
 		{
+
 		    List<Tuple<int, int>> folds = new List<Tuple<int, int>>();
-		    int dataSize = endIndex - startIndex + 1;
+		    int dataSize = windowEnd - windowStart + 1;
 		    int foldSize = dataSize / numFolds;
 
 		    for (int i = 0; i < numFolds; i++)
 		    {
-		        int foldStart = startIndex + i * foldSize;
-		        int foldEnd = (i == numFolds - 1) ? endIndex : foldStart + foldSize - 1;
+		        int foldStart = windowStart + i * foldSize;
+		        int foldEnd = (i == numFolds - 1) ? windowEnd : foldStart + foldSize - 1;
 		        folds.Add(new Tuple<int, int>(foldStart, foldEnd));
 		    }
 
