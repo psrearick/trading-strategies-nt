@@ -45,12 +45,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public Series<int> barsSinceDoubleBottom;
 		private List<Condition> entryConditions = new List<Condition>();
 		private List<ExitCondition> exitConditions = new List<ExitCondition>();
-		private List<List<Condition>> optimalEntryCombinations = new List<List<Condition>>();
-		private List<List<ExitCondition>> optimalExitCombinations = new List<List<ExitCondition>>();
+		private List<Combination> optimalCombinations = new List<Combination>();
+		private List<Combination> optimalEntryCombinations = new List<Combination>();
+		private List<Combination> optimalExitCombinations = new List<Combination>();
 		private List<Signal> cachedEntrySignals = new List<Signal>();
 		private List<Signal> cachedExitSignals = new List<Signal>();
 		private List<Signal> foldEntrySignals = new List<Signal>();
 		private List<Signal> foldExitSignals = new List<Signal>();
+		private Dictionary<List<Condition>, double> entryCombinationCache = new Dictionary<List<Condition>, double>(new ListComparer<Condition>());
+		private Dictionary<List<ExitCondition>, double> exitCombinationCache = new Dictionary<List<ExitCondition>, double>(new ListComparer<ExitCondition>());
 		private GroupedObjectPool<int, Signal> entrySignals;
 		private GroupedObjectPool<int, Signal> exitSignals;
 		private ObjectPool<ParameterType> parameterTypes;
@@ -59,20 +62,18 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public ObjectPool<Signal> entriesOnBar;
 		private int lastUpdateBar = -1;
 		private int lastSignalBar = -1;
-		private Dictionary<List<Condition>, double> entryCombinationCache = new Dictionary<List<Condition>, double>(new ListComparer<Condition>());
-		private Dictionary<List<ExitCondition>, double> exitCombinationCache = new Dictionary<List<ExitCondition>, double>(new ListComparer<ExitCondition>());
 
-		private int rollingWindowSize = 21;
-		private int crossValidationFolds = 1;
+		private int rollingWindowSize = 40;
+		private int crossValidationFolds = 2;
 		private double regularization = 0.1;
-		private int numRuns = 1;
+		private int numRuns = 3;
 		private int populationSize = 100;
 		private int maxGenerations = 200;
-	    private double mutationRate = 0.2;
+	    private double mutationRate = 0.1;
 		private double crossoverRate = 0.6;
-		private int individualPopulation = 5;
-		private int individualConditionInterval = 4;
-		private int minTrades = 5;
+		private int individualPopulation = 8;
+		private int individualConditionInterval = 3;
+		private int minTrades = 10;
 
 		private DateTime initTime = DateTime.Now;
 		private DateTime start = DateTime.Now;
@@ -136,9 +137,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				exits = new ObjectPool<Signal>(0, () => new Signal());
 				entries = new ObjectPool<Signal>(0, () => new Signal());
 
-				optimalEntryCombinations = new List<List<Condition>>();
-				optimalExitCombinations = new List<List<ExitCondition>>();
-
 				SetParameterTypes();
 				SetConditions();
 			}
@@ -153,11 +151,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    {
 		        return;
 		    }
-
-			if (CurrentBar % 20 == 0)
-			{
-//				Print(CurrentBar);
-			}
 
 		    UpdateBarsSinceDoubleTopBottom();
 			TestIndividualConditions();
@@ -305,8 +298,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			int eliteCount = (int) Math.Floor((double) populationSize * 0.1);
 
-			List<List<Condition>> entryInitialPopulation = InitializePopulation(entryConditions, populationSize, 1, 2);
-			List<List<ExitCondition>> exitInitialPopulation = InitializePopulation(exitConditions, populationSize, 1, 2);
+			List<List<Condition>> entryInitialPopulation = InitializePopulation(entryConditions, populationSize, 1, 3);
+			List<List<ExitCondition>> exitInitialPopulation = InitializePopulation(exitConditions, populationSize, 1, 3);
 
 		    foreach (var fold in folds)
 		    {
@@ -348,9 +341,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades, minTrades);
 					double fitnessScore = metrics.FitnessScore;
 
-					if (trades.Count() > 0) {
-						Print(trades.Count() + " - " + fitnessScore);
-					}
+//					if (trades.Count() > 0) {
+//						Print(trades.Count() + " - " + fitnessScore);
+//					}
 
 					entryCombinationCache[combination] = fitnessScore;
 
@@ -408,8 +401,86 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			    optimalExitSet.AddRange(consistentExitFold);
 		    }
 
-		    optimalEntryCombinations = CombineOptimalCombinations<Condition>(optimalEntrySet);
-		    optimalExitCombinations = CombineOptimalCombinations<ExitCondition>(optimalExitSet);
+		    List<List<Condition>> entries = CombineOptimalCombinations<Condition>(optimalEntrySet);
+		    List<List<ExitCondition>> exits = CombineOptimalCombinations<ExitCondition>(optimalExitSet);
+
+			optimalEntryCombinations.Clear();
+			optimalExitCombinations.Clear();
+
+			foreach (var entryCombination in entries)
+			{
+				Combination combination = new Combination();
+				combination.Conditions = entryCombination.Select(c => (ICondition)c).ToList();
+				List<SimTrade> trades = GenerateSimulatedTradesForEntryCombination(startIndex, endIndex, entryCombination);
+	            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades, minTrades);
+				combination.FitnessScore = metrics.FitnessScore;
+
+				if (combination.FitnessScore > 0)
+				{
+					optimalEntryCombinations.Add(combination);
+				}
+			}
+
+			foreach (var exitCombination in exits)
+			{
+			    Combination combination = new Combination();
+				combination.Conditions = exitCombination.Select(c => (ICondition)c).ToList();
+				List<SimTrade> trades = GenerateSimulatedTradesForExitCombination(startIndex, endIndex, exitCombination);
+	            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades, minTrades);
+				combination.FitnessScore = metrics.FitnessScore;
+
+				if (combination.FitnessScore > 0)
+				{
+					optimalExitCombinations.Add(combination);
+				}
+			}
+
+			List<double> fitnessScores = optimalCombinations
+				.Concat(optimalExitCombinations)
+				.Concat(optimalEntryCombinations)
+			    .Select(c => c.FitnessScore)
+			    .ToList();
+
+			foreach (var combination in optimalEntryCombinations)
+			{
+				combination.ConfidenceScore = CalculateConfidenceScore(combination.FitnessScore, fitnessScores);
+			}
+
+			foreach (var combination in optimalExitCombinations)
+			{
+				combination.ConfidenceScore = CalculateConfidenceScore(combination.FitnessScore, fitnessScores);
+			}
+
+			optimalCombinations = optimalCombinations
+				.Concat(optimalExitCombinations)
+				.Concat(optimalEntryCombinations)
+				.ToList();
+
+			if (optimalCombinations.Count > 30)
+			{
+				for (int i = 0; i < optimalCombinations.Count - 30; i++)
+				{
+					optimalCombinations.RemoveAt(0);
+				}
+			}
+		}
+		#endregion
+
+		#region CalculateConfidenceScore()
+		private double CalculateConfidenceScore(double fitnessScore, List<double> populationFitnessScores)
+		{
+		    double mean = populationFitnessScores.Average();
+		    double standardDeviation = Math.Sqrt(populationFitnessScores.Average(x => Math.Pow(x - mean, 2)));
+
+		    double zScore = (fitnessScore - mean) / standardDeviation;
+		    double confidenceScore = 1 - CumulativeDistributionFunction(zScore);
+
+		    return confidenceScore;
+		}
+
+		private double CumulativeDistributionFunction(double zScore)
+		{
+		    return 1.0 / (1.0 + Math.Exp(-1.702 * zScore));
 		}
 		#endregion
 
@@ -476,23 +547,25 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region GenerateSignals()
 		private void GenerateSignals()
 		{
-		    foreach (List<Condition> entryCombination in optimalEntryCombinations)
+		    foreach (Combination entryCombination in optimalEntryCombinations)
 		    {
-		        if (IsEntryCombinationMet(entryCombination))
+		        if (IsEntryCombinationMet(entryCombination.Conditions.Select(c => (Condition)c).ToList()))
 		        {
 		            Signal entrySignal = entries.Get();
 		            entrySignal.Set(md.Direction[0], this, SignalType.Entry);
+					entrySignal.Combination = entryCombination;
 		        }
 		    }
 
-		    foreach (List<ExitCondition> exitCombination in optimalExitCombinations)
+		    foreach (Combination exitCombination in optimalExitCombinations)
 		    {
 		        foreach (Signal entrySignal in cachedEntrySignals)
 		        {
-		            if (IsExitCombinationMet(exitCombination, entrySignal))
+		            if (IsExitCombinationMet(exitCombination.Conditions.Select(c => (ExitCondition)c).ToList(), entrySignal))
 		            {
 		                Signal exitSignal = exits.Get();
 		                exitSignal.Set(entrySignal.Direction, this, SignalType.Exit);
+						exitSignal.Combination = exitCombination;
 		            }
 		        }
 		    }
@@ -685,7 +758,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        .ToList();
 
 		    List<List<T>> optimalCombinations = new List<List<T>>();
-		    int count = Math.Min(10, sortedCombinations.Count);
+		    int count = Math.Min(5, sortedCombinations.Count);
 		    for (int i = 0; i < count; i++)
 		    {
 		        optimalCombinations.Add(sortedCombinations[i].Key);
@@ -1001,6 +1074,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public Dictionary<ExitCondition, List<Parameter>> ExitConditions = new Dictionary<ExitCondition, List<Parameter>>();
 		public Dictionary<Condition, List<Parameter>> EntryConditions = new Dictionary<Condition, List<Parameter>>();
 		public Dictionary<string, double> Indicators = new Dictionary<string, double>();
+		public Combination Combination { get; set; }
 		public SignalType Type { get; set; }
 		public DateTime Time { get; set; }
 		public int Bar { get; set; }
@@ -1977,6 +2051,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	#endregion
 
 	#endregion
+	#endregion
+
+	#region Combination
+	public class Combination
+	{
+		public List<ICondition> Conditions;
+		public double FitnessScore;
+		public double ConfidenceScore;
+	}
 	#endregion
 }
 
