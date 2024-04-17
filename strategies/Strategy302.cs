@@ -125,21 +125,54 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return;
 			}
 
-			if (signalGenerator.CurrentEntries[entryCount - 1].Bar != CurrentBar)
+			Signal entry = signalGenerator.CurrentEntries[entryCount - 1];
+
+			if (entry.Bar != CurrentBar)
 			{
 				return;
 			}
 
+			double stop = Close[0];
+			double confidence = entry.Combination.ConfidenceScore;
 
-			direction = signalGenerator.CurrentEntries[entryCount - 1].Direction;
+			if (confidence < 0.5)
+			{
+				return;
+			}
+
+			int quantity = confidence > 0.9 ? 5
+				: confidence > 0.8 ? 4
+				: confidence > 0.7 ? 3
+				: confidence > 0.6 ? 2
+				: 1;
+
+			direction = entry.Direction;
 			if (direction == TrendDirection.Bullish)
 			{
-				EnterLong(1);
+				stop = Low[signalGenerator.md.LegLong.BarsAgoStarts[0]] - 1;
+
+				if (Close[0] <= stop)
+				{
+					return;
+				}
+
+				SetStopLoss(CalculationMode.Price, stop);
+
+				EnterLong(quantity);
 
 				return;
 			}
 
-			EnterShort(1);
+			stop = High[signalGenerator.md.LegLong.BarsAgoStarts[0]] + 1;
+
+			if (Close[0] >= stop)
+			{
+				return;
+			}
+
+			SetStopLoss(CalculationMode.Price, stop);
+
+			EnterShort(quantity);
 		}
 		#endregion
 
