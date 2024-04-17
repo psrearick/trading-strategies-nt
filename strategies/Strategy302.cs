@@ -140,11 +140,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return;
 			}
 
-			int quantity = confidence > 0.9 ? 5
-				: confidence > 0.8 ? 4
-				: confidence > 0.7 ? 3
-				: confidence > 0.6 ? 2
-				: 1;
+//			int quantity = confidence > 0.9 ? 2
+//				: confidence > 0.8 ? 2
+//				: confidence > 0.7 ? 1
+//				: confidence > 0.6 ? 1
+//				: 1;
+
+			int quantity = 1;
 
 			direction = entry.Direction;
 			if (direction == TrendDirection.Bullish)
