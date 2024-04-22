@@ -76,24 +76,24 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private int generationsWithoutImprovement = 0;
 		private double bestFitness = double.MinValue;
 
-		private int minIndividualPopulation = 4;
+		private int minIndividualPopulation = 2;
     	private int maxIndividualPopulation = 12;
-    	private int minIndividualConditionInterval = 1;
-    	private int maxIndividualConditionInterval = 8;
+    	private int minIndividualConditionInterval = 2;
+    	private int maxIndividualConditionInterval = 6;
 	    private int minPopulationSize = 50;
 	    private int maxPopulationSize = 200;
-	    private int minGenerations = 50;
-	    private int maxGenerations = 500;
+	    private int minGenerations = 100;
+	    private int maxGenerations = 1000;
 	    private double minMutationRate = 0.01;
 	    private double maxMutationRate = 0.2;
 	    private double minCrossoverRate = 0.6;
 	    private double maxCrossoverRate = 0.8;
 		private double convergenceThreshold = 50;
 
-		private double atrMultiplier = 15.0;
-		private double minTradeThresholdMultiplier = 0.2;
+		private double atrMultiplier = 15;
+		private double minTradeThresholdMultiplier = 0.05;
 		private double numFoldMultiplier = 3;
-		private int numRuns = 2;
+		private int numRuns = 10;
 
 		private DateTime initTime = DateTime.Now;
 		private DateTime start = DateTime.Now;
@@ -180,7 +180,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			if (CurrentBar % rollingWindowSize == 0)
 		    {
-				Print(CurrentBar + " " + Time[0].Date + " ==================== " + bestFitness + " -- " + rollingWindowSize + " - " + numFolds + " -- " + (DateTime.Now - start).TotalSeconds + " -- " + (DateTime.Now - initTime).TotalSeconds);
+				Print(CurrentBar + " " + Time[0].ToString("MM/dd/yyyy") + " ==================== " + bestFitness + " -- " + rollingWindowSize + " - " + numFolds + " -- " + (DateTime.Now - start).TotalSeconds + " -- " + (DateTime.Now - initTime).TotalSeconds);
 				start = DateTime.Now;
 
 				entriesOnBar.ReleaseAll();
@@ -332,7 +332,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			optimalSets[SignalType.Entry] = new List<List<ICondition>>();
 			optimalSets[SignalType.Exit] = new List<List<ICondition>>();
 
-
 			entryInitialPopulation = InitializePopulation(entryConditions, maxPopulationSize, 1, 3);
 			exitInitialPopulation = InitializePopulation(exitConditions, maxPopulationSize, 1, 3);
 
@@ -452,7 +451,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
             List<SimTrade> trades = combination[0].Type == SignalType.Entry
 				? GenerateSimulatedTradesForEntryCombination(foldStart, foldEnd, combination)
 				: GenerateSimulatedTradesForExitCombination(foldStart, foldEnd, combination);
-
             PerformanceMetrics metrics = CalculatePerformanceMetrics(trades);
 			double fitnessScore = metrics.FitnessScore;
 
@@ -705,11 +703,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        // Adjust individual condition interval based on algorithm's performance
 		        if (generationsWithoutImprovement > 10 && individualConditionInterval < maxIndividualConditionInterval)
 		        {
-		            individualConditionInterval = Math.Min(individualConditionInterval + 1, maxIndividualConditionInterval);
+					individualConditionInterval = Math.Min(individualConditionInterval + 1, maxIndividualConditionInterval);
+//		            individualConditionInterval = Math.Max(individualConditionInterval - 1, minIndividualConditionInterval);
 		        }
 		        else if (generationsWithoutImprovement < 5 && individualConditionInterval > minIndividualConditionInterval)
 		        {
-		            individualConditionInterval = Math.Max(individualConditionInterval - 1, minIndividualConditionInterval);
+					individualConditionInterval = Math.Max(individualConditionInterval - 1, minIndividualConditionInterval);
+//		            individualConditionInterval = Math.Min(individualConditionInterval + 1, maxIndividualConditionInterval);
 		        }
 
 				TestIndividualEntries();
