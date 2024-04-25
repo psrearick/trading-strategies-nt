@@ -62,8 +62,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private int lastUpdateBar = -1;
 		private int lastSignalBar = -1;
 		private GeneticAlgorithm ga = new GeneticAlgorithm();
-		List<List<ICondition>> entryInitialPopulation = new List<List<ICondition>>();
-		List<List<ICondition>> exitInitialPopulation = new List<List<ICondition>>();
+		private List<List<ICondition>> entryInitialPopulation = new List<List<ICondition>>();
+		private List<List<ICondition>> exitInitialPopulation = new List<List<ICondition>>();
+		private CombinationMetrics combinationMetrics = new CombinationMetrics();
 
 		private int rollingWindowSize = 0;
 		private int windowStart = 0;
@@ -76,24 +77,24 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private int generationsWithoutImprovement = 0;
 		private double bestFitness = double.MinValue;
 
-		private int minIndividualPopulation = 8;
-    	private int maxIndividualPopulation = 16;
-    	private int minIndividualConditionInterval = 4;
-    	private int maxIndividualConditionInterval = 6;
+		private int minIndividualPopulation = 4;
+    	private int maxIndividualPopulation = 12;
+    	private int minIndividualConditionInterval = 2;
+    	private int maxIndividualConditionInterval = 3;
 	    private int minPopulationSize = 50;
 	    private int maxPopulationSize = 200;
-	    private int minGenerations = 50;
-	    private int maxGenerations = 500;
+	    private int minGenerations = 100;
+	    private int maxGenerations = 1000;
 	    private double minMutationRate = 0.01;
-	    private double maxMutationRate = 0.1;
+	    private double maxMutationRate = 0.2;
 	    private double minCrossoverRate = 0.6;
 	    private double maxCrossoverRate = 0.8;
-		private double convergenceThreshold = 100;
+		private double convergenceThreshold = 50;
 
-		private double atrMultiplier = 45;
-		private double minTradeThresholdMultiplier = 0.25;
-		private double numFoldMultiplier = 5;
-		private int numRuns = 15;
+		private double atrMultiplier = 15;
+		private double minTradeThresholdMultiplier = 0.15;
+		private double numFoldMultiplier = 3;
+		private int numRuns = 25;
 
 		private DateTime initTime = DateTime.Now;
 		private DateTime start = DateTime.Now;
@@ -184,6 +185,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				start = DateTime.Now;
 
 				entriesOnBar.ReleaseAll();
+				combinationMetrics.Clear();
 		        AnalyzeConditionPerformance();
 				lastUpdateBar = CurrentBar;
 		    }
@@ -1012,62 +1014,101 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 		#endregion
 
-		#region CalculatePerformanceMetrics()
+		#region CalculatePerformanceMetrics
 		private PerformanceMetrics CalculatePerformanceMetrics(List<SimTrade> trades)
 		{
 		    PerformanceMetrics metrics = new PerformanceMetrics();
 
-		    double tradeScore = 0;
-		    double maxAdverseExcursionScore = 0;
-		    double netProfitScore = 0;
-		    double consistencyScore = 0;
 			int minTradesThreshold = (int) Math.Ceiling(rollingWindowSize * minTradeThresholdMultiplier);
-
 		    if (trades.Count < minTradesThreshold)
 		    {
 		        return metrics;
 		    }
 
-		    double totalNetProfit = 0;
-		    double totalMaxFavorableExcursion = 0;
-		    double totalMaxAdverseExcursion = 0;
-		    double totalTradeScore = 0;
-
 		    foreach (SimTrade trade in trades)
 		    {
 		        trade.CalculatePerformance();
-
-		        totalNetProfit += trade.Performance.NetProfit;
-		        totalMaxFavorableExcursion += trade.Performance.MaxFavorableExcursion;
-		        totalMaxAdverseExcursion += trade.Performance.MaxAdverseExcursion;
-		        totalTradeScore += trade.Performance.TradeScore;
 		    }
 
-		    double averageNetProfit = totalNetProfit / trades.Count;
+			// Trades Lists
+			List<double> tradesNetProfit = trades.Select(t => t.Performance.NetProfit).ToList();
+			List<double> tradesMaxAdverseExcursion = trades.Select(t => t.Performance.MaxAdverseExcursion).ToList();
+			List<double> tradesFavorableExcursion = trades.Select(t => t.Performance.MaxFavorableExcursionDifference).ToList();
+			List<double> tradesTradeScore = trades.Select(t => t.Performance.TradeScore).ToList();
+
+			// Calculate Total Metrics
+			double totalNetProfit = tradesNetProfit.Sum();
+			double totalMaxAdverseExcursion = tradesMaxAdverseExcursion.Sum();
+			double totalMaxFavorableExcursion = tradesFavorableExcursion.Sum();
+			double totalTradeScore = tradesTradeScore.Sum();
+
+			// Calcuate Average Metrics
+		    double averageNetProfit = tradesNetProfit.Average();
 		    double averageMaxAdverseExcursion = totalMaxAdverseExcursion / trades.Count;
+		    double averageMaxFavorableExcursion = totalMaxFavorableExcursion / trades.Count;
 		    double averageTradeScore = totalTradeScore / trades.Count;
 
-		    // Calculate the consistency score based on the variability of net profit
-		    double netProfitVariance = trades.Sum(t => Math.Pow(t.Performance.NetProfit - averageNetProfit, 2)) / trades.Count;
-		    double netProfitStdDev = Math.Sqrt(netProfitVariance);
-		    consistencyScore = 1.0 - (netProfitStdDev / Math.Abs(averageNetProfit));
+			// Calculate More Metrics
+			double netProfitStdDev = CalcuatePopulationStandardDeviation(tradesNetProfit);
+		    double consistencyScoreValue = (
+				CalculateConsistencyScore(averageNetProfit, tradesNetProfit) +
+				CalculateConsistencyScore(averageMaxAdverseExcursion, tradesMaxAdverseExcursion) +
+				CalculateConsistencyScore(averageMaxFavorableExcursion, tradesFavorableExcursion) +
+				CalculateConsistencyScore(averageTradeScore, tradesTradeScore)) / 4;
+		    double sharpeRatio = (averageNetProfit - 0.02) / netProfitStdDev;
+			double maxDrawdown = CalculateMaxDrawdown(trades);
+			double winLossRatio = CalculateWinLossRatio(trades);
 
-		    // Normalize the scores based on predefined ranges or thresholds
-		    netProfitScore = NormalizeScore(averageNetProfit, -100, 100); // Adjust the range as per your expectations
-		    maxAdverseExcursionScore = 1.0 - NormalizeScore(averageMaxAdverseExcursion, 0, 20); // Adjust the range as per your expectations
-		    consistencyScore = NormalizeScore(consistencyScore, 0, 1);
+			// Set Combination Metrics
+			combinationMetrics.NetProfit.Add(averageNetProfit);
+			combinationMetrics.TradeScore.Add(averageTradeScore);
+			combinationMetrics.MaxAdverseExcursion.Add(averageMaxAdverseExcursion);
+			combinationMetrics.MaxFavorableExcursion.Add(averageMaxFavorableExcursion);
+			combinationMetrics.ConsistencyScore.Add(consistencyScoreValue);
+			combinationMetrics.SharpeRatio.Add(sharpeRatio);
+			combinationMetrics.MaxDrawdown.Add(maxDrawdown);
+			combinationMetrics.WinLossRatio.Add(winLossRatio);
+
+			// Calculate Overfitting Penalty
+			double averageVariance = CalculateAverageVarianceForMetrics(combinationMetrics);
+			double overfittingPenalty = 1.0 - averageVariance;
+
+			// Normalize the scores based on the population of metric values
+			double netProfitScore = NormalizeScore(averageNetProfit, combinationMetrics.NetProfit);
+			double tradeScore = NormalizeScore(averageTradeScore, combinationMetrics.TradeScore);
+			double maxAdverseExcursionScore = 1.0 - NormalizeScore(averageMaxAdverseExcursion, combinationMetrics.MaxAdverseExcursion);
+		    double maxFavorableExcursionScore = 1.0 - NormalizeScore(averageMaxFavorableExcursion, combinationMetrics.MaxFavorableExcursion);
+		    double consistencyScore = NormalizeScore(consistencyScoreValue, combinationMetrics.ConsistencyScore);
+		    double sharpeRatioScore = NormalizeScore(sharpeRatio, combinationMetrics.SharpeRatio);
+		    double maxDrawdownScore = 1.0 - NormalizeScore(maxDrawdown, combinationMetrics.MaxDrawdown);
+		    double winLossRatioScore = NormalizeScore(winLossRatio, combinationMetrics.WinLossRatio);
 
 		    // Assign weights to each score based on their importance
 		    double netProfitWeight = 0.6;
-		    double maxAdverseExcursionWeight = 0.2;
-		    double consistencyWeight = 0.1;
-		    double tradeScoreWeight = 0.1;
+//		    double tradeScoreWeight = 0.05;
+		    double maxAdverseExcursionWeight = 0.15;
+		    double maxFavorableExcursionWeight = 0.05;
+		    double consistencyWeight = 0.05;
+		    double sharpeRatioWeight = 0.05;
+		    double maxDrawdownWeight = 0.05;
+		    double winLossRatioWeight = 0.05;
 
 		    // Calculate the final fitness score
 		    double fitnessScore = (netProfitScore * netProfitWeight) +
-		                          (maxAdverseExcursionScore * maxAdverseExcursionWeight) +
-		                          (consistencyScore * consistencyWeight) +
-		                          (averageTradeScore * tradeScoreWeight);
+//                          (tradeScore * tradeScoreWeight) +
+                          (maxAdverseExcursionScore * maxAdverseExcursionWeight) +
+                          (maxFavorableExcursionScore * maxFavorableExcursionWeight) +
+                          (consistencyScore * consistencyWeight) +
+                          (sharpeRatioScore * sharpeRatioWeight) +
+                          (maxDrawdownScore * maxDrawdownWeight) +
+                          (winLossRatioScore * winLossRatioWeight);
+
+			if (double.IsNaN(fitnessScore))
+			{
+				fitnessScore = 0.5;
+			}
+
+			fitnessScore *= overfittingPenalty;
 
 		    metrics.FitnessScore = fitnessScore;
 		    metrics.AverageNetProfit = averageNetProfit;
@@ -1076,13 +1117,119 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			metrics.NetProfit = totalNetProfit;
 			metrics.MaxAdverseExcursion = totalMaxAdverseExcursion;
 			metrics.MaxFavorableExcursion = totalMaxFavorableExcursion;
+			metrics.SharpeRatio = sharpeRatio;
+			metrics.MaxDrawdown = maxDrawdown;
+			metrics.WinLossRatio = winLossRatio;
 
 		    return metrics;
 		}
 
-		private double NormalizeScore(double value, double min, double max)
+		private double CalculateAverageVarianceForMetrics(CombinationMetrics combinationMetrics)
 		{
-		    return (value - min) / (max - min);
+		    List<double> variances = new List<double>();
+
+		    variances.Add(CalculateVariance(combinationMetrics.NetProfit));
+		    variances.Add(CalculateVariance(combinationMetrics.TradeScore));
+		    variances.Add(CalculateVariance(combinationMetrics.MaxAdverseExcursion));
+		    variances.Add(CalculateVariance(combinationMetrics.MaxFavorableExcursion));
+		    variances.Add(CalculateVariance(combinationMetrics.ConsistencyScore));
+		    variances.Add(CalculateVariance(combinationMetrics.SharpeRatio));
+		    variances.Add(CalculateVariance(combinationMetrics.MaxDrawdown));
+		    variances.Add(CalculateVariance(combinationMetrics.WinLossRatio));
+
+		    // Remove any infinite or NaN values from the variances list
+		    variances = variances.Where(v => !double.IsInfinity(v) && !double.IsNaN(v)).ToList();
+
+		    // If all variances are infinite or NaN, return a default value (e.g., 0)
+		    if (variances.Count == 0)
+		    {
+		        return 0;
+		    }
+
+		    double minVariance = variances.Min();
+		    double maxVariance = variances.Max();
+
+		    // If the minimum and maximum variances are equal, return a default value (e.g., 0)
+		    if (minVariance == maxVariance)
+		    {
+		        return 0;
+		    }
+
+		    List<double> normalizedVariances = variances.Select(v => NormalizeValue(v, minVariance, maxVariance)).ToList();
+
+		    return normalizedVariances.Average();
+		}
+
+		private double NormalizeValue(double value, double min, double max)
+		{
+		    double epsilon = 1e-8;
+		    return (value - min) / (max - min + epsilon);
+		}
+
+		private double CalculateVariance(List<double> values)
+		{
+		    double average = values.Average();
+		    double sumOfSquares = values.Sum(x => Math.Pow(x - average, 2));
+
+			return sumOfSquares / (values.Count - 1);
+		}
+
+		private double CalculateConsistencyScore(double averageValue, List<double> values)
+		{
+			double stdDev = CalcuatePopulationStandardDeviation(values);
+
+			return 1.0 - (stdDev / Math.Abs(averageValue));
+		}
+
+		private double CalcuatePopulationStandardDeviation(List<double> population)
+		{
+			return Math.Sqrt(CalculateVariance(population));
+		}
+
+		private double CalculateMaxDrawdown(List<SimTrade> trades)
+		{
+			double maxDrawdown = 0;
+		    double peakEquity = 0;
+		    double currentEquity = 0;
+
+		    foreach (SimTrade trade in trades)
+		    {
+		        currentEquity += trade.Performance.NetProfit;
+		        if (currentEquity > peakEquity)
+		            peakEquity = currentEquity;
+		        double drawdown = peakEquity - currentEquity;
+		        if (drawdown > maxDrawdown)
+		            maxDrawdown = drawdown;
+		    }
+
+			return maxDrawdown;
+		}
+
+		private double CalculateWinLossRatio(List<SimTrade> trades)
+		{
+		    int winCount = trades.Count(t => t.Performance.NetProfit > 0);
+		    int lossCount = trades.Count(t => t.Performance.NetProfit < 0);
+
+			return (lossCount > 0) ? (double) winCount / lossCount : winCount;
+		}
+
+		private double NormalizeScore(double value, List<double> population)
+		{
+		    // Sort the population in ascending order
+		    List<double> sortedPopulation = new List<double>(population);
+		    sortedPopulation.Sort();
+
+		    // Find the rank of the value in the sorted population
+		    int rank = sortedPopulation.BinarySearch(value);
+		    if (rank < 0)
+		    {
+		        rank = ~rank;
+		    }
+
+		    // Calculate the normalized score based on the rank
+		    double normalizedScore = (double)rank / (population.Count - 1);
+
+		    return normalizedScore;
 		}
 		#endregion
 	}
@@ -1233,6 +1380,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public int BarsInTrade { get; set; }
 	    public double MaxAdverseExcursion { get; set; }
 	    public double MaxFavorableExcursion { get; set; }
+	    public double MaxFavorableExcursionDifference { get; set; }
 		public double NetProfit { get; set; }
 	    public int TradeDuration { get; set; }
 		public double TradeScore { get; set; }
@@ -1248,6 +1396,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			MaxAdverseExcursion = entry.Direction == TrendDirection.Bullish ? entry.Price - lowestLow : highestHigh - entry.Price;
 			MaxFavorableExcursion = entry.Direction == TrendDirection.Bullish ? highestHigh - entry.Price : entry.Price - lowestLow;
 			NetProfit = entry.Direction == TrendDirection.Bullish ? exit.Price - entry.Price : entry.Price - exit.Price;
+			MaxFavorableExcursionDifference = MaxFavorableExcursion - NetProfit;
 			TradeDuration = (exit.Time - entry.Time).Seconds;
 
 			double netProfitScore = NetProfit;
@@ -1269,6 +1418,33 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public double FitnessScore { get; set; }
 		public double AverageMaxAdverseExcursion { get; set; }
 		public double ConsistencyScore { get; set; }
+		public double SharpeRatio { get; set; }
+		public double MaxDrawdown { get; set; }
+		public double WinLossRatio { get; set; }
+	}
+
+	public class CombinationMetrics
+	{
+		public List<double> NetProfit = new List<double>();
+		public List<double> TradeScore = new List<double>();
+		public List<double> MaxAdverseExcursion = new List<double>();
+		public List<double> MaxFavorableExcursion = new List<double>();
+		public List<double> ConsistencyScore = new List<double>();
+		public List<double> SharpeRatio = new List<double>();
+		public List<double> MaxDrawdown = new List<double>();
+		public List<double> WinLossRatio = new List<double>();
+
+		public void Clear()
+		{
+			NetProfit.Clear();
+			TradeScore.Clear();
+			MaxAdverseExcursion.Clear();
+			MaxFavorableExcursion.Clear();
+			ConsistencyScore.Clear();
+			SharpeRatio.Clear();
+			MaxDrawdown.Clear();
+			WinLossRatio.Clear();
+		}
 	}
 	#endregion
 

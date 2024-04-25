@@ -44,7 +44,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             "15:00",
             System.Globalization.CultureInfo.InvariantCulture
         );
-		private int TimeShift = -6;
+		private int TimeShift = 0;
 		#endregion
 
 		#region OnStateChange()
