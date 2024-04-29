@@ -65,7 +65,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private List<List<ICondition>> entryInitialPopulation = new List<List<ICondition>>();
 		private List<List<ICondition>> exitInitialPopulation = new List<List<ICondition>>();
 		private CombinationMetrics combinationMetrics = new CombinationMetrics();
-		private Dictionary<double, double> performanceWeights = new Dictionary<double, double>();
+		private Dictionary<string, double> performanceWeights = new Dictionary<string, double>();
 
 		private int rollingWindowSize = 0;
 		private int windowStart = 0;
@@ -431,7 +431,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades);
 				combination.FitnessScore = metrics.FitnessScore;
 
-				UpdatePerformanceWeights(trades, entryCombination.Select(c => (Parameter)c).ToList());
+				UpdatePerformanceWeights(entryCombination, metrics.FitnessScore);
 
 				if (combination.FitnessScore > 0)
 				{
@@ -447,7 +447,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	            PerformanceMetrics metrics = CalculatePerformanceMetrics(trades);
 				combination.FitnessScore = metrics.FitnessScore;
 
-				UpdatePerformanceWeights(trades, exitCombination.Select(c => (Parameter)c).ToList());
+				UpdatePerformanceWeights(exitCombination, metrics.FitnessScore);
 
 				if (combination.FitnessScore > 0)
 				{
@@ -677,37 +677,135 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region Initialize Population
 		#region InitializePopulation()
-		private List<List<T>> InitializePopulation<T>(List<T> availableConditions, int populationSize, int minConditions, int maxConditions)
+		private List<List<ICondition>> InitializePopulation(List<ICondition> availableConditions, int populationSize, int minConditions, int maxConditions)
 		{
-		    List<List<T>> population = new List<List<T>>();
+		    List<List<ICondition>> population = new List<List<ICondition>>();
 		    Random random = new Random();
+
+		    // Calculate importance weights for each combination based on past performance
+		    double[] combinationWeights = CalculateCombinationWeights(availableConditions);
 
 		    for (int i = 0; i < populationSize; i++)
 		    {
 		        int numConditions = random.Next(minConditions, maxConditions + 1);
-		        List<T> individual = new List<T>();
+		        List<ICondition> individual = new List<ICondition>();
 
-		        for (int j = 0; j < numConditions; j++)
-		        {
-		            int index = random.Next(availableConditions.Count);
-					if (individual.Contains(availableConditions[index]))
-					{
-						continue;
-					}
+		        // Select combinations based on their importance weights
+		        List<ICondition> selectedConditions = ImportanceSampling(availableConditions, combinationWeights, numConditions);
 
-		            individual.Add(availableConditions[index]);
-		        }
-
-				if (individual.Count() < numConditions) {
-					continue;
-				}
+		        individual.AddRange(selectedConditions);
 
 		        population.Add(individual);
 		    }
 
 		    return population;
 		}
+		#endregion
+
+		#region CalculateCombinationWeights()
+		private double[] CalculateCombinationWeights(List<ICondition> availableConditions)
+		{
+		    double[] weights = new double[availableConditions.Count];
+		    double totalWeight = 0;
+
+		    for (int i = 0; i < availableConditions.Count; i++)
+		    {
+		        List<ICondition> combination = new List<ICondition> { availableConditions[i] };
+		        double weight = GetPerformanceWeight(combination);
+		        weights[i] = weight;
+		        totalWeight += weight;
+		    }
+
+		    for (int i = 0; i < weights.Length; i++)
+		    {
+		        weights[i] /= totalWeight;
+		    }
+
+		    return weights;
+		}
+		#endregion
+
+		#region UpdatePerformanceWeights
+		private void UpdatePerformanceWeights(List<ICondition> combination, double fitnessScore)
+		{
+			if (combination.Count() == 0)
+			{
+				return;
+			}
+
+		    string combinationKey = GetCombinationKey(combination);
+
+		    if (performanceWeights.ContainsKey(combinationKey))
+		    {
+		        performanceWeights[combinationKey] = (performanceWeights[combinationKey] + fitnessScore) / 2.0;
+		    }
+		    else
+		    {
+		        performanceWeights[combinationKey] = fitnessScore;
+		    }
+		}
+		#endregion
+
+		#region GetCombinationKey()
+		private string GetCombinationKey(List<ICondition> combination)
+		{
+			if (combination.Count() == 0)
+			{
+				return "";
+			}
+
+		    return string.Join("_", combination.Select(c => c.GetType().Name));
+		}
+		#endregion
+
+		#region GetPerformanceWeight()
+		private double GetPerformanceWeight(List<ICondition> combination)
+		{
+		    string combinationKey = GetCombinationKey(combination);
+
+		    if (performanceWeights.ContainsKey(combinationKey))
+		    {
+		        return performanceWeights[combinationKey];
+		    }
+		    else
+		    {
+		        return 1.0;
+		    }
+		}
+		#endregion
+
+		#region ImportanceSampling()
+		private List<T> ImportanceSampling<T>(List<T> availableConditions, double[] weights, int numSamples)
+		{
+		    List<T> samples = new List<T>();
+		    Random random = new Random();
+
+		    for (int i = 0; i < numSamples; i++)
+		    {
+		        double randomValue = random.NextDouble();
+		        double cumulativeWeight = 0;
+
+		        for (int j = 0; j < weights.Length; j++)
+		        {
+					if (availableConditions.Count() < (j - 1))
+					{
+						break;
+					}
+
+		            cumulativeWeight += weights[j];
+		            if (randomValue <= cumulativeWeight)
+		            {
+		                samples.Add(availableConditions[j]);
+		                break;
+		            }
+		        }
+		    }
+
+		    return samples;
+		}
+		#endregion
 		#endregion
 
 		#region GenerateSignals()
@@ -956,10 +1054,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    }
 		    else
 		    {
-		        int numSamples = Math.Min(parameterTypes[depth].Values.Length, 5);
-		        var importanceWeights = CalculateImportanceWeights(parameterTypes[depth].Values);
-		        var selectedValues = ImportanceSampling(parameterTypes[depth].Values, importanceWeights, numSamples);
-		        foreach (double value in selectedValues)
+		        foreach (double value in parameterTypes[depth].Values)
 		        {
 		            Parameter parameter = new Parameter();
 		            parameter.Set(parameterTypes[depth], value);
@@ -968,92 +1063,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		            currentCombination.RemoveAt(currentCombination.Count - 1);
 		        }
 		    }
-		}
-		#endregion
-
-		#region CalculateImportanceWeights()
-		private double[] CalculateImportanceWeights(double[] values)
-		{
-		    double[] weights = new double[values.Length];
-		    double totalWeight = 0;
-
-		    for (int i = 0; i < values.Length; i++)
-		    {
-		        double value = values[i];
-		        double weight = GetPerformanceWeight(value);
-		        weights[i] = weight;
-		        totalWeight += weight;
-		    }
-
-		    // Normalize the weights
-		    for (int i = 0; i < weights.Length; i++)
-		    {
-		        weights[i] /= totalWeight;
-		    }
-
-		    return weights;
-		}
-		#endregion
-
-		#region UpdatePerformanceWeights
-		private void UpdatePerformanceWeights(List<SimTrade> trades, List<Parameter> combination)
-		{
-		    double fitnessScore = CalculateFitnessScore(trades);
-
-		    foreach (Parameter parameter in combination)
-		    {
-		        double parameterValue = parameter.Value;
-		        if (performanceWeights.ContainsKey(parameterValue))
-		        {
-		            performanceWeights[parameterValue] = (performanceWeights[parameterValue] + fitnessScore) / 2.0;
-		        }
-		        else
-		        {
-		            performanceWeights[parameterValue] = fitnessScore;
-		        }
-		    }
-		}
-		#endregion
-
-		#region GetPerformanceWeight()
-		private double GetPerformanceWeight(double value)
-		{
-		    if (performanceWeights.ContainsKey(value))
-		    {
-		        return performanceWeights[value];
-		    }
-		    else
-		    {
-		        return 1.0;
-		    }
-		}
-		#endregion
-
-		#region ImportanceSampling()
-		private IEnumerable<double> ImportanceSampling(double[] values, double[] weights, int numSamples)
-		{
-		    double[] cumulativeWeights = new double[weights.Length];
-		    cumulativeWeights[0] = weights[0];
-		    for (int i = 1; i < weights.Length; i++)
-		    {
-		        cumulativeWeights[i] = cumulativeWeights[i - 1] + weights[i];
-		    }
-
-		    List<double> samples = new List<double>();
-		    Random random = new Random();
-
-		    for (int i = 0; i < numSamples; i++)
-		    {
-		        double randomValue = random.NextDouble();
-		        int index = Array.BinarySearch(cumulativeWeights, randomValue);
-		        if (index < 0)
-		        {
-		            index = ~index;
-		        }
-		        samples.Add(values[index]);
-		    }
-
-		    return samples;
 		}
 		#endregion
 		#endregion
