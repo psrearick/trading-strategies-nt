@@ -87,8 +87,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
     	private int maxIndividualPopulation = 16;
     	private int minIndividualConditionInterval = 2;
     	private int maxIndividualConditionInterval = 6;
-	    private int minPopulationSize = 100;
-	    private int maxPopulationSize = 500;
+	    private int minPopulationSize = 50;
+	    private int maxPopulationSize = 200;
 	    private int minGenerations = 100;
 	    private int maxGenerations = 500;
 	    private double minMutationRate = 0.01;
@@ -97,7 +97,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	    private double maxCrossoverRate = 0.8;
 
 		private double numFoldMultiplier = 3;
-		private int numRuns = 5;
+		private int numRuns = 10;
 
 		private DateTime initTime = DateTime.Now;
 		private DateTime start = DateTime.Now;
@@ -182,6 +182,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			CalculateAdaptiveRollingWindowSize();
 			CalculateWindowPosition();
 			PruneSignals();
+
 			if (CurrentBar % (2 * rollingWindowSize) == 0)
 			{
 				bestFitness = double.MinValue;
@@ -387,7 +388,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    List<Tuple<int, int>> folds = SplitDataIntoFolds();
 
 			Dictionary<SignalType, List<List<ICondition>>> optimalSets = new Dictionary<SignalType, List<List<ICondition>>>();
-
 			optimalSets[SignalType.Entry] = new List<List<ICondition>>();
 			optimalSets[SignalType.Exit] = new List<List<ICondition>>();
 
@@ -400,6 +400,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    {
 				foldStart = fold.Item1;
 				foldEnd = fold.Item2;
+
 		        AnalyzeFoldPerformance(optimalSets);
 		    }
 
@@ -548,16 +549,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	        PopulateFoldSignals();
 			CalculateConvergenceThreshold();
 
-		    List<List<List<ICondition>>> optimalEntryFoldRuns = new List<List<List<ICondition>>>();
-		    List<List<List<ICondition>>> optimalExitFoldRuns = new List<List<List<ICondition>>>();
-			Dictionary<SignalType, List<List<ICondition>>> conditionSets = new Dictionary<SignalType, List<List<ICondition>>>();
-			conditionSets[SignalType.Entry] = new List<List<ICondition>>();
-			conditionSets[SignalType.Exit] = new List<List<ICondition>>();
-
 			int eliteCount = (int) Math.Floor((double) ((minPopulationSize + maxPopulationSize) * 0.5) * 0.1);
+			List<Dictionary<SignalType, List<List<ICondition>>>> optimalFoldRuns = new List<Dictionary<SignalType, List<List<ICondition>>>>();
 
 			for (int run = 0; run < numRuns; run++)
 			{
+				Dictionary<SignalType, List<List<ICondition>>> optimalFoldRun = new Dictionary<SignalType, List<List<ICondition>>>();
+        		optimalFoldRun[SignalType.Entry] = new List<List<ICondition>>();
+       			optimalFoldRun[SignalType.Exit] = new List<List<ICondition>>();
+
 		        List<List<ICondition>> optimalEntryFold = ga.Optimize(
 		            FitnessFunction,
 		            entryInitialPopulation,
@@ -586,27 +586,54 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			        maxCrossoverRate,
 					eliteCount);
 
-		        optimalEntryFoldRuns.Add(optimalEntryFold);
-		        optimalExitFoldRuns.Add(optimalExitFold);
+		        optimalFoldRun[SignalType.Entry] = optimalEntryFold;
+       			optimalFoldRun[SignalType.Exit] = optimalExitFold;
+
+        		optimalFoldRuns.Add(optimalFoldRun);
 			}
 
-			conditionSets[SignalType.Entry] = GetConsistentCombinations(optimalEntryFoldRuns);
-			conditionSets[SignalType.Exit] = GetConsistentCombinations(optimalExitFoldRuns);
+			Dictionary<SignalType, List<List<ICondition>>> bestFoldCombinations = GetBestCombinationsAcrossRuns(optimalFoldRuns);
 
-			Dictionary<SignalType, List<Combination>> conditionPerformance = CalculatePerformanceForConditionSet(conditionSets, 20);
+		    optimalSets[SignalType.Entry].AddRange(bestFoldCombinations[SignalType.Entry]);
+		    optimalSets[SignalType.Exit].AddRange(bestFoldCombinations[SignalType.Exit]);
+		}
+		#endregion
 
-			List<Combination> conditions = conditionPerformance[SignalType.Entry]
-				.Concat(conditionPerformance[SignalType.Exit])
-				.ToList();
+		#region GetBestCombinationsAcrossRuns()
+		private Dictionary<SignalType, List<List<ICondition>>> GetBestCombinationsAcrossRuns(List<Dictionary<SignalType, List<List<ICondition>>>> optimalFoldRuns)
+		{
+		    Dictionary<SignalType, List<List<ICondition>>> bestCombinations = new Dictionary<SignalType, List<List<ICondition>>>();
+		    bestCombinations[SignalType.Entry] = new List<List<ICondition>>();
+		    bestCombinations[SignalType.Exit] = new List<List<ICondition>>();
 
-			if (conditions.Count() > 0)
-			{
-				foldBestFitness = conditions.Max(c => c.FitnessScore);
-				foldWorstFitness = conditions.Min(c => c.FitnessScore);
-			}
+		    foreach (SignalType signalType in new[] { SignalType.Entry, SignalType.Exit })
+		    {
+		        Dictionary<List<ICondition>, double> combinationScores = new Dictionary<List<ICondition>, double>();
 
-		    optimalSets[SignalType.Entry].AddRange(conditionSets[SignalType.Entry]);
-		    optimalSets[SignalType.Exit].AddRange(conditionSets[SignalType.Exit]);
+		        foreach (Dictionary<SignalType, List<List<ICondition>>> optimalFoldRun in optimalFoldRuns)
+		        {
+		            foreach (List<ICondition> combination in optimalFoldRun[signalType])
+		            {
+		                if (!combinationScores.ContainsKey(combination))
+		                {
+		                    combinationScores[combination] = 0;
+		                }
+		                combinationScores[combination] += FitnessFunction(combination);
+		            }
+		        }
+
+		        List<KeyValuePair<List<ICondition>, double>> sortedCombinations = combinationScores
+		            .OrderByDescending(x => x.Value)
+		            .ToList();
+
+		        int count = Math.Min(10, sortedCombinations.Count);
+		        for (int i = 0; i < count; i++)
+		        {
+		            bestCombinations[signalType].Add(sortedCombinations[i].Key);
+		        }
+		    }
+
+		    return bestCombinations;
 		}
 		#endregion
 
@@ -646,30 +673,30 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#endregion
 
 		#region GetConsistentCombinations()
-		private List<List<T>> GetConsistentCombinations<T>(List<List<List<T>>> combinationRuns)
-		{
-		    List<List<T>> consistentCombinations = new List<List<T>>();
+//		private List<List<T>> GetConsistentCombinations<T>(List<List<List<T>>> combinationRuns)
+//		{
+//		    List<List<T>> consistentCombinations = new List<List<T>>();
 
-		    foreach (List<T> combination in combinationRuns[0])
-		    {
-		        bool isConsistent = true;
-		        for (int run = 1; run < combinationRuns.Count; run++)
-		        {
-		            if (!combinationRuns[run].Contains(combination))
-		            {
-		                isConsistent = false;
-		                break;
-		            }
-		        }
+//		    foreach (List<T> combination in combinationRuns[0])
+//		    {
+//		        bool isConsistent = true;
+//		        for (int run = 1; run < combinationRuns.Count; run++)
+//		        {
+//		            if (!combinationRuns[run].Contains(combination))
+//		            {
+//		                isConsistent = false;
+//		                break;
+//		            }
+//		        }
 
-		        if (isConsistent)
-		        {
-		            consistentCombinations.Add(combination);
-		        }
-		    }
+//		        if (isConsistent)
+//		        {
+//		            consistentCombinations.Add(combination);
+//		        }
+//		    }
 
-		    return consistentCombinations;
-		}
+//		    return consistentCombinations;
+//		}
 		#endregion
 
 		#region InitializePopulation()
@@ -1096,7 +1123,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		    PerformanceMetrics metrics = new PerformanceMetrics();
 
 			int minTradesThreshold = (int) Math.Ceiling(rollingWindowSize * minTradeThresholdMultiplier);
-		    if (trades.Count < minTradesThreshold)
+		    if (trades.Count < minTradesThreshold || trades.Count == 0)
 		    {
 		        return metrics;
 		    }
