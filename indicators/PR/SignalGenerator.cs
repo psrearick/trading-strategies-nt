@@ -55,7 +55,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private Dictionary<List<ICondition>, double> combinationCache = new Dictionary<List<ICondition>, double>(new ListComparer<ICondition>());
 		private GroupedObjectPool<int, Signal> entrySignals;
 		private GroupedObjectPool<int, Signal> exitSignals;
-		private ObjectPool<ParameterType> parameterTypes;
+		private Dictionary<Type, List<ParameterType>> conditionParameterTypes = new Dictionary<Type, List<ParameterType>>();
 		public ObjectPool<Signal> entries;
 		public ObjectPool<Signal> exits;
 		public ObjectPool<Signal> entriesOnBar;
@@ -141,6 +141,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				emaFast					= EMA(9);
 				emaSlow					= EMA(21);
 
+				AddDataSeries(Data.BarsPeriodType.Second, 15);
 			}
 			#endregion
 			#region State.DataLoaded
@@ -155,7 +156,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				barsSinceDoubleBottom	= new Series<int>(this);
 
 				entriesOnBar = new ObjectPool<Signal>(0, () => new Signal());
-				parameterTypes = new ObjectPool<ParameterType>(0, () => new ParameterType());
 				exitSignals = new GroupedObjectPool<int, Signal>(0, () => new Signal());
 				entrySignals = new GroupedObjectPool<int, Signal>(0, () => new Signal());
 				exits = new ObjectPool<Signal>(0, () => new Signal());
@@ -176,6 +176,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        return;
 		    }
 
+			if (BarsInProgress == 1)
+			{
+				return;
+			}
+
 			CalculateParameters();
 		    UpdateBarsSinceDoubleTopBottom();
 			TestIndividualConditions();
@@ -191,7 +196,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			if (CurrentBar % rollingWindowSize == 0)
 		    {
-				Print(CurrentBar + " " + Time[0].ToString("MM/dd/yyyy") + " ==================== " + (DateTime.Now - start).TotalSeconds + " -- " + (DateTime.Now - initTime).TotalSeconds);
+				Print(CurrentBar + " " + Time[0].ToString() + " ==================== " + (DateTime.Now - start).TotalSeconds + " -- " + (DateTime.Now - initTime).TotalSeconds);
 				start = DateTime.Now;
 
 				entriesOnBar.ReleaseAll();
@@ -289,14 +294,23 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region SetParameterTypes()
 		private void SetParameterTypes()
 		{
-			ParameterType NewExtremeLength = parameterTypes.Get();
-			NewExtremeLength.Set("NewExtremeLength", 20, 6, 2);
+			List<ParameterType> newExtremeParameters = new List<ParameterType>();
+		    ParameterType NewExtremeLength = new ParameterType();
+		    NewExtremeLength.Set("NewExtremeLength", 20, 6, 2);
+		    newExtremeParameters.Add(NewExtremeLength);
+		    conditionParameterTypes[typeof(NoNewExtremeCondition)] = newExtremeParameters;
 
-			ParameterType ProfitTargetMultiplier = parameterTypes.Get();
-			ProfitTargetMultiplier.Set("ProfitTargetMultiplier", 20, 0.5, 0.5);
+			List<ParameterType> profitTargetParameters = new List<ParameterType>();
+		    ParameterType ProfitTargetMultiplier = new ParameterType();
+		    ProfitTargetMultiplier.Set("ProfitTargetMultiplier", 20, 0.5, 0.5);
+		    profitTargetParameters.Add(ProfitTargetMultiplier);
+		    conditionParameterTypes[typeof(ProfitTargetCondition)] = profitTargetParameters;
 
-			ParameterType StopLossMultiplier = parameterTypes.Get();
-			StopLossMultiplier.Set("StopLossMultiplier", 10, 0.5, 0.5);
+			List<ParameterType> stopLossParameters = new List<ParameterType>();
+		    ParameterType stopLossMultiplier = new ParameterType();
+		    stopLossMultiplier.Set("StopLossMultiplier", 10, 0.5, 0.5);
+		    stopLossParameters.Add(stopLossMultiplier);
+		    conditionParameterTypes[typeof(StopLossCondition)] = stopLossParameters;
 		}
 		#endregion
 
@@ -304,79 +318,82 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private void SetConditions()
 		{
 			#region Entry Conditions
-			entryConditions.Add(new RSIRangeCondition());
-			entryConditions.Add(new AboveAverageATRCondition());
+//			entryConditions.Add(new RSIRangeCondition());
+//			entryConditions.Add(new AboveAverageATRCondition());
 			entryConditions.Add(new BelowAverageATRCondition());
 			entryConditions.Add(new AboveAverageATRByAStdDevCondition());
 			entryConditions.Add(new BreakoutCondition());
 			entryConditions.Add(new BroadChannelCondition());
-			entryConditions.Add(new TightChannelCondition());
-			entryConditions.Add(new WeakTrendCondition());
-			entryConditions.Add(new StrongTrendCondition());
-			entryConditions.Add(new WithTrendTrendBarCondition());
-			entryConditions.Add(new BreakoutBarPatternCondition());
+//			entryConditions.Add(new TightChannelCondition()); // Produces very few trades -- REMOVE
+			entryConditions.Add(new WeakTrendCondition()); // Produces very few trades -- REMOVE
+			entryConditions.Add(new StrongTrendCondition()); // Produces very few trades -- REMOVE
+//			entryConditions.Add(new WithTrendTrendBarCondition());
+//			entryConditions.Add(new BreakoutBarPatternCondition()); // Produces very few trades -- REMOVE
 			entryConditions.Add(new WeakBarCondition());
-			entryConditions.Add(new StrongFollowThroughCondition());
+//			entryConditions.Add(new StrongFollowThroughCondition()); // Produces very few trades -- REMOVE
 			entryConditions.Add(new WithTrendPressureCondition());
-			entryConditions.Add(new StrongWithTrendPressureCondition());
-			entryConditions.Add(new EMADivergingCondition());
+//			entryConditions.Add(new StrongWithTrendPressureCondition()); // Produces few trades, 5-8 per month
+//			entryConditions.Add(new EMADivergingCondition());
 			entryConditions.Add(new EMAConvergingCondition());
 			entryConditions.Add(new WithTrendEMACondition());
-			entryConditions.Add(new LeadsFastEMAByMoreThanATRCondition());
-			entryConditions.Add(new FastEMADirectionCondition());
-			entryConditions.Add(new SlowEMADirectionCondition());
+			entryConditions.Add(new LeadsFastEMAByMoreThanATRCondition()); // Good performance, but produces very few trades, less than 5 per month
+//			entryConditions.Add(new FastEMADirectionCondition());
+//			entryConditions.Add(new SlowEMADirectionCondition());
 			#endregion
 
 			#region Exit Conditions
 
 			List<ExitCondition> singleExitConditions = new List<ExitCondition>();
 
-			singleExitConditions.Add(new TrendDirectionChangedCondition());
-			singleExitConditions.Add(new CounterTrendTightChannelCondition());
-			singleExitConditions.Add(new CounterBroadTightChannelCondition());
-			singleExitConditions.Add(new CounterTrendBreakoutsCondition());
-			singleExitConditions.Add(new CounterTrendBreakoutTrendCondition());
-			singleExitConditions.Add(new CounterTrendLegLongCondition());
-			singleExitConditions.Add(new CounterTrendLegShortCondition());
-			singleExitConditions.Add(new DoubleTopBottomCondition());
-			singleExitConditions.Add(new CounterTrendLegAfterDoubleTopBottomCondition());
-			singleExitConditions.Add(new TrailingStopBeyondPreviousExtremeCondition());
-			singleExitConditions.Add(new MovingAverageCrossoverCondition());
-			singleExitConditions.Add(new NoNewExtremeCondition());
+//			singleExitConditions.Add(new TrendDirectionChangedCondition());
+//			singleExitConditions.Add(new CounterTrendTightChannelCondition());
+//			singleExitConditions.Add(new CounterBroadTightChannelCondition());
+//			singleExitConditions.Add(new CounterTrendBreakoutsCondition());
+//			singleExitConditions.Add(new CounterTrendBreakoutTrendCondition());
+//			singleExitConditions.Add(new CounterTrendLegLongCondition());
+//			singleExitConditions.Add(new CounterTrendLegShortCondition());
+//			singleExitConditions.Add(new DoubleTopBottomCondition());
+//			singleExitConditions.Add(new CounterTrendLegAfterDoubleTopBottomCondition());
+//			singleExitConditions.Add(new TrailingStopBeyondPreviousExtremeCondition());
+//			singleExitConditions.Add(new MovingAverageCrossoverCondition());
+//			singleExitConditions.Add(new NoNewExtremeCondition());
 			singleExitConditions.Add(new ProfitTargetCondition());
 			singleExitConditions.Add(new StopLossCondition());
-			singleExitConditions.Add(new CounterTrendPressureCondition());
-			singleExitConditions.Add(new CounterTrendWeakTrendCondition());
-			singleExitConditions.Add(new CounterTrendStrongTrendCondition());
-			singleExitConditions.Add(new RSIOutOfRangeCondition());
-			singleExitConditions.Add(new AboveAverageATRExitCondition());
-			singleExitConditions.Add(new BelowAverageATRExitCondition());
-			singleExitConditions.Add(new AboveAverageATRByAStdDevExitCondition());
-			singleExitConditions.Add(new BelowAverageATRByAStdDevExitCondition());
-			singleExitConditions.Add(new StrongCounterTrendFollowThroughCondition());
+//			singleExitConditions.Add(new CounterTrendPressureCondition());
+//			singleExitConditions.Add(new CounterTrendWeakTrendCondition());
+//			singleExitConditions.Add(new CounterTrendStrongTrendCondition());
+//			singleExitConditions.Add(new RSIOutOfRangeCondition());
+//			singleExitConditions.Add(new AboveAverageATRExitCondition());
+//			singleExitConditions.Add(new BelowAverageATRExitCondition());
+//			singleExitConditions.Add(new AboveAverageATRByAStdDevExitCondition());
+//			singleExitConditions.Add(new BelowAverageATRByAStdDevExitCondition());
+//			singleExitConditions.Add(new StrongCounterTrendFollowThroughCondition());
 
 			foreach (ExitCondition singleExitCondition in singleExitConditions)
 			{
-				if (singleExitCondition.ParameterTypes.Count == 0) {
+				Type exitType = singleExitCondition.GetType();
+
+				if (!conditionParameterTypes.ContainsKey(exitType))
+				{
 					exitConditions.Add(singleExitCondition);
 
 					continue;
 				}
 
-				List<List<Parameter>> parameterCombinations = GenerateParameterCombinations(singleExitCondition.ParameterTypes);
-				Type exitType = singleExitCondition.GetType();
+				List<ParameterType> parameterTypes = conditionParameterTypes[exitType];
+	            List<List<Parameter>> parameterCombinations = GenerateParameterCombinations(parameterTypes);
 
-				foreach (List<Parameter> parameterCombination in parameterCombinations)
-                {
-					ExitCondition exitCondition = (ExitCondition) Activator.CreateInstance(exitType);
+	            foreach (List<Parameter> parameterCombination in parameterCombinations)
+	            {
+	                ExitCondition exitCondition = (ExitCondition)Activator.CreateInstance(exitType);
 
-                    foreach (Parameter parameter in parameterCombination)
-                    {
-                        exitCondition.SetParameterValue(parameter.Type, parameter.Value);
-                    }
+	                foreach (Parameter parameter in parameterCombination)
+	                {
+	                    exitCondition.SetParameterValue(parameter.Type, parameter.Value);
+	                }
 
-					exitConditions.Add(exitCondition);
-                }
+	                exitConditions.Add(exitCondition);
+	            }
 			}
 			#endregion
 		}
@@ -672,33 +689,6 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region GetConsistentCombinations()
-//		private List<List<T>> GetConsistentCombinations<T>(List<List<List<T>>> combinationRuns)
-//		{
-//		    List<List<T>> consistentCombinations = new List<List<T>>();
-
-//		    foreach (List<T> combination in combinationRuns[0])
-//		    {
-//		        bool isConsistent = true;
-//		        for (int run = 1; run < combinationRuns.Count; run++)
-//		        {
-//		            if (!combinationRuns[run].Contains(combination))
-//		            {
-//		                isConsistent = false;
-//		                break;
-//		            }
-//		        }
-
-//		        if (isConsistent)
-//		        {
-//		            consistentCombinations.Add(combination);
-//		        }
-//		    }
-
-//		    return consistentCombinations;
-//		}
-		#endregion
-
 		#region InitializePopulation()
 		private List<List<T>> InitializePopulation<T>(List<T> availableConditions, int populationSize, int minConditions, int maxConditions)
 		{
@@ -758,6 +748,66 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		        }
 		    }
 		}
+		#endregion
+
+		#region ExitConditions
+		#region GetStopLoss
+		public double GetStopLoss()
+		{
+			double minStopLoss = double.MaxValue;
+
+			foreach (Combination exitCombination in optimalExitCombinations)
+		    {
+		        foreach (ICondition condition in exitCombination.Conditions)
+			    {
+					if (condition.GetType() == typeof(StopLossCondition))
+					{
+						minStopLoss = Math.Min(minStopLoss, ((StopLossCondition)condition).StopLoss);
+					}
+			    }
+		    }
+
+			return minStopLoss;
+		}
+		#endregion
+
+		#region GetProfitTarget
+		public double GetProfitTarget()
+		{
+			double minProfitTarget = double.MaxValue;
+
+			foreach (Combination exitCombination in optimalExitCombinations)
+		    {
+		        foreach (ICondition condition in exitCombination.Conditions)
+			    {
+					if (condition.GetType() == typeof(ProfitTargetCondition))
+					{
+						minProfitTarget = Math.Min(minProfitTarget, ((ProfitTargetCondition)condition).ProfitTarget);
+					}
+			    }
+		    }
+
+			return minProfitTarget;
+		}
+		#endregion
+
+		#region AreExitConditionsMet
+		public bool AreExitConditionsMet(TrendDirection direction)
+		{
+			foreach (Combination exitCombination in optimalExitCombinations)
+		    {
+				foreach (Signal entrySignal in cachedEntrySignals)
+		        {
+					if (IsExitCombinationMet(exitCombination.Conditions, entrySignal) && entrySignal.Direction == direction)
+		            {
+						return true;
+		            }
+		        }
+		    }
+
+			return false;
+		}
+		#endregion
 		#endregion
 
 		#region Check If Combination Met
@@ -2250,6 +2300,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	#region ProfitTargetCondition
 	public class ProfitTargetCondition : ExitCondition
 	{
+		public double ProfitTarget = 0;
+
 		public override bool IsMet(SignalGenerator generator, Signal entry)
 		{
 			if (entry.Direction == TrendDirection.Flat)
@@ -2263,11 +2315,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			double profitTargetMultiplier = ParameterValues["ProfitTargetMultiplier"];
-			double profitTarget = generator.avgAtrFast[0] * profitTargetMultiplier;
+			ProfitTarget = generator.avgAtrFast[0] * profitTargetMultiplier;
 			double distanceMoved = entry.Direction == TrendDirection.Bullish
 					? generator.Close[0] - entry.Price : entry.Price - generator.Close[0];
 
-			return distanceMoved >= profitTarget;
+			return distanceMoved >= ProfitTarget;
 		}
 	}
 	#endregion
@@ -2275,6 +2327,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	#region StopLossCondition
 	public class StopLossCondition : ExitCondition
 	{
+		public double StopLoss = 0;
+
 		public override bool IsMet(SignalGenerator generator, Signal entry)
 		{
 			if (entry.Direction == TrendDirection.Flat)
@@ -2288,7 +2342,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			}
 
 			double stopLossMultiplier = ParameterValues["StopLossMultiplier"];
-			double stopLoss = generator.avgAtrFast[0] * stopLossMultiplier;
+			StopLoss = generator.avgAtrFast[0] * stopLossMultiplier;
 			double distanceMoved = entry.Direction == TrendDirection.Bullish
 					? generator.Close[0] - entry.Price : entry.Price - generator.Close[0];
 
@@ -2296,7 +2350,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return false;
 			}
 
-			return Math.Abs(distanceMoved) >= stopLoss;
+			return Math.Abs(distanceMoved) >= StopLoss;
 		}
 	}
 	#endregion

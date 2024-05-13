@@ -31,7 +31,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region Variables
 		private SignalGenerator signalGenerator;
 		private TrendDirection direction;
-		private DateTime LastDataDay = new DateTime(2023, 03, 17);
         private DateTime OpenTime = DateTime.Parse(
             "10:00",
             System.Globalization.CultureInfo.InvariantCulture
@@ -79,6 +78,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 			#region State.Configure
 			else if (State == State.Configure)
 			{
+				AddDataSeries(Data.BarsPeriodType.Second, 15);
+			}
+			#endregion
+
+			#region State.DataLoaded
+			else if (State == State.DataLoaded)
+			{
+//				signalGenerator = SignalGenerator(BarsArray[1], Data.BarsPeriodType.Minute, 5);
+//				signalGenerator = SignalGenerator(BarsArray[0], Data.BarsPeriodType.Second, 15);
 				signalGenerator = SignalGenerator();
 			}
 			#endregion
@@ -88,19 +96,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			signalGenerator.Update();
-//			if (signalGenerator.optimalEntryCombinations.Count > 0) {
-//				Print(signalGenerator.optimalEntryCombinations.Count);
+
+
+//			if (BarsInProgress == 1) {
+//				signalGenerator.Update();
 //			}
+			signalGenerator.Update();
 
-//            tradeDirection = Position.MarketPosition;
-
-            if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1)
+            if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1 || CurrentBars[1] < 1)
             {
                 return;
             }
 
             exitPositions();
+
+			if (BarsInProgress != 0) {
+				return;
+			}
 
             setEntries();
 		}
@@ -134,6 +146,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			double stop = Close[0];
 			double confidence = entry.Combination.ConfidenceScore;
+
+			Print(confidence);
 
 			if (confidence < 0.5)
 			{
@@ -206,11 +220,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return false;
 			}
 
-
 			int exitCount = signalGenerator.CurrentExits.Count();
 
 			if (exitCount == 0) {
 				return false;
+			}
+
+			if (signalGenerator.AreExitConditionsMet(direction))
+			{
+				return true;
 			}
 
 			if (signalGenerator.CurrentExits[exitCount - 1].Bar != CurrentBar)
@@ -227,14 +245,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             int now = ToTime(Time[0]);
 
-            double shift = Time[0] > LastDataDay ? 0.0 : TimeShift;
-
-            if (now < ToTime(OpenTime.AddHours(shift)))
+            if (now < ToTime(OpenTime))
             {
                 return false;
             }
 
-            if (now > ToTime(LastTradeTime.AddHours(shift)))
+            if (now > ToTime(LastTradeTime))
             {
                 return false;
             }
@@ -248,14 +264,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             int now = ToTime(Time[0]);
 
-            double shift = Time[0] > LastDataDay ? 0.0 : TimeShift;
-
-            if (now > ToTime(CloseTime.AddHours(shift)))
+            if (now > ToTime(CloseTime))
             {
                 return false;
             }
 
-            if (now < ToTime(OpenTime.AddHours(shift)))
+            if (now < ToTime(OpenTime))
             {
                 return false;
             }
