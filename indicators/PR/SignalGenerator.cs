@@ -41,6 +41,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public SMA avgAtrFast;
 		public MIN minATR;
 		public MAX maxATR;
+		public ChoppinessIndex chop;
 		public Series<int> barsSinceDoubleTop;
 		public Series<int> barsSinceDoubleBottom;
 		private List<ICondition> entryConditions = new List<ICondition>();
@@ -140,6 +141,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				rsi						= RSI(14, 3);
 				emaFast					= EMA(9);
 				emaSlow					= EMA(21);
+				chop					= ChoppinessIndex(14);
 
 				AddDataSeries(Data.BarsPeriodType.Second, 15);
 			}
@@ -302,13 +304,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			List<ParameterType> profitTargetParameters = new List<ParameterType>();
 		    ParameterType ProfitTargetMultiplier = new ParameterType();
-		    ProfitTargetMultiplier.Set("ProfitTargetMultiplier", 20, 0.5, 0.5);
+//		    ProfitTargetMultiplier.Set("ProfitTargetMultiplier", 20, 0.5, 0.5);
+		    ProfitTargetMultiplier.Set("ProfitTargetMultiplier", 5, 3, 1);
 		    profitTargetParameters.Add(ProfitTargetMultiplier);
 		    conditionParameterTypes[typeof(ProfitTargetCondition)] = profitTargetParameters;
 
 			List<ParameterType> stopLossParameters = new List<ParameterType>();
 		    ParameterType stopLossMultiplier = new ParameterType();
-		    stopLossMultiplier.Set("StopLossMultiplier", 10, 0.5, 0.5);
+//		    stopLossMultiplier.Set("StopLossMultiplier", 10, 0.5, 0.5);
+		    stopLossMultiplier.Set("StopLossMultiplier", 5, 3, 1);
 		    stopLossParameters.Add(stopLossMultiplier);
 		    conditionParameterTypes[typeof(StopLossCondition)] = stopLossParameters;
 		}
@@ -318,51 +322,70 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private void SetConditions()
 		{
 			#region Entry Conditions
-//			entryConditions.Add(new RSIRangeCondition());
-//			entryConditions.Add(new AboveAverageATRCondition());
-			entryConditions.Add(new BelowAverageATRCondition());
-			entryConditions.Add(new AboveAverageATRByAStdDevCondition());
-			entryConditions.Add(new BreakoutCondition());
-			entryConditions.Add(new BroadChannelCondition());
-//			entryConditions.Add(new TightChannelCondition()); // Produces very few trades -- REMOVE
-			entryConditions.Add(new WeakTrendCondition()); // Produces very few trades -- REMOVE
-			entryConditions.Add(new StrongTrendCondition()); // Produces very few trades -- REMOVE
-//			entryConditions.Add(new WithTrendTrendBarCondition());
-//			entryConditions.Add(new BreakoutBarPatternCondition()); // Produces very few trades -- REMOVE
-			entryConditions.Add(new WeakBarCondition());
-//			entryConditions.Add(new StrongFollowThroughCondition()); // Produces very few trades -- REMOVE
-			entryConditions.Add(new WithTrendPressureCondition());
-//			entryConditions.Add(new StrongWithTrendPressureCondition()); // Produces few trades, 5-8 per month
-//			entryConditions.Add(new EMADivergingCondition());
-			entryConditions.Add(new EMAConvergingCondition());
-			entryConditions.Add(new WithTrendEMACondition());
-			entryConditions.Add(new LeadsFastEMAByMoreThanATRCondition()); // Good performance, but produces very few trades, less than 5 per month
-//			entryConditions.Add(new FastEMADirectionCondition());
-//			entryConditions.Add(new SlowEMADirectionCondition());
+////			entryConditions.Add(new RSIRangeCondition());
+////			entryConditions.Add(new AboveAverageATRCondition());
+//			entryConditions.Add(new BelowAverageATRCondition());
+//			entryConditions.Add(new AboveAverageATRByAStdDevCondition());
+//			entryConditions.Add(new BreakoutCondition());
+//			entryConditions.Add(new BroadChannelCondition());
+////			entryConditions.Add(new TightChannelCondition()); // Produces very few trades -- REMOVE
+//			entryConditions.Add(new WeakTrendCondition()); // Produces very few trades -- REMOVE
+//			entryConditions.Add(new StrongTrendCondition()); // Produces very few trades -- REMOVE
+////			entryConditions.Add(new WithTrendTrendBarCondition());
+////			entryConditions.Add(new BreakoutBarPatternCondition()); // Produces very few trades -- REMOVE
+//			entryConditions.Add(new WeakBarCondition());
+////			entryConditions.Add(new StrongFollowThroughCondition()); // Produces very few trades -- REMOVE
+//			entryConditions.Add(new WithTrendPressureCondition());
+////			entryConditions.Add(new StrongWithTrendPressureCondition()); // Produces few trades, 5-8 per month
+////			entryConditions.Add(new EMADivergingCondition());
+//			entryConditions.Add(new EMAConvergingCondition());
+//			entryConditions.Add(new WithTrendEMACondition());
+//			entryConditions.Add(new LeadsFastEMAByMoreThanATRCondition()); // Good performance, but produces very few trades, less than 5 per month
+////			entryConditions.Add(new FastEMADirectionCondition());
+////			entryConditions.Add(new SlowEMADirectionCondition());
+
+//			entryConditions.Add(new TrendFollowingStrategy206Condition());
+			entryConditions.Add(new MARisingFallingCondition());
+			entryConditions.Add(new TrendRisingFallingCondition());
+			entryConditions.Add(new NewHighLowCondition());
+			entryConditions.Add(new ValidChoppinessCondition());
+			entryConditions.Add(new UpDownTrendCondition());
+
 			#endregion
 
 			#region Exit Conditions
 
+
+			// =================
+			// TODO: Randomize Exit Conditions
+			// TODO: Widen Range of Take Profit Conditions
+			// TODO: Widen Range of Stop Loss Conditions
+			// TODO: Add Strategy 2.0.6 Logic to Entry and Exit Conditions
+			// =================
+
+
+
+
 			List<ExitCondition> singleExitConditions = new List<ExitCondition>();
 
 //			singleExitConditions.Add(new TrendDirectionChangedCondition());
-//			singleExitConditions.Add(new CounterTrendTightChannelCondition());
-//			singleExitConditions.Add(new CounterBroadTightChannelCondition());
-//			singleExitConditions.Add(new CounterTrendBreakoutsCondition());
-//			singleExitConditions.Add(new CounterTrendBreakoutTrendCondition());
+//			// singleExitConditions.Add(new CounterTrendTightChannelCondition()); // Rarely Triggers
+//			// singleExitConditions.Add(new CounterTrendBroadChannelCondition()); // Rarely Triggers
+//			// singleExitConditions.Add(new CounterTrendBreakoutsCondition()); // Rarely Triggers
+//			// singleExitConditions.Add(new CounterTrendBreakoutTrendCondition()); // Rarely Triggers
 //			singleExitConditions.Add(new CounterTrendLegLongCondition());
 //			singleExitConditions.Add(new CounterTrendLegShortCondition());
-//			singleExitConditions.Add(new DoubleTopBottomCondition());
-//			singleExitConditions.Add(new CounterTrendLegAfterDoubleTopBottomCondition());
+//			// singleExitConditions.Add(new DoubleTopBottomCondition()); // Rarely Triggers
+//			// singleExitConditions.Add(new CounterTrendLegAfterDoubleTopBottomCondition()); // Rarely Triggers
 //			singleExitConditions.Add(new TrailingStopBeyondPreviousExtremeCondition());
 //			singleExitConditions.Add(new MovingAverageCrossoverCondition());
 //			singleExitConditions.Add(new NoNewExtremeCondition());
 			singleExitConditions.Add(new ProfitTargetCondition());
 			singleExitConditions.Add(new StopLossCondition());
-//			singleExitConditions.Add(new CounterTrendPressureCondition());
-//			singleExitConditions.Add(new CounterTrendWeakTrendCondition());
-//			singleExitConditions.Add(new CounterTrendStrongTrendCondition());
-//			singleExitConditions.Add(new RSIOutOfRangeCondition());
+			// singleExitConditions.Add(new CounterTrendPressureCondition()); // Rarely Triggers
+//			// singleExitConditions.Add(new CounterTrendWeakTrendCondition()); // Rarely Triggers
+//			// singleExitConditions.Add(new CounterTrendStrongTrendCondition()); // Rarely Triggers
+//			// singleExitConditions.Add(new RSIOutOfRangeCondition()); // Rarely Triggers
 //			singleExitConditions.Add(new AboveAverageATRExitCondition());
 //			singleExitConditions.Add(new BelowAverageATRExitCondition());
 //			singleExitConditions.Add(new AboveAverageATRByAStdDevExitCondition());
@@ -762,6 +785,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			    {
 					if (condition.GetType() == typeof(StopLossCondition))
 					{
+						if (((StopLossCondition)condition).StopLoss == 0)
+						{
+							continue;
+						}
+
 						minStopLoss = Math.Min(minStopLoss, ((StopLossCondition)condition).StopLoss);
 					}
 			    }
@@ -782,6 +810,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			    {
 					if (condition.GetType() == typeof(ProfitTargetCondition))
 					{
+						if(((ProfitTargetCondition)condition).ProfitTarget == 0)
+						{
+							continue;
+						}
+
 						minProfitTarget = Math.Min(minProfitTarget, ((ProfitTargetCondition)condition).ProfitTarget);
 					}
 			    }
@@ -892,7 +925,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			List<Condition> entryConditionsRandomized = InitializePopulation(entryConditions, individualPopulation, 1, 1).Select(c => (Condition) c[0]).ToList();
+//			List<Condition> entryConditionsRandomized = InitializePopulation(entryConditions, individualPopulation, 1, 1).Select(c => (Condition) c[0]).ToList();
+
+			List<Condition> entryConditionsRandomized = entryConditions.Select(c => (Condition) c).ToList();
 
 			foreach (Condition entryCondition in entryConditionsRandomized)
 		    {
@@ -914,7 +949,10 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
-			List<ExitCondition> exitConditionsRandomized = InitializePopulation(exitConditions, individualPopulation, 1, 1).Select(c => (ExitCondition) c[0]).ToList();
+//			List<ExitCondition> exitConditionsRandomized = InitializePopulation(exitConditions, individualPopulation, 1, 1).Select(c => (ExitCondition) c[0]).ToList();
+
+
+			List<ExitCondition> exitConditionsRandomized = exitConditions.Select(c => (ExitCondition) c).ToList();
 
 			foreach (ExitCondition exitCondition in exitConditionsRandomized)
 			{
@@ -2031,6 +2069,184 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 	#endregion
 
+	#region Strategies/Combinations
+
+	#region TrendFollowingStrategy206Condition
+	public class TrendFollowingStrategy206Condition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			TrendDirection Direction = generator.md.Direction[0];
+
+			bool emaFastRising 		= generator.emaFast[0] > generator.emaFast[1];
+			bool emaFastFalling		= generator.emaFast[0] < generator.emaFast[1];
+			bool emaSlowRising		= generator.emaSlow[0] > generator.emaSlow[1];
+			bool emaSlowFalling		= generator.emaSlow[0] < generator.emaSlow[1];
+			bool maRising			= emaFastRising && emaSlowRising;
+			bool maFalling			= emaFastFalling && emaSlowFalling;
+
+			bool lowChop			= generator.chop[0] < 38.2;
+			bool highChop			= generator.chop[0] > 61.8;
+			bool validChoppiness 	= lowChop || highChop;
+
+			bool rising1			= generator.Close[0] > generator.Close[1];
+			bool rising2			= generator.Close[1] > generator.Close[2];
+			bool rising3			= generator.Close[2] > generator.Close[3];
+			bool rising				= rising1 && rising2 && rising3;
+
+			bool falling1			= generator.Close[0] < generator.Close[1];
+			bool falling2			= generator.Close[1] < generator.Close[2];
+			bool falling3			= generator.Close[2] < generator.Close[3];
+			bool falling			= falling1 && falling2 && falling3;
+
+			bool newHigh			= generator.Close[0] > generator.MAX(generator.High, 10)[1];
+			bool newLow				= generator.Close[0] < generator.MIN(generator.Low, 10)[1];
+
+			bool higherHigh1		= generator.High[0] > generator.High[1];
+			bool higherHigh2		= generator.High[1] > generator.High[2];
+			bool higherHigh3		= generator.High[2] > generator.High[3];
+			bool higherHigh			= higherHigh1 && higherHigh2 && higherHigh3;
+
+			bool lowerLow1			= generator.Low[0] < generator.Low[1];
+			bool lowerLow2			= generator.Low[1] < generator.Low[2];
+			bool lowerLow3			= generator.Low[2] < generator.Low[3];
+			bool lowerLow			= lowerLow1 && lowerLow2 && lowerLow3;
+
+			bool highestInTrend		= generator.MAX(generator.High, 3)[0] >= generator.MAX(generator.High, 10)[0];
+			bool lowestInTrend		= generator.MIN(generator.Low, 3)[0] <= generator.MIN(generator.Low, 10)[0];
+
+			bool upTrend 			= higherHigh && highestInTrend;
+			bool downTrend			= lowerLow && lowestInTrend;
+
+			bool longPatternMatched 	= maRising && rising && newHigh && validChoppiness && upTrend;
+			bool shortPatternMatched	= maFalling && falling && newLow && validChoppiness && downTrend;
+
+			if (Direction == TrendDirection.Bullish)
+			{
+				return longPatternMatched;
+			}
+
+			return shortPatternMatched;
+		}
+	}
+	#endregion
+
+	#region UpDownTrendCondition
+	public class UpDownTrendCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			TrendDirection Direction = generator.md.Direction[0];
+
+			bool higherHigh1		= generator.High[0] > generator.High[1];
+			bool higherHigh2		= generator.High[1] > generator.High[2];
+			bool higherHigh3		= generator.High[2] > generator.High[3];
+			bool higherHigh			= higherHigh1 && higherHigh2 && higherHigh3;
+
+			bool lowerLow1			= generator.Low[0] < generator.Low[1];
+			bool lowerLow2			= generator.Low[1] < generator.Low[2];
+			bool lowerLow3			= generator.Low[2] < generator.Low[3];
+			bool lowerLow			= lowerLow1 && lowerLow2 && lowerLow3;
+
+			bool highestInTrend		= generator.MAX(generator.High, 3)[0] >= generator.MAX(generator.High, 10)[0];
+			bool lowestInTrend		= generator.MIN(generator.Low, 3)[0] <= generator.MIN(generator.Low, 10)[0];
+
+			if (Direction == TrendDirection.Bullish)
+			{
+				return higherHigh && highestInTrend;
+			}
+
+			return lowerLow && lowestInTrend;
+		}
+	}
+	#endregion
+
+	#region ValidChoppinessCondition
+	public class ValidChoppinessCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			bool lowChop			= generator.chop[0] < 38.2;
+			bool highChop			= generator.chop[0] > 61.8;
+
+			return lowChop || highChop;
+		}
+	}
+	#endregion
+
+	#region NewHighLowCondition
+	public class NewHighLowCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			TrendDirection Direction = generator.md.Direction[0];
+
+			bool newHigh			= generator.Close[0] > generator.MAX(generator.High, 10)[1];
+			bool newLow				= generator.Close[0] < generator.MIN(generator.Low, 10)[1];
+
+			if (Direction == TrendDirection.Bullish)
+			{
+				return newHigh;
+			}
+
+			return newLow;
+		}
+	}
+	#endregion
+
+	#region TrendRisingFallingCondition
+	public class TrendRisingFallingCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			TrendDirection Direction = generator.md.Direction[0];
+
+			bool rising1			= generator.Close[0] > generator.Close[1];
+			bool rising2			= generator.Close[1] > generator.Close[2];
+			bool rising3			= generator.Close[2] > generator.Close[3];
+			bool rising				= rising1 && rising2 && rising3;
+
+			bool falling1			= generator.Close[0] < generator.Close[1];
+			bool falling2			= generator.Close[1] < generator.Close[2];
+			bool falling3			= generator.Close[2] < generator.Close[3];
+			bool falling			= falling1 && falling2 && falling3;
+
+			if (Direction == TrendDirection.Bullish)
+			{
+				return rising;
+			}
+
+			return falling;
+		}
+	}
+	#endregion
+
+	#region MARisingFallingCondition
+	public class MARisingFallingCondition : Condition
+	{
+		public override bool IsMet(SignalGenerator generator)
+		{
+			TrendDirection Direction = generator.md.Direction[0];
+
+			bool emaFastRising 		= generator.emaFast[0] > generator.emaFast[1];
+			bool emaFastFalling		= generator.emaFast[0] < generator.emaFast[1];
+			bool emaSlowRising		= generator.emaSlow[0] > generator.emaSlow[1];
+			bool emaSlowFalling		= generator.emaSlow[0] < generator.emaSlow[1];
+			bool maRising			= emaFastRising && emaSlowRising;
+			bool maFalling			= emaFastFalling && emaSlowFalling;
+
+			if (Direction == TrendDirection.Bullish)
+			{
+				return maRising;
+			}
+
+			return maFalling;
+		}
+	}
+	#endregion
+
+	#endregion
+
 	#endregion
 
 	#region Exit Conditions
@@ -2059,8 +2275,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	}
 	#endregion
 
-	#region CounterBroadTightChannelCondition
-	public class CounterBroadTightChannelCondition : ExitCondition
+	#region CounterTrendBroadChannelCondition
+	public class CounterTrendBroadChannelCondition : ExitCondition
 	{
 		public override bool IsMet(SignalGenerator generator, Signal entry)
 		{

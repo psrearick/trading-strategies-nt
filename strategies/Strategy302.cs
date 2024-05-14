@@ -44,6 +44,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             System.Globalization.CultureInfo.InvariantCulture
         );
 		private int TimeShift = 0;
+		private double stopLoss = double.MaxValue;
+		private double profitTarget = 1000;
 		#endregion
 
 		#region OnStateChange()
@@ -147,8 +149,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double stop = Close[0];
 			double confidence = entry.Combination.ConfidenceScore;
 
-			Print(confidence);
-
 			if (confidence < 0.5)
 			{
 				return;
@@ -161,6 +161,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 //				: 1;
 
 			int quantity = 1;
+			double TickValue = Instrument.MasterInstrument.PointValue * TickSize;
+			double TicksPerPoint = Instrument.MasterInstrument.PointValue / TickValue;
 
 			direction = entry.Direction;
 			if (direction == TrendDirection.Bullish)
@@ -172,7 +174,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 					return;
 				}
 
-				SetStopLoss(CalculationMode.Price, stop);
+				stopLoss = (Close[0] - stop) * TicksPerPoint;
+
+				SetStopLoss(CalculationMode.Ticks, stopLoss);
+				SetProfitTarget(CalculationMode.Ticks, profitTarget);
 
 				EnterLong(quantity);
 
@@ -186,7 +191,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return;
 			}
 
-			SetStopLoss(CalculationMode.Price, stop);
+			stopLoss = (stop - Close[0]) * TicksPerPoint;
+
+			SetStopLoss(CalculationMode.Ticks, stopLoss);
+			SetProfitTarget(CalculationMode.Ticks, profitTarget);
 
 			EnterShort(quantity);
 		}
@@ -215,6 +223,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region shouldExit()
         private bool shouldExit()
         {
+			double tickValue = Instrument.MasterInstrument.PointValue * TickSize;
+			double ticksPerPoint = Instrument.MasterInstrument.PointValue / tickValue;
+
             if (Position.MarketPosition == MarketPosition.Flat)
             {
 				return false;
@@ -225,6 +236,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (exitCount == 0) {
 				return false;
 			}
+
+			double profitTargetSignal = signalGenerator.GetProfitTarget();
+			double profitTargetDistance = (profitTargetSignal < double.MaxValue && profitTargetSignal > 0)
+					? profitTargetSignal * ticksPerPoint : profitTarget;
+			SetProfitTarget(CalculationMode.Ticks, profitTargetDistance);
+
+			double stopLossSignal = signalGenerator.GetStopLoss();
+			double stopLossDistance = (stopLossSignal < double.MaxValue && stopLossSignal > 0)
+					? stopLossSignal * ticksPerPoint : stopLoss;
+			SetStopLoss(CalculationMode.Ticks, stopLossDistance);
 
 			if (signalGenerator.AreExitConditionsMet(direction))
 			{
