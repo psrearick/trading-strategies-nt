@@ -149,16 +149,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double stop = Close[0];
 			double confidence = entry.Combination.ConfidenceScore;
 
+//			Print(confidence);
+
+//			int quantity = (int) Math.Max(1, Math.Floor(5 * confidence));
+
 			if (confidence < 0.5)
 			{
 				return;
 			}
-
-//			int quantity = confidence > 0.9 ? 2
-//				: confidence > 0.8 ? 2
-//				: confidence > 0.7 ? 1
-//				: confidence > 0.6 ? 1
-//				: 1;
 
 			int quantity = 1;
 			double TickValue = Instrument.MasterInstrument.PointValue * TickSize;
@@ -247,10 +245,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 					? stopLossSignal * ticksPerPoint : stopLoss;
 			SetStopLoss(CalculationMode.Ticks, stopLossDistance);
 
-			if (signalGenerator.AreExitConditionsMet(direction))
-			{
-				return true;
-			}
+//			if (signalGenerator.AreExitConditionsMet(direction))
+//			{
+//				return true;
+//			}
 
 			if (signalGenerator.CurrentExits[exitCount - 1].Bar != CurrentBar)
 			{

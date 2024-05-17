@@ -346,11 +346,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 //			entryConditions.Add(new BreakoutCondition());
 			entryConditions.Add(new BroadChannelCondition());
 //			entryConditions.Add(new WeakBarCondition());
-//			entryConditions.Add(new RSIRangeCondition());
-//			entryConditions.Add(new AboveAverageATRCondition());
-//			entryConditions.Add(new WithTrendTrendBarCondition());
+			// entryConditions.Add(new RSIRangeCondition());
+			// entryConditions.Add(new AboveAverageATRCondition());
+			// entryConditions.Add(new WithTrendTrendBarCondition());
 //			entryConditions.Add(new WithTrendPressureCondition());
-//			entryConditions.Add(new EMADivergingCondition());
+			// entryConditions.Add(new EMADivergingCondition());
 //			entryConditions.Add(new FastEMADirectionCondition());
 //			entryConditions.Add(new SlowEMADirectionCondition());
 
