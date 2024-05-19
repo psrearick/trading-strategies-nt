@@ -56,8 +56,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private EMA emaLong;
 		private ATR atr;
 		private ATR atrDaily;
+		public SMA avgAtr;
 		private ChoppinessIndex chop;
 		public RSI rsi;
+		public MarketDirection md;
 
 		private double ProfitTarget = 3;
 		private double StopLossTarget = 5;
@@ -71,14 +73,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private int lookbackPeriod = 80;
 		private int performanceTrackingPeriod = 21;
 
+		private double performanceScore = 0;
 		private Queue<double> recentPerformanceScores = new Queue<double>();
 		private Queue<double> sharpeRatios = new Queue<double>();
 		private Queue<double> drawdownRatios = new Queue<double>();
+		private Queue<double> profitLoss = new Queue<double>();
 
 		private DateTime initTime = DateTime.Now;
 		private DateTime start = DateTime.Now;
 		private int cooldownPeriod = 2;
 		private int cooldownCounter = 0;
+
+
+		private double PerformanceThreshold = 0.5;
+		private int ConditionCount = 1;
 
 		#endregion
 
@@ -107,13 +115,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 				BarsRequiredToTrade								= 81;
 
 				IncludeTradeHistoryInBacktest					= true;
-				IsInstantiatedOnEachOptimizationIteration		= false;
+				IsInstantiatedOnEachOptimizationIteration		= true;
 				IsUnmanaged										= false;
 
 				Risk											= 0;
 				TradeQuantity									= 1;
-				PerformanceThreshold 							= 0.5;
-				ConditionCount									= 3;
+				ShortPeriod										= 10;
+				LongPeriod										= 20;
+
+				PrintTo = PrintTo.OutputTab1;
 			}
 			#endregion
 
@@ -122,17 +132,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 				AddDataSeries(Data.BarsPeriodType.Second, 15);
 				AddDataSeries(Data.BarsPeriodType.Minute, 30);
-			}
-			#endregion
-
-			#region DataLoaded
-			if (State == State.DataLoaded) {
 				emaShort			= EMA(9);
 				emaLong				= EMA(21);
 				atr 				= ATR(14);
 				atrDaily			= ATR(BarsArray[2], 14);
 				rsi					= RSI(14, 3);
 				chop				= ChoppinessIndex(14);
+				md					= MarketDirection(ShortPeriod, LongPeriod);
+			}
+			#endregion
+
+			#region DataLoaded
+			if (State == State.DataLoaded) {
+				avgAtr				= SMA(atr, 21);
 			}
 			#endregion
 		}
@@ -141,6 +153,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
+			atrDaily.Update();
+			atr.Update();
+			md.Update();
+
 			if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1 || CurrentBars[1] < 1 || CurrentBars[2] < 1)
 			{
 				return;
@@ -152,7 +168,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 				return;
 			}
-
 
 			if (lastBarOptimized == 0)
 			{
@@ -166,14 +181,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 				AdjustDynamicParameters();
 		    }
 
-			if (SystemPerformance.AllTrades.Count > 0 && SystemPerformance.AllTrades.Count != recentPerformanceScores.Count && lastTradeCount < SystemPerformance.AllTrades.Count)
+			if ((SystemPerformance.AllTrades.Count > 0) && (SystemPerformance.AllTrades.Count != recentPerformanceScores.Count) && (lastTradeCount < SystemPerformance.AllTrades.Count))
 		    {
-		        double currentPerformance = CalculateRecentPerformance();
-		        UpdateOverallPerformance(currentPerformance);
+		        performanceScore = CalculateRecentPerformance();
+		        UpdateOverallPerformance();
 
-//				Print("Current Performance: " + currentPerformance + " Overall Performance: " + overallPerformance + " Threshold: " + PerformanceThreshold);
-
-				if (currentPerformance < PerformanceThreshold || overallPerformance < PerformanceThreshold)
+				if (performanceScore < PerformanceThreshold || overallPerformance < PerformanceThreshold)
 		        {
 					OptimizeStrategy();
 		        }
@@ -183,6 +196,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			calculateQuantity();
 			setEntries();
+
+			lookbackPeriod = CalculateAdaptiveLookbackPeriod();
+			optimizationPeriod = lookbackPeriod;
 		}
 		#endregion
 
@@ -254,8 +270,9 @@ namespace NinjaTrader.NinjaScript.Strategies
     		double drawdownRatio = averageProfit != 0 ? maxDrawdown / Math.Abs(averageProfit) : 1;  // Set to 1 if averageProfit is zero to avoid division by zero
 
 		    // Save the historical values
-    		sharpeRatios.Enqueue(sharpeRatio);
+			sharpeRatios.Enqueue(sharpeRatio);
     		drawdownRatios.Enqueue(drawdownRatio);
+			profitLoss.Enqueue(averageProfit);
 
 			if (sharpeRatios.Count > lookbackPeriod) sharpeRatios.Dequeue();
    			if (drawdownRatios.Count > lookbackPeriod) drawdownRatios.Dequeue();
@@ -263,11 +280,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 			// Normalize using dynamic historical range
 		    double normalizedSharpeRatio = NormalizeValue(sharpeRatio, sharpeRatios);
 		    double normalizedDrawdownRatio = NormalizeValue(drawdownRatio, drawdownRatios);
+			double normalizedProfitLoss = NormalizeValue(averageProfit, profitLoss);
 
 		    // Calculate the performance score as a weighted average
-		    double sharpeWeight = 0.7;
-		    double drawdownWeight = 0.3;
-		    double performanceScore = (sharpeWeight * normalizedSharpeRatio) + (drawdownWeight * (1 - normalizedDrawdownRatio));
+		    double sharpeWeight = 0.3;
+		    double drawdownWeight = 0.2;
+			double profitLossWeight = 0.5;
+		    double performanceScore = (profitLossWeight * normalizedProfitLoss) + (sharpeWeight * normalizedSharpeRatio) + (drawdownWeight * (1 - normalizedDrawdownRatio));
 
 		    return performanceScore;
 		}
@@ -285,9 +304,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#endregion
 
 		#region UpdateOverallPerformance()
-		private void UpdateOverallPerformance(double currentPerformance)
+		private void UpdateOverallPerformance()
 		{
-		    recentPerformanceScores.Enqueue(currentPerformance);
+		    recentPerformanceScores.Enqueue(performanceScore);
 
 		    if (recentPerformanceScores.Count > lookbackPeriod)
 		    {
@@ -314,18 +333,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		    double recentAveragePerformance = recentPerformanceScores.Average();
 		    double performanceStdDev = CalculateStandardDeviation(recentPerformanceScores.ToList());
-			double performanceThresholdAdjustment = (recentAveragePerformance - PerformanceThreshold) * 0.2;
+			double performanceThresholdAdjustment = (recentAveragePerformance - PerformanceThreshold) * 0.1;
 			double conditionCountAdjustment = (performanceStdDev - 0.15) > 0 ? 1 : -1;
 
-			PerformanceThreshold = Math.Max(0.1, Math.Min(0.8, PerformanceThreshold + performanceThresholdAdjustment));
+
+			PerformanceThreshold = Math.Max(0.1, Math.Min(0.9, PerformanceThreshold + performanceThresholdAdjustment));
+
+			PerformanceThreshold = Double.IsNaN(PerformanceThreshold) ? 0.5 : PerformanceThreshold;
    			ConditionCount = Math.Max(1, Math.Min(3, ConditionCount + (int)conditionCountAdjustment));
 
 		    // Reset the cooldown counter
 		    cooldownCounter = cooldownPeriod;
 
-			Print("PerformanceThreshold: " + PerformanceThreshold + "; ConditionCount: " + ConditionCount);
-
-//			Print("PerformanceThreshold: " + PerformanceThreshold + "-" + recentAveragePerformance + "; ConditionCount: " + ConditionCount + "-" + performanceStdDev);
+			Print("PerformanceThreshold: " + Math.Round(PerformanceThreshold, 5).ToString() + "; ConditionCount: " + ConditionCount);
 		}
 		#endregion
 
@@ -348,12 +368,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region calculateQuantity()
 		private void calculateQuantity()
 		{
-			quantity = TradeQuantity;
+			// Calculate the current market volatility (e.g., using ATR or standard deviation)
+		    double volatility = atr[0];
 
-			if (Risk > 0) {
-				double stopLossDistance	= Math.Round((atrDaily[0] * StopLossTarget) / 4);
-				quantity = (int) Math.Floor(Math.Max(quantity, Risk / (stopLossDistance * 50)));
-			}
+		    // Calculate the recent performance (e.g., using a performance metric)
+			double recentPerformance = performanceScore > 0 ? performanceScore : 0.5;
+
+		    // Define the base position size
+		    double basePositionSize = Risk > 0 ? Risk : Account.Get(AccountItem.CashValue, Currency.UsDollar) * 0.02; // 2% of account balance
+
+		    // Adjust the position size based on volatility and recent performance
+		    double adjustedPositionSize = basePositionSize * (1 + recentPerformance) / (1 + volatility);
+
+		    // Update the quantity variable
+			double TickValue = Instrument.MasterInstrument.PointValue * TickSize;
+			double TicksPerPoint = Instrument.MasterInstrument.PointValue / TickValue;
+			double stopLossDistance	= Math.Round(atrDaily[0] * StopLossTarget * TicksPerPoint);
+		    quantity = (int)Math.Max(1,  Math.Floor(adjustedPositionSize / (stopLossDistance * Instrument.MasterInstrument.PointValue)));
 		}
 		#endregion
 
@@ -379,23 +410,33 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    // Define the list of long entry criteria
 		    List<Func<int, bool>> longEntryCriteria = new List<Func<int, bool>>
 		    {
-//		        (int i) => emaShort[0 + i] > emaShort[1 + i] && emaLong[0 + i] > emaLong[1 + i],  // maRising
-		        (int i) => Close[0 + i] > Close[1 + i] && Close[1 + i] > Close[2 + i] && Close[2 + i] > Close[3 + i],  // rising
-//		        (int i) => Close[0 + i] > MAX(High, 10)[1 + i],  // newHigh
-		        (int i) => chop[0 + i] < 38.2 || chop[0 + i] > 61.8,  // validChoppiness
+		        (int i) => emaShort[i] > emaShort[1 + i] && emaLong[i] > emaLong[1 + i],  // maRising
+		        (int i) => Close[i] > Close[1 + i] && Close[1 + i] > Close[2 + i] && Close[2 + i] > Close[3 + i],  // rising
+		        (int i) => Close[i] > MAX(High, 10)[1 + i],  // newHigh
+		        (int i) => (chop[i] < 38.2 || chop[0 + i] > 61.8) && md.Direction[i] == TrendDirection.Bullish,  // validChoppiness and Bullish
+				(int i) => atr[i] > avgAtr[i] && md.Direction[i] == TrendDirection.Bullish,  // Above Average ATR and Bullish
 				(int i) => rsi[i] < 70 && rsi[i] > 50,  // validRSI
-		        (int i) => MAX(High, 3)[0 + i] >= MAX(High, 10)[0 + i] && High[0 + i] > High[1 + i] && High[1 + i] > High[2 + i] && High[2 + i] > High[3 + i]  // upTrend
+		        (int i) => MAX(High, 3)[i] >= MAX(High, 10)[i] && High[i] > High[1 + i] && High[1 + i] > High[2 + i] && High[2 + i] > High[3 + i],  // upTrend
+				(int i) => (chop[i] < 38.2 || chop[i] > 61.8),  // validChoppiness
+				(int i) => atr[i] > avgAtr[i],  // Above Average
+				(int i) => md.Direction[i] == TrendDirection.Bullish && md.Direction[i + 1] != TrendDirection.Bullish,  // Trend Direction Changed
+				(int i) => md.Breakouts[i] == TrendDirection.Bullish || md.TightChannels[i] == TrendDirection.Bullish, // Strong Trend Direction
 		    };
 
 		    // Define the list of short entry criteria
 		    List<Func<int, bool>> shortEntryCriteria = new List<Func<int, bool>>
 		    {
-//		        (int i) => emaShort[0 + i] < emaShort[1 + i] && emaLong[0 + i] < emaLong[1 + i],  // maFalling
-		        (int i) => Close[0 + i] < Close[1 + i] && Close[1 + i] < Close[2 + i] && Close[2 + i] < Close[3 + i],  // falling
-//		        (int i) => Close[0 + i] < MIN(Low, 10)[1 + i],  // newLow
-		        (int i) => chop[0 + i] < 38.2 || chop[0 + i] > 61.8,  // validChoppiness
+		        (int i) => emaShort[i] < emaShort[1 + i] && emaLong[i] < emaLong[1 + i],  // maFalling
+		        (int i) => Close[i] < Close[1 + i] && Close[1 + i] < Close[2 + i] && Close[2 + i] < Close[3 + i],  // falling
+		        (int i) => Close[i] < MIN(Low, 10)[1 + i],  // newLow
+		        (int i) => (chop[i] < 38.2 || chop[0 + i] > 61.8) && md.Direction[i] == TrendDirection.Bearish,  // validChoppiness and Bearish
+				(int i) => atr[i] > avgAtr[i] && md.Direction[i] == TrendDirection.Bearish,  // Above Average ATR and Bearish
 				(int i) => rsi[i] < 50 && rsi[i] > 30,  // validRSI
-		        (int i) => MIN(Low, 3)[0 + i] <= MIN(Low, 10)[0 + i] && Low[0 + i] < Low[1 + i] && Low[1 + i] < Low[2 + i] && Low[2 + i] < Low[3 + i]  // downTrend
+		        (int i) => MIN(Low, 3)[i] <= MIN(Low, 10)[i] && Low[i] < Low[1 + i] && Low[1 + i] < Low[2 + i] && Low[2 + i] < Low[3 + i],  // downTrend
+				(int i) => (chop[i] < 38.2 || chop[i] > 61.8),  // validChoppiness
+				(int i) => atr[i] > avgAtr[i],  // Above Average
+				(int i) => md.Direction[i] == TrendDirection.Bearish && md.Direction[i + 1] != TrendDirection.Bearish,  // Trend Direction Changed
+				(int i) => md.Breakouts[i] == TrendDirection.Bearish || md.TightChannels[i] == TrendDirection.Bearish, // Strong Trend Direction
 		    };
 
 		    // Generate all possible combinations of 3 long entry criteria
@@ -437,6 +478,67 @@ namespace NinjaTrader.NinjaScript.Strategies
 		}
 		#endregion
 
+		#region CalculateAdaptiveLookbackPeriod()
+		private int CalculateAdaptiveLookbackPeriod()
+		{
+		    // Calculate the average true range (ATR) for the past 14 periods
+		    double atr = ATR(14)[0];
+
+		    // Calculate the average closing price for the past 14 periods
+		    double avgClose = SMA(Close, 14)[0];
+
+		    // Calculate the volatility percentage
+		    double volatilityPercentage = (atr / avgClose) * 100;
+
+		    // Define the volatility thresholds and corresponding lookback periods
+		    if (volatilityPercentage < 1)
+		    {
+		        return 120; // Low volatility, use a longer lookback period
+		    }
+		    else if (volatilityPercentage < 2)
+		    {
+		        return 90; // Medium volatility, use a medium lookback period
+		    }
+		    else
+		    {
+		        return 60; // High volatility, use a shorter lookback period
+		    }
+		}
+		#endregion
+
+		#region IsTrendValid()
+		private bool IsTrendValid(TrendDirection direction)
+		{
+			if (direction == TrendDirection.Bullish)
+			{
+				return md.Breakouts[0] != TrendDirection.Bearish
+				&& md.TightChannels[0] != TrendDirection.Bearish;
+			}
+
+			return md.Breakouts[0] != TrendDirection.Bullish
+				&& md.TightChannels[0] != TrendDirection.Bullish;
+		}
+		#endregion
+
+		#region IsVolatilityValid()
+		private bool IsVolatilityValid()
+		{
+		    // Calculate the ATR and average closing price
+		    double atr = ATR(14)[0];
+		    double avgClose = SMA(Close, 14)[0];
+
+		    // Calculate the volatility percentage
+		    double volatilityPercentage = (atr / avgClose) * 100;
+
+		    // Define the valid volatility range
+		    double minVolatility = 0;
+		    double maxVolatility = 0.1;
+
+		    // Check if the volatility is within the valid range
+		    return volatilityPercentage >= minVolatility && volatilityPercentage <= maxVolatility;
+		}
+		#endregion
+
 		#region GenerateCombinations()
 		private IEnumerable<Func<int, bool>[]> GenerateCombinations(List<Func<int, bool>> criteria, int combinationSize)
 		{
@@ -469,10 +571,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    int totalTrades = 0;
 
 		    // Iterate over the past N bars
-		    for (int i = lookbackPeriod - 3; i > 0; i--)
+			int bar = Math.Min(lookbackPeriod, CurrentBar - 3);
+		    for (int i = bar - 3; i > 0; i--)
 		    {
 		        // Check if the current combination matches the entry criteria for the current bar
-				bool entryMatched = ConditionsMet(combination, i);
+				bool entryMatched = ConditionsMet(combination, bar);
 
 		        // Simulate the trade if the entry criteria are met
 		        if (entryMatched)
@@ -523,9 +626,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private void OptimizeExitConditions()
 		{
 		    // Define the range of values for ProfitTarget, StopLossTarget, and HighATRMultiplier
-		    double[] profitTargetValues = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0 };
-		    double[] stopLossTargetValues = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0 };
-		    double[] highATRMultiplierValues = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0 };
+		    double[] profitTargetValues = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0 };
+		    double[] stopLossTargetValues = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0 };
+		    double[] highATRMultiplierValues = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0 };
 
 
 		    // Initialize variables to store the best performance and parameters
@@ -570,7 +673,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 		    int totalTrades = 0;
 
 		    // Iterate over the past N bars
-		    for (int i = lookbackPeriod - 3; i > 0; i--)
+			int bar = Math.Min(lookbackPeriod, CurrentBar - 3);
+		    for (int i = bar - 3; i > 0; i--)
 		    {
 		        bool entryMatched = false;
 		        bool isLong = false;
@@ -733,12 +837,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return;
 			}
 
-			if (ConditionsMet(longCombination, 0))
+			if (ConditionsMet(longCombination, 0)
+				&& IsTrendValid(TrendDirection.Bullish)
+				&& IsVolatilityValid()
+				)
 			{
 				EnterLong(quantity, "longEntry");
 			}
 
-			if (ConditionsMet(shortCombination, 0))
+			if (ConditionsMet(shortCombination, 0)
+				&& IsTrendValid(TrendDirection.Bearish)
+				&& IsVolatilityValid()
+				)
 			{
 				EnterShort(quantity, "shortEntry");
 			}
@@ -760,15 +870,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{ get; set; }
 
 		[NinjaScriptProperty]
-		[Range(0, 1)]
-		[Display(Name="Performance Threshold", Description="Performance Threshold", Order=2, GroupName="Parameters")]
-		public double PerformanceThreshold
+		[Range(1, int.MaxValue)]
+		[Display(Name="Short Period", Description="Short Period", Order=2, GroupName="Parameters")]
+		public int ShortPeriod
 		{ get; set; }
 
 		[NinjaScriptProperty]
-		[Range(0, int.MaxValue)]
-		[Display(Name="Conditions", Description="Conditions", Order=3, GroupName="Parameters")]
-		public int ConditionCount
+		[Range(1, int.MaxValue)]
+		[Display(Name="Long Period", Description="Long Period", Order=3, GroupName="Parameters")]
+		public int LongPeriod
 		{ get; set; }
 
 		#endregion
