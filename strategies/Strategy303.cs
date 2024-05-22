@@ -80,7 +80,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private Queue<double> drawdownRatios = new Queue<double>();
 		private Queue<double> profitLoss = new Queue<double>();
 		private Queue<double> volatilityPercentages = new Queue<double>();
-		private Queue<double> entryVolatilityPercentages = new Queue<double>();
+		private Queue<double> performanceVolatilityScores = new Queue<double>();
 
 		private DateTime initTime = DateTime.Now;
 		private DateTime start = DateTime.Now;
@@ -126,9 +126,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 				IsUnmanaged										= false;
 
 				Risk											= 0;
-				TradeQuantity									= 1;
-				ShortPeriod										= 12;
-				LongPeriod										= 16;
+//				ShortPeriod										= 12;
+//				LongPeriod										= 16;
 				MaxConditions									= 2;
 
 				PrintTo = PrintTo.OutputTab1;
@@ -448,22 +447,36 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region calculateQuantity()
 		private void calculateQuantity()
 		{
-			// Calculate the current market volatility (e.g., using ATR or standard deviation)
-		    double volatility = atr[0];
+			// Calculate the current market volatility (e.g., using ATR)
+		    double volatilityPercentage = (atr[0] / avgClose[0]) * 100;
+			double volatility = volatilityPercentages.Count > 0
+				? NormalizeValue(volatilityPercentage, volatilityPercentages)
+				: 0.5;
 
 		    // Calculate the recent performance (e.g., using a performance metric)
 			double recentPerformance = performanceScore > 0 ? performanceScore : 0.5;
+			double performance = recentPerformanceScores.Count > 0
+				? NormalizeValue(recentPerformance, recentPerformanceScores)
+				: 0.5;
 
 		    // Define the base position size
 		    double basePositionSize = Risk > 0 ? Risk : Account.Get(AccountItem.CashValue, Currency.UsDollar) * 0.02; // 2% of account balance
 
 		    // Adjust the position size based on volatility and recent performance
-		    double adjustedPositionSize = basePositionSize * (1 + recentPerformance) / (1 + volatility);
+		    double performanceVolatilityScore = (performance * 0.5) + (volatility * 0.5);
+			performanceVolatilityScores.Enqueue(performanceVolatilityScore);
+
+			if (performanceVolatilityScores.Count > performanceTrackingPeriod)
+		    {
+		        performanceVolatilityScores.Dequeue();
+		    }
+
+			double normalizedScore = Math.Max(0.1, NormalizeValue(performanceVolatilityScore, performanceVolatilityScores));
+
+			double adjustedPositionSize = basePositionSize * normalizedScore;
 
 		    // Update the quantity variable
-			double TickValue = Instrument.MasterInstrument.PointValue * TickSize;
-			double TicksPerPoint = Instrument.MasterInstrument.PointValue / TickValue;
-			double stopLossDistance	= Math.Round(atrDaily[0] * StopLossTarget * TicksPerPoint);
+			double stopLossDistance	= Math.Round(atrDaily[0] * StopLossTarget);
 		    quantity = (int)Math.Max(1,  Math.Floor(adjustedPositionSize / (stopLossDistance * Instrument.MasterInstrument.PointValue)));
 		}
 		#endregion
@@ -669,18 +682,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			double normalizedVolatilityPercentage = NormalizeValue(volatilityPercentage, volatilityPercentages);
 
-
-//			entryVolatilityPercentages.Enqueue(volatilityPercentage);
-
-//			if (entryVolatilityPercentages.Count > lookbackQueueLength) entryVolatilityPercentages.Dequeue();
-//			double normalizedVolatilityPercentage = NormalizeValue(volatilityPercentage, entryVolatilityPercentages);
-
 		    // Define the valid volatility range
 		    double minVolatility = 0.33;
 		    double maxVolatility = 0.67;
 
 		    // Check if the volatility is within the valid range
-//			return normalizedVolatilityPercentage <= maxVolatility;
 		    return normalizedVolatilityPercentage >= minVolatility && normalizedVolatilityPercentage <= maxVolatility;
 		}
 		#endregion
@@ -1019,7 +1025,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			if (longCombination != null && longCombination.Length > 0 && ConditionsMet(longCombination, 0)
 				&& IsTrendValid(TrendDirection.Bullish)
-//				&& IsVolatilityValid()
+				&& IsVolatilityValid()
 				)
 			{
 				EnterLong(quantity, "longEntry");
@@ -1027,7 +1033,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			if (shortCombination != null && shortCombination.Length > 0 && ConditionsMet(shortCombination, 0)
 				&& IsTrendValid(TrendDirection.Bearish)
-//				&& IsVolatilityValid()
+				&& IsVolatilityValid()
 				)
 			{
 				EnterShort(quantity, "shortEntry");
@@ -1043,23 +1049,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 		public int Risk
 		{ get; set; }
 
-		[NinjaScriptProperty]
-		[Range(0, int.MaxValue)]
-		[Display(Name="Trade Quantity", Description="Trade Quantity", Order=1, GroupName="Parameters")]
-		public int TradeQuantity
-		{ get; set; }
+//		[NinjaScriptProperty]
+//		[Range(1, int.MaxValue)]
+//		[Display(Name="Short Period", Description="Short Period", Order=2, GroupName="Parameters")]
+//		public int ShortPeriod
+//		{ get; set; }
 
-		[NinjaScriptProperty]
-		[Range(1, int.MaxValue)]
-		[Display(Name="Short Period", Description="Short Period", Order=2, GroupName="Parameters")]
-		public int ShortPeriod
-		{ get; set; }
-
-		[NinjaScriptProperty]
-		[Range(1, int.MaxValue)]
-		[Display(Name="Long Period", Description="Long Period", Order=3, GroupName="Parameters")]
-		public int LongPeriod
-		{ get; set; }
+//		[NinjaScriptProperty]
+//		[Range(1, int.MaxValue)]
+//		[Display(Name="Long Period", Description="Long Period", Order=3, GroupName="Parameters")]
+//		public int LongPeriod
+//		{ get; set; }
 
 		[NinjaScriptProperty]
 		[Range(1, int.MaxValue)]
