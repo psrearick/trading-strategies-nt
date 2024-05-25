@@ -74,19 +74,12 @@ namespace NinjaTrader.NinjaScript.OptimizationFitnesses
 				days = (int) strategy.GetType().GetProperty("Days").GetValue(strategy);
 			}
 
-			double[] netProfitRange = {100, 2000};
-			double[] maxDrawdownRange = {100, 2000};
-			double[] tradeCountRange = {minTradeCount, 10};
-//			double[] netProfitRange = {100, 2000};
-//			double[] netProfitRange = {100, 2000};
-//			double[] netProfitRange = {100, 2000};
-
 		    // Calculate normalized values for each metric
-		    double normalizedNetProfit = Math.Round(NormalizeValue(netProfit / days, -100, 100),3);
+		    double normalizedNetProfit = Math.Round(NormalizeValue(100 + (netProfit / days), 0, 200),3);
 		    double normalizedMaxDrawdown = Math.Round(1 - NormalizeValue(maxDrawdown / days, 0, 100),3);
 		    double normalizedTradeCount = Math.Round(NormalizeValue((double)tradeCount / (double)days, 0, 1),3);
 		    double normalizedProfitFactor = Math.Round(NormalizeValue(profitFactor, 0, 8),3);
-		    double normalizedSharpeRatio = Math.Round(NormalizeValue(sharpeRatio / days, -0.5, 0.5),3);
+		    double normalizedSharpeRatio = Math.Round(NormalizeValue(0.5 + (sharpeRatio / days), 0, 1),3);
 		    double normalizedAvgMae = Math.Round(1 - NormalizeValue(avgMae / days, 0, 20),3);
 
 		    // Calculate the weighted sum of normalized values
@@ -100,14 +93,9 @@ namespace NinjaTrader.NinjaScript.OptimizationFitnesses
 //			Print($"weightedSum: {weightedSum} days: {days} normalizedAvgMae: {normalizedAvgMae} normalizedSharpeRatio: {normalizedSharpeRatio} normalizedProfitFactor: {normalizedProfitFactor} normalizedTradeCount: {normalizedTradeCount} normalizedMaxDrawdown: {normalizedMaxDrawdown} normalizedNetProfit: {normalizedNetProfit}");
 
 		    // Apply a penalty if the trade count is below the minimum threshold
-		    if (tradeCount < minTradeCount)
+		    if ((tradeCount < minTradeCount) || (netProfit < 0))
 		    {
 		        weightedSum *= 0.3;
-		    }
-
-		    if (netProfit < 0)
-		    {
-		        weightedSum *= 0.1;
 		    }
 
 		    Value = weightedSum;
