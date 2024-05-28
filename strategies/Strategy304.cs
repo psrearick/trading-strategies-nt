@@ -47,20 +47,27 @@ namespace NinjaTrader.NinjaScript.Strategies
 		Func<int, bool>[] longCombination = null;
 		Func<int, bool>[] shortCombination = null;
 
-//		List<int> timeframeLengths = new List<int> { 2, 5, 8, 10, 12, 15 };
+//		List<int> timeframeLengths = new List<int> { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
+//		List<int> timeframeLengths = new List<int> { 5, 8, 10, 12, 15 };
+//		List<int> timeframeLengths = new List<int> { 5, 10, 15 };
+//		List<int> timeframeLengths = new List<int> { 5, 10, 15, 20 };
+		List<int> timeframeLengths = new List<int> { 5, 8, 10, 12, 15, 20 };
+//		List<int> timeframeLengths = new List<int> { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20 };
 
-//		List<int> timeframeLengths = new List<int> { 2 };
-//		List<int> timeframeLengths = new List<int> { 5 };
-//		List<int> timeframeLengths = new List<int> { 8 };
-//		List<int> timeframeLengths = new List<int> { 10 };
-//		List<int> timeframeLengths = new List<int> { 12 };
-//		List<int> timeframeLengths = new List<int> { 15 };
+//		List<int> timeframeLengths;
 
-		List<int> timeframeLengths = new List<int> { 2, 5 };
-//		List<int> timeframeLengths = new List<int> { 5, 8 };
-//		List<int> timeframeLengths = new List<int> { 8, 10 };
-//		List<int> timeframeLengths = new List<int> { 10, 12 };
-//		List<int> timeframeLengths = new List<int> { 12, 15 };
+		List<List<int>> timeframeLengthOptions = new List<List<int>> {
+//			new List<int> { 2, 5, 12, 15 },
+			new List<int> { 8, 10, 15 },
+			new List<int> { 5, 10 },
+			new List<int> { 2, 10, 12, 15 },
+			new List<int> { 2, 12, 15 },
+//			new List<int> { 5 ,8, 15 },
+//			new List<int> { 5 ,8, 10 }
+		};
+
+
+
 		int currentTimeframeIndex = 0;
 		int currentTimeframe;
 
@@ -194,6 +201,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				IsUnmanaged										= false;
 
 				Risk											= 1;
+				Control											= 0;
 
 				PrintTo = PrintTo.OutputTab1;
 			}
@@ -202,6 +210,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			#region Configure
 			if (State == State.Configure)
 			{
+//				timeframeLengths = timeframeLengthOptions[Control];
+
 				currentTimeframe = timeframeLengths[currentTimeframeIndex];
 
 				AddDataSeries(Data.BarsPeriodType.Second, 15);
@@ -324,6 +334,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 //			}
 
 			performanceScore = CalculateRecentPerformance();
+
+			if ((CurrentBar % (40 * currentTimeframe) == 0))
+			{
+				return true;
+			}
 
 			cooldownCounter--;
 			if (cooldownCounter > 0)
@@ -803,8 +818,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double normalizedVolatilityPercentage = NormalizeValue(volatilityPercentage, volatilityPercentages);
 
 		    // Define the valid volatility range
-		    double minVolatility = 0.33;
-		    double maxVolatility = 0.67;
+		    double minVolatility = Control;
+		    double maxVolatility = 1;
 
 		    // Check if the volatility is within the valid range
 		    return normalizedVolatilityPercentage >= minVolatility && normalizedVolatilityPercentage <= maxVolatility;
@@ -1166,25 +1181,27 @@ namespace NinjaTrader.NinjaScript.Strategies
 			bool validLong =
 				longCombination != null
 				&& longCombination.Length > 0
-				&& (ConditionsMet(longCombination, 0) || (
-						AnyConditionsMet(longCombination, 0)
-						&& (SystemPerformance.AllTrades.Count < 5)
-					)
-				)
+				&& AnyConditionsMet(longCombination, 0)
+//				&& (ConditionsMet(longCombination, 0) || (
+//						AnyConditionsMet(longCombination, 0)
+//						&& (SystemPerformance.AllTrades.Count < 5)
+//					)
+//				)
 				&& IsTrendValid(TrendDirection.Bullish)
-//				&& IsVolatilityValid()
+				&& IsVolatilityValid()
 				;
 
 			bool validShort =
 				shortCombination != null
 				&& shortCombination.Length > 0
-				&& (ConditionsMet(shortCombination, 0) || (
-						AnyConditionsMet(shortCombination, 0)
-						&& (SystemPerformance.AllTrades.Count < 5)
-					)
-				)
+				&& AnyConditionsMet(shortCombination, 0)
+//				&& (ConditionsMet(shortCombination, 0) || (
+//						AnyConditionsMet(shortCombination, 0)
+//						&& (SystemPerformance.AllTrades.Count < 5)
+//					)
+//				)
 				&& IsTrendValid(TrendDirection.Bearish)
-//				&& IsVolatilityValid()
+				&& IsVolatilityValid()
 				;
 
 			if (validLong)
@@ -1205,6 +1222,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		[Range(0, int.MaxValue)]
 		[Display(Name="Risk", Description="Risk", Order=0, GroupName="Parameters")]
 		public int Risk
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Range(0, double.MaxValue)]
+		[Display(Name="Control", Description="Control", Order=1, GroupName="Parameters")]
+		public double Control
 		{ get; set; }
 
 		#endregion
