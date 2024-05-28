@@ -82,15 +82,15 @@ namespace NinjaTrader.NinjaScript.OptimizationFitnesses
 			metrics["profitDrawdownRatio"] = metrics["maxDrawdown"] != 0 ? metrics["netProfit"] / metrics["maxDrawdown"] : 0;
 
 		    // Weights for each performance metric
-		    const double netProfitWeight = 1;
-		    const double maxDrawdownWeight = 1;
-		    const double avgProfitWeight = 1;
-		    const double tradeCountWeight = 1;
-		    const double profitFactorWeight = 1;
-		    const double sharpeRatioWeight = 1;
-		    const double avgMaeWeight = 1;
-		    const double avgMfeWeight = 1;
-			const double profitDrawdownRatioWeight = 1;
+		    const double netProfitWeight = 0;
+		    const double maxDrawdownWeight = 0;// 0.125;
+		    const double avgProfitWeight = 0.0625;
+		    const double tradeCountWeight = 0.0625;
+		    const double profitFactorWeight = 0;// 0.125;
+		    const double sharpeRatioWeight = 0.25;
+		    const double avgMaeWeight = 0.25;
+		    const double avgMfeWeight = 0.125;
+			const double profitDrawdownRatioWeight = 0.25;
 
 		    // Minimum trade count threshold
 		    const int minTradeCount = 5;
