@@ -24,7 +24,7 @@ using NinjaTrader.Core.FloatingPoint;
 //This namespace holds Optimization fitnesses in this folder and is required. Do not change it.
 namespace NinjaTrader.NinjaScript.OptimizationFitnesses
 {
-	public class Strategy206Fitness : OptimizationFitness
+	public class Strategy207Fitness : OptimizationFitness
 	{
 		private double weightedSum;
 		Dictionary<string, double> metrics;
@@ -35,7 +35,7 @@ namespace NinjaTrader.NinjaScript.OptimizationFitnesses
 			if (State == State.SetDefaults)
 			{
 				Description									= @"";
-				Name										= "Strategy 206 Fitness";
+				Name										= "Strategy 2.0.7 Fitness";
 			}
 			else if (State == State.Configure)
 			{
@@ -84,12 +84,12 @@ namespace NinjaTrader.NinjaScript.OptimizationFitnesses
 		    // Weights for each performance metric
 		    const double netProfitWeight = 0;
 		    const double maxDrawdownWeight = 0;// 0.125;
-		    const double avgProfitWeight = 0.0625;
-		    const double tradeCountWeight = 0.0625;
-		    const double profitFactorWeight = 0;// 0.125;
-		    const double sharpeRatioWeight = 0.25;
-		    const double avgMaeWeight = 0.25;
-		    const double avgMfeWeight = 0.125;
+		    const double avgProfitWeight = 0.0;
+		    const double tradeCountWeight = 0.0;
+		    const double profitFactorWeight = 0.75;// 0.125;
+		    const double sharpeRatioWeight = 0.0;
+		    const double avgMaeWeight = 0.0;
+		    const double avgMfeWeight = 0.0;
 			const double profitDrawdownRatioWeight = 0.25;
 
 		    // Minimum trade count threshold
@@ -158,14 +158,14 @@ namespace NinjaTrader.NinjaScript.OptimizationFitnesses
 					continue;
 				}
 
-				LogString += $"{parameter.Value}, ";
+				LogString += $"{parameter.Value},";
 			}
 
-			LogString += weightedSum.ToString() + ", ";
+			LogString += weightedSum.ToString() + ",";
 
-			LogString += string.Join(", ", metrics.Values);
+			LogString += string.Join(",", metrics.Values) + ",";
 
-			LogString += $"{strategy.SystemPerformance.AllTrades.TradesPerformance.GrossProfit.ToString()}, {strategy.SystemPerformance.AllTrades.TradesPerformance.GrossLoss.ToString()}";
+			LogString += $"{strategy.SystemPerformance.AllTrades.TradesPerformance.GrossProfit.ToString()},{strategy.SystemPerformance.AllTrades.TradesPerformance.GrossLoss.ToString()}";
 
 			Print(LogString);
 		}

@@ -46,11 +46,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private bool longPatternMatched;
 		private bool shortPatternMatched;
 
+		private double stopLossDistance = 1;
+		private double stopLossMultiplier = 1;
+		private double profitTargetDistance = 1;
+		private double profitTargetMultiplier = 1;
+
+		private SMA atrMA;
 		private EMA emaShort;
 		private EMA emaLong;
 
 		private ATR atr;
-		private ATR atrDaily;
 
 		private ChoppinessIndex chop;
 		private double ChoppinessThresholdLow = 38.2;
@@ -92,14 +97,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 				BarsRequiredToTrade								= 20;
 
 				IncludeTradeHistoryInBacktest					= true;
-				IsInstantiatedOnEachOptimizationIteration		= false;
+				IsInstantiatedOnEachOptimizationIteration		= true;
 				IsUnmanaged										= false;
 
 				Risk = 0;
 				TradeQuantity = 1;
-				ProfitTarget = 3;
 				StopLossTarget = 5;
-				HighATRMultiplier = 3;
 				LogTrades = false;
 			}
 			#endregion
@@ -107,20 +110,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 			#region State.Configure
 			if (State == State.Configure)
 			{
-				AddDataSeries(Data.BarsPeriodType.Second, 15);
-				AddDataSeries(Data.BarsPeriodType.Minute, 30);
+				AddDataSeries(Data.BarsPeriodType.Second, 30);
+				emaShort			= EMA(10);
+				emaLong				= EMA(20);
+				atr 				= ATR(8);
+				atrMA				= SMA(atr, 3);
+				chop				= ChoppinessIndex(7);
 			}
 			#endregion
 
 			#region State.DataLoaded
 			if (State == State.DataLoaded) {
-				emaShort			= EMA(9);
-				emaLong				= EMA(21);
-				atr 				= ATR(14);
-				atrDaily			= ATR(BarsArray[2], 14);
-				chop				= ChoppinessIndex(5);
-//				chop				= ChoppinessIndex(10);
-//				chop				= ChoppinessIndex(14);
 			}
 			#endregion
 		}
@@ -128,13 +128,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		protected override void OnBarUpdate()
 		{
-			if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1 || CurrentBars[1] < 1 || CurrentBars[2] < 1) {
+			if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1 || CurrentBars[1] < 1)
+			{
 				return;
             }
 
 			exitPositions();
 
-			if (BarsInProgress != 0) {
+			if (BarsInProgress != 0)
+			{
 				return;
 			}
 
@@ -149,24 +151,56 @@ namespace NinjaTrader.NinjaScript.Strategies
 				lastDay = Time[0];
 			}
 
+			calculateMultiples();
 			calculateQuantity();
 			setIndicators();
 			setEntries();
 		}
 
+		#region calculateQuantity()
 		private void calculateQuantity()
 		{
 			quantity = TradeQuantity;
 
 			if (Risk > 0) {
-				double stopLossDistance	= Math.Round((atrDaily[0] * StopLossTarget) / TickSize);
 				double TickValue = Instrument.MasterInstrument.PointValue * TickSize;
+
 				quantity = (int) Math.Max(1, Math.Floor(Risk / (stopLossDistance * TickValue)));
 
 			}
 		}
+		#endregion
 
-		private void exitPositions() {
+		#region calculateMultiples()
+		private void calculateMultiples()
+		{
+			double atrValue = atr[0];
+			double atrMultiple = (atrValue > atrMA[0]) ? 1.5 : 1.0;
+
+   			double shortEmaSlope = (emaShort[0] - emaShort[2]) / 2;
+    		double longEmaSlope = (emaLong[0] - emaLong[2]) / 2;
+
+			double profitTarget = Math.Min(10, Math.Max(1, (1 - (StopLossTarget / 30)) * 10));
+
+			if (longPatternMatched)
+		    {
+		        stopLossMultiplier = (shortEmaSlope > longEmaSlope) ? StopLossTarget : (StopLossTarget * 1.5);
+		        profitTargetMultiplier = (shortEmaSlope > longEmaSlope) ? (profitTarget * 1.5) : profitTarget;
+		    }
+		    else if (shortPatternMatched)
+		    {
+		        stopLossMultiplier = (shortEmaSlope < longEmaSlope) ? StopLossTarget : (StopLossTarget * 1.5);
+		        profitTargetMultiplier = (shortEmaSlope < longEmaSlope) ? (profitTarget * 1.5) : profitTarget;
+		    }
+
+			stopLossDistance = atrValue * stopLossMultiplier * atrMultiple;
+    		profitTargetDistance = atrValue * profitTargetMultiplier * atrMultiple;
+		}
+		#endregion
+
+		#region exitPositions()
+		private void exitPositions()
+		{
 			if (isValidTradeTime()) {
 				return;
 			}
@@ -179,7 +213,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				ExitShort();
 			}
         }
+		#endregion
 
+		#region
 		private void setIndicators()
 		{
 			bool emaShortRising 	= emaShort[0] > emaShort[1];
@@ -225,7 +261,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 			longPatternMatched 		= maRising && rising && newHigh && validChoppiness && upTrend;
 			shortPatternMatched		= maFalling && falling && newLow && validChoppiness && downTrend;
 		}
+		#endregion
 
+		#region isValidEntryTime()
 		private bool isValidEntryTime()
 		{
 			int now = ToTime(Time[0]);
@@ -241,7 +279,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			return true;
 		}
+		#endregion
 
+		#region  isValidTradeTime()
 		private bool isValidTradeTime()
 		{
 			int now = ToTime(Time[0]);
@@ -256,7 +296,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			return true;
 		}
+		#endregion
 
+		#region setEntries()
 		private void setEntries()
 		{
 			if (!isValidEntryTime()) {
@@ -271,15 +313,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return;
 			}
 
-			double profitDistance			= atrDaily[0] * ProfitTarget;
-			double stopLossDistance			= atrDaily[0] * StopLossTarget;
-
-			if (atr[0] > (atrDaily[0] * 0.5)) {
-				profitDistance = profitDistance * HighATRMultiplier;
-			}
-
 			SetStopLoss(CalculationMode.Ticks, stopLossDistance);
-			SetProfitTarget(CalculationMode.Ticks, profitDistance);
+			SetProfitTarget(CalculationMode.Ticks, profitTargetDistance);
 
 			if (longPatternMatched) {
 				EnterLong(quantity, "longEntry");
@@ -289,6 +324,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				EnterShort(quantity, "shortEntry");
 			}
 		}
+		#endregion
 
 		#region Properties
 
@@ -306,24 +342,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		[NinjaScriptProperty]
 		[Range(0, double.MaxValue)]
-		[Display(Name="Profit Target", Description="Profit Target", Order=2, GroupName="Parameters")]
-		public double ProfitTarget
-		{ get; set; }
-
-		[NinjaScriptProperty]
-		[Range(0, double.MaxValue)]
-		[Display(Name="Stop Loss Target", Description="Stop Loss Target", Order=3, GroupName="Parameters")]
+		[Display(Name="Stop Loss Target", Description="Stop Loss Target", Order=2, GroupName="Parameters")]
 		public double StopLossTarget
 		{ get; set; }
 
 		[NinjaScriptProperty]
-		[Range(0, 100)]
-		[Display(Name="High ATR Multiplier", Description="High ATR Multiplier", Order=4, GroupName="Parameters")]
-		public double HighATRMultiplier
-		{ get; set; }
-
-		[NinjaScriptProperty]
-		[Display(Name="Log Trades", Description="Log Trades", Order=5, GroupName="Parameters")]
+		[Display(Name="Log Trades", Description="Log Trades", Order=3, GroupName="Parameters")]
 		public bool LogTrades
 		{ get; set; }
 
