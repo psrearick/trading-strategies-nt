@@ -40,9 +40,6 @@ namespace NinjaTrader.NinjaScript.OptimizationFitnesses
 				Description									= @"";
 				Name										= "Strategy 2.0.8 Fitness";
 			}
-			else if (State == State.Configure)
-			{
-			}
 		}
 
 		protected override void OnCalculatePerformanceValue(StrategyBase strategy)
@@ -76,7 +73,7 @@ namespace NinjaTrader.NinjaScript.OptimizationFitnesses
 			    ["maxDrawdown"] = Math.Abs(strategy.SystemPerformance.AllTrades.TradesPerformance.Currency.Drawdown),
 				["avgProfit"] = Math.Abs(strategy.SystemPerformance.AllTrades.TradesPerformance.Currency.AverageProfit),
 			    ["tradeCount"] = (double) strategy.SystemPerformance.AllTrades.Count,
-			    ["profitFactor"] = loss > 0 ? profit / loss : 99,
+			    ["profitFactor"] = loss != 0 ? Math.Abs(profit / loss) : 99,
 			    ["sharpeRatio"] = strategy.SystemPerformance.AllTrades.TradesPerformance.SharpeRatio,
 			    ["avgMae"] = strategy.SystemPerformance.AllTrades.TradesPerformance.Currency.AverageMae,
 			    ["avgMfe"] = strategy.SystemPerformance.AllTrades.TradesPerformance.Currency.AverageMfe,
@@ -98,22 +95,7 @@ namespace NinjaTrader.NinjaScript.OptimizationFitnesses
 		    const double avgMfeWeight = 0.0;
 			const double profitDrawdownRatioWeight = 0;
 
-//		    const double netProfitWeight = 0;
-//		    const double maxDrawdownWeight = 0;
-//		    const double avgProfitWeight = 0.0;
-//		    const double tradeCountWeight = 0.0;
-//		    const double profitFactorWeight = 0.3;
-//		    const double sharpeRatioWeight = 0.0;
-//		    const double avgMaeWeight = 0.2;
-//		    const double avgMfeWeight = 0.125;
-//			const double profitDrawdownRatioWeight = 0.375;
-
-		    // Minimum trade count threshold
-		    //const int minTradeCount = 5;
-
 			bool shouldNormalize = metrics["metricDays"] > 0;
-
-			// Print(metrics["netProfit"]);
 
 		    // Calculate normalized values for each metric
 			double normalizedNetProfit = shouldNormalize ? Math.Round(NormalizeValue(metrics["netProfit"] / metrics["metricDays"], -150, 150), 3) : 0;
@@ -143,42 +125,17 @@ namespace NinjaTrader.NinjaScript.OptimizationFitnesses
 
 			weightedSum += normalizedProfitFactor / 100;
 
-            //			if (((int) metrics["metricDays"] <= strategy.TestPeriod) && metrics["days"] > 0)
-            //			{
-            //				Print(string.Join(",", metrics.Select(valueObject => valueObject.Key + ": " + valueObject.Value).ToArray()));
-            //				Print(string.Join(",", weightedMetrics.Select(valueObject => valueObject.Key + ": " + valueObject.Value).ToArray()));
-            //			}
-
-            //			Print(string.Join(",", weightedMetrics.Select(valueObject => valueObject.Value).ToArray()));
-
-
-            // Apply a penalty if the trade count is below the minimum threshold
-            /*if ((metrics["tradeCount"] < minTradeCount) || (metrics["netProfit"] < 0))
-		    {
-		        weightedSum *= 0.3;
-		    }*/
-
-
             Random autoRand = new Random(Guid.NewGuid().GetHashCode());
 			double rand = autoRand.NextDouble() / 1000;
 
             Value = weightedSum + rand;
-//            Value = metrics["profitFactor"] + rand;
-
-//			Value = metrics["sharpeRatio"] + rand;
-//			Value = normalizedSharpeRatio + rand;
-
-			//Print(weightedSum + " " + rand + " " + Value);
-
-			//if (strategy.Optimizer.NumberOfIterations == 0)
-			//{
-				//Print(strategy.SystemPerformance.AllTrades.TradesCount);
-			//}
 
 			if (logTrades)
 			{
 				printTrades(strategy);
 			}
+
+//			printBacktestLog(strategy);
 		}
 
 		private void printBacktestLog(StrategyBase strategy)
@@ -206,7 +163,9 @@ namespace NinjaTrader.NinjaScript.OptimizationFitnesses
 
 		private void printTrades(StrategyBase strategy)
 		{
-			if (strategy.Optimizer.NumberOfIterations != 1)
+//			Print(strategy.Optimizer.NumberOfIterations);
+
+			if (strategy.Optimizer.NumberOfIterations != 10)
 			{
 				return;
 			}

@@ -35,19 +35,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public MarketCycle marketLong;
 		public PriceActionUtils pa;
 
+		public Series<int> ShortScores;
+		public Series<int> LongScores;
+		public Series<int> Scores;
 		public Series<TrendDirection> Signals;
 
 		private int lowerLows = 0;
 		private int higherHighs = 0;
 		private int maxLowerLows = 0;
 		private int maxHigherHighs = 0;
-
-		private Brush brushUp0;
-		private Brush brushUp1;
-		private Brush brushUp2;
-		private Brush brushDown0;
-		private Brush brushDown1;
-		private Brush brushDown2;
 		#endregion
 
 		#region OnStateChange()
@@ -67,38 +63,44 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				PaintPriceMarkers							= true;
 				ScaleJustification							= NinjaTrader.Gui.Chart.ScaleJustification.Right;
 				IsSuspendedWhileInactive					= true;
+
 			}
 			#endregion
 
 			#region State.Configure
 			if (State == State.Configure)
 			{
-				AddDataSeries(BarsPeriodType.Minute, 20);
 				emaShort = EMA(10);
 				emaLong = EMA(20);
 				movingAverage = SMA(100);
 				chop = ChoppinessIndex(7);
 				market = MarketCycle();
-				marketLong = MarketCycle(BarsArray[1]);
 				pa = PriceActionUtils();
 
 				Signals = new Series<TrendDirection>(this, MaximumBarsLookBack.Infinite);
-
-				configureBrushes();
+				Scores = new Series<int>(this, MaximumBarsLookBack.Infinite);
+				LongScores = new Series<int>(this, MaximumBarsLookBack.Infinite);
+				ShortScores = new Series<int>(this, MaximumBarsLookBack.Infinite);
 			}
 			#endregion
+
+			if (State == State.DataLoaded)
+			{
+				marketLong = MarketCycle(LongSeries);
+			}
 		}
 		#endregion
 
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			if (CurrentBar < 100 || CurrentBars[0] < 1 || CurrentBars[1] < 1) {
+			if (CurrentBar < 100) {
 				return;
             }
 
-			if (BarsInProgress > 0)
+			if (marketLong.CurrentBar < 1)
 			{
+				marketLong.Update();
 				return;
 			}
 
@@ -113,14 +115,15 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			{
 				Draw.ArrowDown(this, "shortEntry"+CurrentBar, true, 0, High[0] + TickSize, Brushes.Fuchsia);
 			}
-
-//			BackBrush = GetBackgroundBrush();
 		}
 		#endregion
 
 		#region GetSignal()
 		private TrendDirection GetSignal()
 		{
+			int longScore = 0;
+			int shortScore = 0;
+
 			bool emaShortRising = pa.IsRising(emaShort, 0, 1);
 			bool emaShortFalling = pa.IsFalling(emaShort, 0, 1);
 			bool emaLongRising = pa.IsRising(emaLong, 0, 1);
@@ -128,33 +131,87 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			bool maRising = emaShortRising && emaLongRising;
 			bool maFalling = emaShortFalling && emaLongFalling;
 
+			if (emaShortRising)
+				longScore++;
+
+			if (emaLongRising)
+				longScore++;
+
+			if (maRising)
+				longScore++;
+
+			if (emaShortFalling)
+				shortScore++;
+
+			if (emaLongFalling)
+				shortScore++;
+
+			if (maFalling)
+				shortScore++;
+
 			bool aboveMA = Close[0] > movingAverage[0];
 			bool belowMA = Close[0] < movingAverage[0];
 
-//			bool lowChop = (chop[0] > 20) && (chop[0] < 40);
-//			bool highChop = (chop[0] > 60) && (chop[0] < 80);
-//			bool validChoppiness = lowChop || highChop;
+			if (aboveMA)
+				longScore++;
 
-//			bool lowChop = chop[0] < 38.2;
-//			bool highChop = chop[0] > 61.8;
+			if (belowMA)
+				shortScore++;
 
-//			bool rising	= pa.ConsecutiveBarsUp(3, 1);
-//			bool falling = pa.ConsecutiveBarsDown(3, 1);
+			bool lowChop = (chop[0] > 20) && (chop[0] < 40);
+			bool highChop = (chop[0] > 60) && (chop[0] < 80);
+			bool validChoppiness = lowChop || highChop;
+
+			if (validChoppiness)
+			{
+				shortScore++;
+				longScore++;
+			}
 
 			bool rising = pa.LeastBarsUp(2, 4, 1);
 			bool falling = pa.LeastBarsDown(2, 4, 1);
 
+			if (rising)
+				longScore++;
+
+			if (falling)
+				shortScore++;
+
 			bool newHigh = High[0] >= pa.HighestHigh(1, 5);
 			bool newLow	= Low[0] <= pa.LowestLow(1, 5);
+
+			if (newHigh)
+				longScore++;
+
+			if (newLow)
+				shortScore++;
 
 			bool higherHigh	= pa.ConsecutiveHigherHighs(0, 3);
 			bool lowerLow = pa.ConsecutiveLowerLows(0, 3);
 
+			if (higherHigh)
+				longScore++;
+
+			if (lowerLow)
+				shortScore++;
+
 			bool highestInTrend	= pa.HighestHigh(0, 2) >= pa.HighestHigh(0, 5);
 			bool lowestInTrend = pa.LowestLow(0, 2) <= pa.LowestLow(0, 5);
 
+			if (highestInTrend)
+				longScore++;
+
+			if (lowestInTrend)
+				shortScore++;
+
 			int consecutiveHigherHighs = pa.MaxNumberOfConsecutiveHigherHighs(0, 20);
 			int consecutiveLowerLows = pa.MaxNumberOfConsecutiveLowerLows(0, 20);
+
+			if (consecutiveHigherHighs > 2)
+				longScore++;
+
+			if (consecutiveLowerLows > 2)
+				shortScore++;
 
 			higherHighs = consecutiveHigherHighs;
 			lowerLows = consecutiveLowerLows;
@@ -169,53 +226,31 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			bool validMarketDirection = market.Direction[0] == marketLong.Direction[0];
 
-			bool longPatternMatched = true
-				&& chop[0] < 40
-//				&& lowChop
-//				&& highChop
-//				&& (lowChop || highChop)
-//				&& validChoppiness
-//				&& validLongMarket
-//				&& validShortMarket
-//				&& validMarket
-//				&& validMarketDirection
-//				&& emaLongRising
-//				&& emaShortRising
-				&& maRising
-//				&& aboveMA
-				&& pa.IsBullishBar(0)
-				&& rising
-//				&& newHigh
-//				&& higherHigh
-//				&& highestInTrend
-//				&& market.Direction[0] == TrendDirection.Bullish
-//				&& marketLong.Direction[0] == TrendDirection.Bullish
-//				&& stage != MarketCycleStage.TradingRange
-			;
+			if (market.Direction[0] == TrendDirection.Bullish)
+				longScore++;
 
-			bool shortPatternMatched = true
-				&& chop[0] < 40
-//				&& lowChop
-//				&& highChop
-//				&& (lowChop || highChop)
-//				&& validChoppiness
-//				&& validLongMarket
-//				&& validShortMarket
-//				&& validMarket
-//				&& validMarketDirection
-//				&& emaLongFalling
-//				&& emaShortFalling
-				&& maFalling
-//				&& belowMA
-				&& pa.IsBearishBar(0)
-				&& falling
-//				&& newLow
-//				&& lowerLow
-//				&& lowestInTrend
-//				&& market.Direction[0] == TrendDirection.Bearish
-//				&& marketLong.Direction[0] == TrendDirection.Bearish
-//				&& stage != MarketCycleStage.TradingRange
-			;
+			if (marketLong.Direction[0] == TrendDirection.Bullish)
+				longScore++;
+
+			if (market.Direction[0] == TrendDirection.Bearish)
+				shortScore++;
+
+			if (marketLong.Direction[0] == TrendDirection.Bearish)
+				shortScore++;
+
+			if (pa.IsBullishBar(0))
+				longScore++;
+
+			if (pa.IsBearishBar(0))
+				shortScore++;
+
+			bool longPatternMatched = marketLong.Direction[0] == TrendDirection.Bullish;
+
+			bool shortPatternMatched = marketLong.Direction[0] == TrendDirection.Bearish;
+
+			LongScores[0] = longScore;
+			ShortScores[0] = shortScore;
+			Scores[0] = longScore - shortScore;
 
 			if (longPatternMatched)
 			{
@@ -231,76 +266,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
-		#region GetBackgroundBrush()
-		private Brush GetBackgroundBrush()
-		{
-			if (market.Direction[0] == TrendDirection.Flat)
-				return null;
-
-			if (market.Stage[0] == MarketCycleStage.TradingRange)
-				return null;
-
-			if (market.Direction[0] == TrendDirection.Bullish)
-			{
-				if (market.Stage[0] == MarketCycleStage.Breakout)
-					return brushUp0;
-
-				if (market.Stage[0] == MarketCycleStage.TightChannel)
-					return brushUp1;
-
-				if (market.Stage[0] == MarketCycleStage.BroadChannel)
-					return brushUp2;
-			}
-
-			if (market.Stage[0] == MarketCycleStage.Breakout)
-					return brushDown0;
-
-			if (market.Stage[0] == MarketCycleStage.TightChannel)
-				return brushDown1;
-
-			if (market.Stage[0] == MarketCycleStage.BroadChannel)
-				return brushDown2;
-
-			return null;
-
-		}
-		#endregion
-
-		#region configureBrushes()
-		private void configureBrushes()
-		{
-				brushUp0 = Brushes.Green.Clone();
-				brushUp0.Opacity = 0.600;
-				brushUp0.Freeze();
-
-				brushUp1 = Brushes.Green.Clone();
-				brushUp1.Opacity = 0.400;
-				brushUp1.Freeze();
-
-				brushUp2 = Brushes.Green.Clone();
-				brushUp2.Opacity = 0.200;
-				brushUp2.Freeze();
-
-				brushDown0 = Brushes.Red.Clone();
-				brushDown0.Opacity = 0.600;
-				brushDown0.Freeze();
-
-				brushDown1 = Brushes.Red.Clone();
-				brushDown1.Opacity = 0.400;
-				brushDown1.Freeze();
-
-				brushDown2 = Brushes.Red.Clone();
-				brushDown2.Opacity = 0.200;
-				brushDown2.Freeze();
-		}
-		#endregion
-
 		#region properties
 
-//		[NinjaScriptProperty]
-//		[Display(Name="Display Market Cycle", Description="Display Market Cycle", Order=0, GroupName="Parameters")]
-//		public bool DisplayMarketCycle
-//		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Display(Name="Long Series", Description="Long Series", Order=1, GroupName="Parameters")]
+		public Bars LongSeries
+		{ get; set; }
 
 		#endregion
 	}
@@ -313,18 +285,18 @@ namespace NinjaTrader.NinjaScript.Indicators
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
 		private PR.Strategy208Signals[] cacheStrategy208Signals;
-		public PR.Strategy208Signals Strategy208Signals()
+		public PR.Strategy208Signals Strategy208Signals(Bars longSeries)
 		{
-			return Strategy208Signals(Input);
+			return Strategy208Signals(Input, longSeries);
 		}
 
-		public PR.Strategy208Signals Strategy208Signals(ISeries<double> input)
+		public PR.Strategy208Signals Strategy208Signals(ISeries<double> input, Bars longSeries)
 		{
 			if (cacheStrategy208Signals != null)
 				for (int idx = 0; idx < cacheStrategy208Signals.Length; idx++)
-					if (cacheStrategy208Signals[idx] != null &&  cacheStrategy208Signals[idx].EqualsInput(input))
+					if (cacheStrategy208Signals[idx] != null && cacheStrategy208Signals[idx].LongSeries == longSeries && cacheStrategy208Signals[idx].EqualsInput(input))
 						return cacheStrategy208Signals[idx];
-			return CacheIndicator<PR.Strategy208Signals>(new PR.Strategy208Signals(), input, ref cacheStrategy208Signals);
+			return CacheIndicator<PR.Strategy208Signals>(new PR.Strategy208Signals(){ LongSeries = longSeries }, input, ref cacheStrategy208Signals);
 		}
 	}
 }
@@ -333,14 +305,14 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.PR.Strategy208Signals Strategy208Signals()
+		public Indicators.PR.Strategy208Signals Strategy208Signals(Bars longSeries)
 		{
-			return indicator.Strategy208Signals(Input);
+			return indicator.Strategy208Signals(Input, longSeries);
 		}
 
-		public Indicators.PR.Strategy208Signals Strategy208Signals(ISeries<double> input )
+		public Indicators.PR.Strategy208Signals Strategy208Signals(ISeries<double> input , Bars longSeries)
 		{
-			return indicator.Strategy208Signals(input);
+			return indicator.Strategy208Signals(input, longSeries);
 		}
 	}
 }
@@ -349,14 +321,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.PR.Strategy208Signals Strategy208Signals()
+		public Indicators.PR.Strategy208Signals Strategy208Signals(Bars longSeries)
 		{
-			return indicator.Strategy208Signals(Input);
+			return indicator.Strategy208Signals(Input, longSeries);
 		}
 
-		public Indicators.PR.Strategy208Signals Strategy208Signals(ISeries<double> input )
+		public Indicators.PR.Strategy208Signals Strategy208Signals(ISeries<double> input , Bars longSeries)
 		{
-			return indicator.Strategy208Signals(input);
+			return indicator.Strategy208Signals(input, longSeries);
 		}
 	}
 }
