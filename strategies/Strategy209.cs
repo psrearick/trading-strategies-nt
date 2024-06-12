@@ -129,6 +129,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 				LogTrades 										= false;
 
 				LongPeriod = 1;
+				LowerThreshold = 10;
+				UpperThreshold = 90;
 			}
 			#endregion
 
@@ -160,7 +162,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				marketLong			= MarketCycle(BarsArray[2]);
 				pa				 	= PriceActionUtils();
 				adx					= ADX(14);
-				signals				= Strategy209Signals(LongPeriod, 10, 90);
+				signals				= Strategy209Signals(LongPeriod, LowerThreshold, UpperThreshold);
 			}
 			#endregion
 		}
@@ -360,7 +362,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 		public int LongPeriod
 		{ get; set; }
 
+		[Range(0, 100), NinjaScriptProperty]
+		[Display(Name = "Lower Threshold", Description = "Lower Threshold", GroupName = "Parameters", Order = 2)]
+		public double LowerThreshold
+		{ get; set; }
+	
+		[Range(0, 100), NinjaScriptProperty]
+		[Display(Name = "Upper Threshold", Description = "Upper Threshold", GroupName = "Parameters", Order = 3)]
+		public double UpperThreshold
+		{ get; set; }
+
 		#endregion
 	}
 }
-
