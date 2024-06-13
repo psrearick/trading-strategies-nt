@@ -366,7 +366,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		[Display(Name = "Lower Threshold", Description = "Lower Threshold", GroupName = "Parameters", Order = 2)]
 		public double LowerThreshold
 		{ get; set; }
-	
+
 		[Range(0, 100), NinjaScriptProperty]
 		[Display(Name = "Upper Threshold", Description = "Upper Threshold", GroupName = "Parameters", Order = 3)]
 		public double UpperThreshold
