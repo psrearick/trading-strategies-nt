@@ -24,7 +24,7 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //This namespace holds Indicators in this folder and is required. Do not change it.
 namespace NinjaTrader.NinjaScript.Indicators.PR
 {
-	public class Strategy208Signals : Indicator
+	public class Strategy208Display : Indicator
 	{
 		#region Variables
 		public EMA emaShort;
@@ -37,7 +37,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 		public Series<int> ShortScores;
 		public Series<int> LongScores;
-		public Series<int> Scores;
+		public Series<double> Scores;
 		public Series<TrendDirection> Signals;
 
 		private int lowerLows = 0;
@@ -52,8 +52,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			#region State.SetDefaults
 			if (State == State.SetDefaults)
 			{
-				Description									= @"Enter the description for your new custom Indicator here.";
-				Name										= "Strategy 2.0.8 Signals";
+				Description									= @"";
+				Name										= "Strategy 2.0.8";
 				Calculate									= Calculate.OnBarClose;
 				IsOverlay									= false;
 				DisplayInDataBox							= true;
@@ -64,6 +64,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				ScaleJustification							= NinjaTrader.Gui.Chart.ScaleJustification.Right;
 				IsSuspendedWhileInactive					= true;
 
+				LongPeriod = 10;
+				LowerThreshold = 15;
+				UpperThreshold = 85;
+
+				AddPlot(Brushes.Black, "Signal Strength");
+				AddLine(Brushes.DarkCyan, LowerThreshold, "Lower Threshold");
+				AddLine(Brushes.DarkCyan, UpperThreshold, "Upper Threshold");
 			}
 			#endregion
 
@@ -78,16 +85,29 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				pa = PriceActionUtils();
 
 				Signals = new Series<TrendDirection>(this, MaximumBarsLookBack.Infinite);
-				Scores = new Series<int>(this, MaximumBarsLookBack.Infinite);
+				Scores = new Series<double>(this, MaximumBarsLookBack.Infinite);
 				LongScores = new Series<int>(this, MaximumBarsLookBack.Infinite);
 				ShortScores = new Series<int>(this, MaximumBarsLookBack.Infinite);
+
+				AddDataSeries(BarsPeriodType.Minute, 20);
+				AddDataSeries(BarsPeriodType.Minute, 40);
+				AddDataSeries(BarsPeriodType.Minute, 60);
+				AddDataSeries(BarsPeriodType.Minute, 80);
+				AddDataSeries(BarsPeriodType.Minute, 100);
+				AddDataSeries(BarsPeriodType.Minute, 120);
+				AddDataSeries(BarsPeriodType.Minute, 140);
+				AddDataSeries(BarsPeriodType.Minute, 160);
+				AddDataSeries(BarsPeriodType.Minute, 180);
+				AddDataSeries(BarsPeriodType.Minute, 200);
 			}
 			#endregion
 
+			#region State.DataLoaded
 			if (State == State.DataLoaded)
 			{
-				marketLong = MarketCycle(LongSeries);
+				marketLong = MarketCycle(BarsArray[LongPeriod]);
 			}
+			#endregion
 		}
 		#endregion
 
@@ -104,25 +124,38 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				return;
 			}
 
+			Value[0] = GetScore();
+
 			Signals[0] = GetSignal();
 
-			if (Signals[1] == TrendDirection.Bullish)
-			{
-				Draw.ArrowUp(this, "longEntry"+CurrentBar, true, 0, Low[0] - TickSize, Brushes.RoyalBlue);
-			}
-
-			if (Signals[1] == TrendDirection.Bearish)
-			{
-				Draw.ArrowDown(this, "shortEntry"+CurrentBar, true, 0, High[0] + TickSize, Brushes.Fuchsia);
-			}
+			BackBrush = marketLong.background;
 		}
 		#endregion
 
 		#region GetSignal()
 		private TrendDirection GetSignal()
 		{
+			if (Value[0] >= UpperThreshold)
+			{
+				return TrendDirection.Bullish;
+			}
+
+			if (Value[0] <= LowerThreshold)
+			{
+				return TrendDirection.Bearish;
+			}
+
+			return TrendDirection.Flat;
+		}
+		#endregion
+
+		#region GetScore()
+		private double GetScore()
+		{
 			int longScore = 0;
 			int shortScore = 0;
+
+			int maxScore = 12;
 
 			bool emaShortRising = pa.IsRising(emaShort, 0, 1);
 			bool emaShortFalling = pa.IsFalling(emaShort, 0, 1);
@@ -219,6 +252,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			maxLowerLows = Math.Max(maxLowerLows, lowerLows);
 
 			MarketCycleStage stage = market.Stage[0];
+
 			MarketCycleStage stageLong = marketLong.Stage[0];
 
 			bool validLongMarket = stageLong == MarketCycleStage.BroadChannel || stageLong == MarketCycleStage.TightChannel;
@@ -244,35 +278,30 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			if (pa.IsBearishBar(0))
 				shortScore++;
 
-			bool longPatternMatched = marketLong.Direction[0] == TrendDirection.Bullish;
-
-			bool shortPatternMatched = marketLong.Direction[0] == TrendDirection.Bearish;
-
 			LongScores[0] = longScore;
 			ShortScores[0] = shortScore;
-			Scores[0] = longScore - shortScore;
+			Scores[0] = (((double)(maxScore + longScore - shortScore)) / (maxScore * 2)) * 100;
 
-			if (longPatternMatched)
-			{
-				return TrendDirection.Bullish;
-			}
-
-			if (shortPatternMatched)
-			{
-				return TrendDirection.Bearish;
-			}
-
-			return TrendDirection.Flat;
+			return Scores[0];
 		}
 		#endregion
 
-		#region properties
-
+		#region Properties
 		[NinjaScriptProperty]
-		[Display(Name="Long Series", Description="Long Series", Order=1, GroupName="Parameters")]
-		public ISeries<double> LongSeries
+		[Range(1, int.MaxValue)]
+		[Display(Name="Long Period", Description="Long Period", Order=0, GroupName="Parameters")]
+		public int LongPeriod
 		{ get; set; }
 
+		[Range(0, 100), NinjaScriptProperty]
+		[Display(Name = "Lower Threshold", Description = "Lower Threshold", GroupName = "Parameters", Order = 1)]
+		public double LowerThreshold
+		{ get; set; }
+
+		[Range(0, 100), NinjaScriptProperty]
+		[Display(Name = "Upper Threshold", Description = "Upper Threshold", GroupName = "Parameters", Order = 2)]
+		public double UpperThreshold
+		{ get; set; }
 		#endregion
 	}
 }
@@ -283,19 +312,19 @@ namespace NinjaTrader.NinjaScript.Indicators
 {
 	public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
 	{
-		private PR.Strategy208Signals[] cacheStrategy208Signals;
-		public PR.Strategy208Signals Strategy208Signals(ISeries<double> longSeries)
+		private PR.Strategy208Display[] cacheStrategy208Display;
+		public PR.Strategy208Display Strategy208Display(int longPeriod, double lowerThreshold, double upperThreshold)
 		{
-			return Strategy208Signals(Input, longSeries);
+			return Strategy208Display(Input, longPeriod, lowerThreshold, upperThreshold);
 		}
 
-		public PR.Strategy208Signals Strategy208Signals(ISeries<double> input, ISeries<double> longSeries)
+		public PR.Strategy208Display Strategy208Display(ISeries<double> input, int longPeriod, double lowerThreshold, double upperThreshold)
 		{
-			if (cacheStrategy208Signals != null)
-				for (int idx = 0; idx < cacheStrategy208Signals.Length; idx++)
-					if (cacheStrategy208Signals[idx] != null && cacheStrategy208Signals[idx].LongSeries == longSeries && cacheStrategy208Signals[idx].EqualsInput(input))
-						return cacheStrategy208Signals[idx];
-			return CacheIndicator<PR.Strategy208Signals>(new PR.Strategy208Signals(){ LongSeries = longSeries }, input, ref cacheStrategy208Signals);
+			if (cacheStrategy208Display != null)
+				for (int idx = 0; idx < cacheStrategy208Display.Length; idx++)
+					if (cacheStrategy208Display[idx] != null && cacheStrategy208Display[idx].LongPeriod == longPeriod && cacheStrategy208Display[idx].LowerThreshold == lowerThreshold && cacheStrategy208Display[idx].UpperThreshold == upperThreshold && cacheStrategy208Display[idx].EqualsInput(input))
+						return cacheStrategy208Display[idx];
+			return CacheIndicator<PR.Strategy208Display>(new PR.Strategy208Display(){ LongPeriod = longPeriod, LowerThreshold = lowerThreshold, UpperThreshold = upperThreshold }, input, ref cacheStrategy208Display);
 		}
 	}
 }
@@ -304,14 +333,14 @@ namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
 {
 	public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
 	{
-		public Indicators.PR.Strategy208Signals Strategy208Signals(ISeries<double> longSeries)
+		public Indicators.PR.Strategy208Display Strategy208Display(int longPeriod, double lowerThreshold, double upperThreshold)
 		{
-			return indicator.Strategy208Signals(Input, longSeries);
+			return indicator.Strategy208Display(Input, longPeriod, lowerThreshold, upperThreshold);
 		}
 
-		public Indicators.PR.Strategy208Signals Strategy208Signals(ISeries<double> input , ISeries<double> longSeries)
+		public Indicators.PR.Strategy208Display Strategy208Display(ISeries<double> input , int longPeriod, double lowerThreshold, double upperThreshold)
 		{
-			return indicator.Strategy208Signals(input, longSeries);
+			return indicator.Strategy208Display(input, longPeriod, lowerThreshold, upperThreshold);
 		}
 	}
 }
@@ -320,14 +349,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
 	{
-		public Indicators.PR.Strategy208Signals Strategy208Signals(ISeries<double> longSeries)
+		public Indicators.PR.Strategy208Display Strategy208Display(int longPeriod, double lowerThreshold, double upperThreshold)
 		{
-			return indicator.Strategy208Signals(Input, longSeries);
+			return indicator.Strategy208Display(Input, longPeriod, lowerThreshold, upperThreshold);
 		}
 
-		public Indicators.PR.Strategy208Signals Strategy208Signals(ISeries<double> input , ISeries<double> longSeries)
+		public Indicators.PR.Strategy208Display Strategy208Display(ISeries<double> input , int longPeriod, double lowerThreshold, double upperThreshold)
 		{
-			return indicator.Strategy208Signals(input, longSeries);
+			return indicator.Strategy208Display(input, longPeriod, lowerThreshold, upperThreshold);
 		}
 	}
 }

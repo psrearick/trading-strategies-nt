@@ -81,28 +81,109 @@ namespace NinjaTrader.NinjaScript.Strategies
 			else if (State == State.Configure)
 			{
 				AddDataSeries(Data.BarsPeriodType.Second, 15);
+				signalGenerator = SignalGenerator();
 			}
 			#endregion
 
 			#region State.DataLoaded
 			else if (State == State.DataLoaded)
 			{
-//				signalGenerator = SignalGenerator(BarsArray[1], Data.BarsPeriodType.Minute, 5);
-//				signalGenerator = SignalGenerator(BarsArray[0], Data.BarsPeriodType.Second, 15);
-				signalGenerator = SignalGenerator();
+				SetParameterTypes();
+				SetConditions();
 			}
 			#endregion
+		}
+		#endregion
+
+		#region SetParameterTypes()
+		private void SetParameterTypes()
+		{
+			signalGenerator.SetParameterType(typeof(StopLossCondition), "StopLossMultiplier", 5, 1, 1);
+			signalGenerator.SetParameterType(typeof(ProfitTargetCondition), "ProfitTargetMultiplier", 8, 1, 1);
+			signalGenerator.SetParameterType(typeof(ProfitTargetCondition), "HighATRMultiplier", 5, 0, 1);
+			signalGenerator.SetParameterType(typeof(SLTPCondition), "StopLossMultiplier", 5, 1, 1);
+			signalGenerator.SetParameterType(typeof(SLTPCondition), "ProfitTargetMultiplier", 8, 1, 1);
+			signalGenerator.SetParameterType(typeof(SLTPCondition), "HighATRMultiplier", 5, 0, 1);
+			signalGenerator.SetParameterType(typeof(NoNewExtremeCondition), "StopLossMultiplier", 20, 6, 2);
+		}
+		#endregion
+
+		#region SetConditions()
+		private void SetConditions()
+		{
+			#region Entry Conditions
+
+//			entryConditions.Add(new MARisingFallingCondition());
+			signalGenerator.AddEntryCondition(new TrendRisingFallingCondition());
+//			entryConditions.Add(new NewHighLowCondition());
+			signalGenerator.AddEntryCondition(new ValidChoppinessCondition());
+			signalGenerator.AddEntryCondition(new UpDownTrendCondition());
+
+//			entryConditions.Add(new EMAConvergingCondition());
+//			entryConditions.Add(new WithTrendEMACondition());
+//			entryConditions.Add(new BelowAverageATRCondition());
+//			entryConditions.Add(new AboveAverageATRByAStdDevCondition());
+//			entryConditions.Add(new BreakoutCondition());
+			signalGenerator.AddEntryCondition(new BroadChannelCondition());
+//			entryConditions.Add(new WeakBarCondition());
+//			entryConditions.Add(new RSIRangeCondition());
+//			entryConditions.Add(new AboveAverageATRCondition());
+//			entryConditions.Add(new WithTrendTrendBarCondition());
+//			entryConditions.Add(new WithTrendPressureCondition());
+//			entryConditions.Add(new EMADivergingCondition());
+//			entryConditions.Add(new FastEMADirectionCondition());
+//			entryConditions.Add(new SlowEMADirectionCondition());
+
+//			entryConditions.Add(new TrendFollowingStrategy206Condition()); // Produces very few trades -- REMOVE
+//			entryConditions.Add(new StrongWithTrendPressureCondition()); // Produces few trades -- REMOVE
+//			entryConditions.Add(new TightChannelCondition()); // Produces very few trades -- REMOVE
+//			entryConditions.Add(new WeakTrendCondition()); // Produces very few trades -- REMOVE
+//			entryConditions.Add(new StrongTrendCondition()); // Produces very few trades -- REMOVE
+//			entryConditions.Add(new BreakoutBarPatternCondition()); // Produces very few trades -- REMOVE
+//			entryConditions.Add(new StrongFollowThroughCondition()); // Produces very few trades -- REMOVE
+//			entryConditions.Add(new LeadsFastEMAByMoreThanATRCondition()); // Produces very few trades -- REMOVE
+
+			#endregion
+
+			#region Exit Conditions
+
+
+
+//			singleExitConditions.Add(new TrendDirectionChangedCondition());
+//			// singleExitConditions.Add(new CounterTrendTightChannelCondition()); // Rarely Triggers
+//			// singleExitConditions.Add(new CounterTrendBroadChannelCondition()); // Rarely Triggers
+//			// singleExitConditions.Add(new CounterTrendBreakoutsCondition()); // Rarely Triggers
+//			// singleExitConditions.Add(new CounterTrendBreakoutTrendCondition()); // Rarely Triggers
+//			singleExitConditions.Add(new CounterTrendLegLongCondition());
+//			singleExitConditions.Add(new CounterTrendLegShortCondition());
+//			// singleExitConditions.Add(new DoubleTopBottomCondition()); // Rarely Triggers
+//			// singleExitConditions.Add(new CounterTrendLegAfterDoubleTopBottomCondition()); // Rarely Triggers
+//			singleExitConditions.Add(new TrailingStopBeyondPreviousExtremeCondition());
+//			singleExitConditions.Add(new MovingAverageCrossoverCondition());
+//			singleExitConditions.Add(new NoNewExtremeCondition());
+			// singleExitConditions.Add(new CounterTrendPressureCondition()); // Rarely Triggers
+//			// singleExitConditions.Add(new CounterTrendWeakTrendCondition()); // Rarely Triggers
+//			// singleExitConditions.Add(new CounterTrendStrongTrendCondition()); // Rarely Triggers
+//			// singleExitConditions.Add(new RSIOutOfRangeCondition()); // Rarely Triggers
+//			singleExitConditions.Add(new AboveAverageATRExitCondition());
+//			singleExitConditions.Add(new BelowAverageATRExitCondition());
+//			singleExitConditions.Add(new AboveAverageATRByAStdDevExitCondition());
+//			singleExitConditions.Add(new BelowAverageATRByAStdDevExitCondition());
+//			singleExitConditions.Add(new StrongCounterTrendFollowThroughCondition());
+
+
+//			singleExitConditions.Add(new ProfitTargetCondition());
+//			singleExitConditions.Add(new StopLossCondition());
+			signalGenerator.AddSingleExitCondition(new SLTPCondition());
+			#endregion
+
+			signalGenerator.SetConditions();
 		}
 		#endregion
 
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-
-
-//			if (BarsInProgress == 1) {
-//				signalGenerator.Update();
-//			}
 			signalGenerator.Update();
 
             if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < 1 || CurrentBars[1] < 1)
@@ -148,8 +229,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 			double stop = Close[0];
 			double confidence = entry.Combination.ConfidenceScore;
-
-//			Print(confidence);
 
 //			int quantity = (int) Math.Max(1, Math.Floor(5 * confidence));
 

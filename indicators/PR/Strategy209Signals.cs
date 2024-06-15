@@ -32,8 +32,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public SMA movingAverage;
 		public ChoppinessIndex chop;
 		public MarketCycle market;
-		public MarketCycle marketLong;
+		public List<MarketCycle> marketLong = new List<MarketCycle>();
 		public PriceActionUtils pa;
+
+		private Utils utils = new Utils();
+
+		private ATR atr;
+		private List<double> atrWindow = new List<double>();
 
 		public Series<int> ShortScores;
 		public Series<int> LongScores;
@@ -44,6 +49,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private int higherHighs = 0;
 		private int maxLowerLows = 0;
 		private int maxHigherHighs = 0;
+
+		private int marketIndex = 0;
 		#endregion
 
 		#region OnStateChange()
@@ -65,8 +72,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				IsSuspendedWhileInactive					= true;
 
 				LongPeriod = 10;
-				LowerThreshold = 20;
-				UpperThreshold = 80;
+				LowerThreshold = 15;
+				UpperThreshold = 85;
 
 				AddPlot(Brushes.Red, "Signal Strength");
 				AddLine(Brushes.DarkCyan, LowerThreshold, "Lower Threshold");
@@ -83,6 +90,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				chop = ChoppinessIndex(7);
 				market = MarketCycle();
 				pa = PriceActionUtils();
+				atr = ATR(14);
 
 				Signals = new Series<TrendDirection>(this, MaximumBarsLookBack.Infinite);
 				Scores = new Series<int>(this, MaximumBarsLookBack.Infinite);
@@ -92,21 +100,22 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 				AddDataSeries(BarsPeriodType.Minute, 20);
 				AddDataSeries(BarsPeriodType.Minute, 40);
 				AddDataSeries(BarsPeriodType.Minute, 60);
-				AddDataSeries(BarsPeriodType.Minute, 80);
-				AddDataSeries(BarsPeriodType.Minute, 100);
-				AddDataSeries(BarsPeriodType.Minute, 120);
-				AddDataSeries(BarsPeriodType.Minute, 140);
+//				AddDataSeries(BarsPeriodType.Minute, 80);
+//				AddDataSeries(BarsPeriodType.Minute, 100);
+//				AddDataSeries(BarsPeriodType.Minute, 120);
+//				AddDataSeries(BarsPeriodType.Minute, 140);
 				AddDataSeries(BarsPeriodType.Minute, 160);
 				AddDataSeries(BarsPeriodType.Minute, 180);
 				AddDataSeries(BarsPeriodType.Minute, 200);
-
-
 			}
 			#endregion
 
 			if (State == State.DataLoaded)
 			{
-				marketLong = MarketCycle(BarsArray[LongPeriod]);
+				for (int i = 0; i < 6; i++)
+				{
+					marketLong.Add(MarketCycle(BarsArray[i + 1]));
+				}
 			}
 		}
 		#endregion
@@ -114,48 +123,49 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region OnBarUpdate()
 		protected override void OnBarUpdate()
 		{
-			if (CurrentBar < 100) {
+			if (CurrentBar < 200) {
 				Value[0] = 50;
+				atrWindow.Add(atr[0]);
 				return;
             }
 
-			if (marketLong.CurrentBar < 1)
+			for (int i = 0; i < 6; i++)
+			{
+				marketLong[i].Update();
+			}
+
+
+			if (marketLong[marketIndex].CurrentBar < 1)
 			{
 				Value[0] = 50;
-				marketLong.Update();
+
 				return;
 			}
+
+			if (atrWindow.Count() > 20)
+			{
+				atrWindow.RemoveAt(0);
+			}
+
+			double normalizedATR = Math.Min(1, Math.Max(0, (atr[0] - atrWindow.Min()) / (atrWindow.Max() - atrWindow.Min())));
+
+			marketIndex = (int) Math.Round(normalizedATR * 5);
 
 			Value[0] = GetScore();
 
 			Signals[0] = GetSignal();
-
-
-
-
-
-
-//			if (Signals[1] == TrendDirection.Bullish)
-//			{
-//				Draw.ArrowUp(this, "longEntry"+CurrentBar, true, 0, Low[0] - TickSize, Brushes.RoyalBlue);
-//			}
-
-//			if (Signals[1] == TrendDirection.Bearish)
-//			{
-//				Draw.ArrowDown(this, "shortEntry"+CurrentBar, true, 0, High[0] + TickSize, Brushes.Fuchsia);
-//			}
 		}
 		#endregion
 
 		#region GetSignal()
 		private TrendDirection GetSignal()
 		{
-			if (Value[0] > UpperThreshold)
+			if (Value[0] >= UpperThreshold)
 			{
 				return TrendDirection.Bullish;
 			}
 
-			if (Value[0] < LowerThreshold)
+			if (Value[0] <= LowerThreshold)
 			{
 				return TrendDirection.Bearish;
 			}
@@ -170,7 +180,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			int longScore = 0;
 			int shortScore = 0;
 
-			int maxScore = 13;
+			int maxScore = 12;
 
 			bool emaShortRising = pa.IsRising(emaShort, 0, 1);
 			bool emaShortFalling = pa.IsFalling(emaShort, 0, 1);
@@ -267,23 +277,24 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			maxLowerLows = Math.Max(maxLowerLows, lowerLows);
 
 			MarketCycleStage stage = market.Stage[0];
-			MarketCycleStage stageLong = marketLong.Stage[0];
+
+			MarketCycleStage stageLong = marketLong[marketIndex].Stage[0];
 
 			bool validLongMarket = stageLong == MarketCycleStage.BroadChannel || stageLong == MarketCycleStage.TightChannel;
 			bool validShortMarket = stage != MarketCycleStage.Breakout;
 
-			bool validMarketDirection = market.Direction[0] == marketLong.Direction[0];
+			bool validMarketDirection = market.Direction[0] == marketLong[marketIndex].Direction[0];
 
 			if (market.Direction[0] == TrendDirection.Bullish)
 				longScore++;
 
-			if (marketLong.Direction[0] == TrendDirection.Bullish)
+			if (marketLong[marketIndex].Direction[0] == TrendDirection.Bullish)
 				longScore++;
 
 			if (market.Direction[0] == TrendDirection.Bearish)
 				shortScore++;
 
-			if (marketLong.Direction[0] == TrendDirection.Bearish)
+			if (marketLong[marketIndex].Direction[0] == TrendDirection.Bearish)
 				shortScore++;
 
 			if (pa.IsBullishBar(0))

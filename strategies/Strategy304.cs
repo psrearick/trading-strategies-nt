@@ -51,8 +51,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 //		List<int> timeframeLengths = new List<int> { 5, 8, 10, 12, 15 };
 //		List<int> timeframeLengths = new List<int> { 5, 10, 15 };
 //		List<int> timeframeLengths = new List<int> { 5, 10, 15, 20 };
-		List<int> timeframeLengths = new List<int> { 5, 8, 10, 12, 15, 20 };
-//		List<int> timeframeLengths = new List<int> { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20 };
+//		List<int> timeframeLengths = new List<int> { 5, 8, 10, 12, 15, 20 };
+		List<int> timeframeLengths = new List<int> { 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20 };
 
 //		List<int> timeframeLengths;
 
@@ -202,6 +202,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 				Risk											= 1;
 				Control											= 0;
+				Control2										= 1;
 
 				PrintTo = PrintTo.OutputTab1;
 			}
@@ -819,7 +820,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		    // Define the valid volatility range
 		    double minVolatility = Control;
-		    double maxVolatility = 1;
+		    double maxVolatility = Control2;
 
 		    // Check if the volatility is within the valid range
 		    return normalizedVolatilityPercentage >= minVolatility && normalizedVolatilityPercentage <= maxVolatility;
@@ -1228,6 +1229,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		[Range(0, double.MaxValue)]
 		[Display(Name="Control", Description="Control", Order=1, GroupName="Parameters")]
 		public double Control
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Range(0, double.MaxValue)]
+		[Display(Name="Control 2", Description="Control 2", Order=2, GroupName="Parameters")]
+		public double Control2
 		{ get; set; }
 
 		#endregion
