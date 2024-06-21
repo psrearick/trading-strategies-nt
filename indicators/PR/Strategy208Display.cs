@@ -35,8 +35,11 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public MarketCycle marketLong;
 		public PriceActionUtils pa;
 
-		public Series<int> ShortScores;
-		public Series<int> LongScores;
+		public List<double> minScores = new List<double>();
+		public List<double> maxScores = new List<double>();
+
+		public Series<double> ShortScores;
+		public Series<double> LongScores;
 		public Series<double> Scores;
 		public Series<TrendDirection> Signals;
 
@@ -86,8 +89,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 				Signals = new Series<TrendDirection>(this, MaximumBarsLookBack.Infinite);
 				Scores = new Series<double>(this, MaximumBarsLookBack.Infinite);
-				LongScores = new Series<int>(this, MaximumBarsLookBack.Infinite);
-				ShortScores = new Series<int>(this, MaximumBarsLookBack.Infinite);
+				LongScores = new Series<double>(this, MaximumBarsLookBack.Infinite);
+				ShortScores = new Series<double>(this, MaximumBarsLookBack.Infinite);
 
 				AddDataSeries(BarsPeriodType.Minute, 20);
 				AddDataSeries(BarsPeriodType.Minute, 40);
@@ -152,10 +155,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		#region GetScore()
 		private double GetScore()
 		{
-			int longScore = 0;
-			int shortScore = 0;
-
-			int maxScore = 12;
+			double longScore = 0;
+			double shortScore = 0;
 
 			bool emaShortRising = pa.IsRising(emaShort, 0, 1);
 			bool emaShortFalling = pa.IsFalling(emaShort, 0, 1);
@@ -280,7 +281,31 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			LongScores[0] = longScore;
 			ShortScores[0] = shortScore;
-			Scores[0] = (((double)(maxScore + longScore - shortScore)) / (maxScore * 2)) * 100;
+
+//			int maxScore = Math.Max(longScore, shortScore);
+//			int minScore = Math.Min(longScore, shortScore);
+
+//			int maxScore = 13;
+//			int minScore = 0;
+
+			maxScores.Add(Math.Max(longScore, shortScore));
+			if (maxScores.Count > 300)
+				maxScores.RemoveAt(0);
+
+			minScores.Add(Math.Min(longScore, shortScore));
+			if (minScores.Count > 300)
+				minScores.RemoveAt(0);
+
+
+
+
+			double maxScore = maxScores.Max();
+			double minScore = minScores.Min();
+//			double maxScore = MAX(LongScores, 100)[0];
+//			double minScore = MIN(LongScores, 100)[0];
+
+			Scores[0] = (((maxScore + longScore - shortScore)) / (maxScore * 2 - minScore)) * 100;
+//			Scores[0] = (((maxScore + longScore - shortScore)) / (maxScore * 2)) * 100;
 
 			return Scores[0];
 		}

@@ -50,6 +50,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		private TradesExporter tradesExporter;
 
+		private DateTime lastDay = DateTime.MinValue;
+		private int days = 0;
+
+		[Browsable(false)]
+		public int Days
+		{
+		    get { return days; }
+		    set { days = value; }
+		}
+
 		protected override void OnStateChange()
 		{
 			if (State == State.SetDefaults)
@@ -80,8 +90,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 				TradeQuantity									= 1;
 				ProfitTarget									= 3;
 				StopLossTarget									= 5;
-				ChoppinessThresholdLow							= 30;
-				ChoppinessThresholdHigh							= 60;
+				ChoppinessThresholdLow							= 38.2;
+				ChoppinessThresholdHigh							= 61.8;
 				HighATRMultiplier								= 3;
 				TimeShift										= 0;
 				LastDataDay										= new DateTime(2023, 03, 17);
@@ -93,7 +103,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			}
 			else if (State == State.Configure)
 			{
-				AddDataSeries(Data.BarsPeriodType.Second, 1);
+				AddDataSeries(Data.BarsPeriodType.Second, 15);
 				AddDataSeries(Data.BarsPeriodType.Minute, 30);
 			}
 
@@ -102,8 +112,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 				emaLong				= EMA(21);
 				atr 				= ATR(14);
 				atrDaily			= ATR(BarsArray[2], 14);
+//				chop				= ChoppinessIndex(5);
 				chop				= ChoppinessIndex(14);
-				tradesExporter		= TradesExporter(Name, Instrument.MasterInstrument.Name);
+//				tradesExporter		= TradesExporter(Name, Instrument.MasterInstrument.Name);
 			}
 		}
 
@@ -119,26 +130,39 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return;
 			}
 
+			if (CurrentBar % 20 == 0)
+			{
+//				Print($"Bar: {CurrentBar} Time: {Time[0]}");
+			}
+
+			if (Time[0].Date != lastDay.Date)
+			{
+				Days++;
+				lastDay = Time[0];
+			}
+
 			calculateQuantity();
 			setIndicators();
 			setEntries();
 		}
 
-		protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
-		{
-			if (TradesExporterActivated && SystemPerformance.AllTrades.Count > 0)
-			{
-				tradesExporter.OnNewTrade(SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1]);
-			}
-		}
+//		protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
+//		{
+//			if (TradesExporterActivated && SystemPerformance.AllTrades.Count > 0)
+//			{
+//				tradesExporter.OnNewTrade(SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1]);
+//			}
+//		}
 
 		private void calculateQuantity()
 		{
 			quantity = TradeQuantity;
 
 			if (Risk > 0) {
-				double stopLossDistance	= Math.Round((atrDaily[0] * StopLossTarget) / 4);
-				quantity = (int) Math.Floor(Math.Max(quantity, Risk / (stopLossDistance * 50)));
+				double stopLossDistance	= Math.Round((atrDaily[0] * StopLossTarget) / TickSize);
+				double TickValue = Instrument.MasterInstrument.PointValue * TickSize;
+				quantity = (int) Math.Max(1, Math.Floor(Risk / (stopLossDistance * TickValue)));
+
 			}
 		}
 
@@ -172,7 +196,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (InvertChoppiness) {
 				validChoppiness 	= !lowChop && !highChop;
 			}
-
 
 			bool rising1			= Close[0] > Close[1];
 			bool rising2			= Close[1] > Close[2];
@@ -340,3 +363,4 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#endregion
 	}
 }
+

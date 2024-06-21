@@ -122,7 +122,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 				BarsRequiredToTrade								= 52;
 
 				IncludeTradeHistoryInBacktest					= true;
-				IsInstantiatedOnEachOptimizationIteration		= false;
+				IsInstantiatedOnEachOptimizationIteration		= true;
 				IsUnmanaged										= false;
 
 
@@ -222,15 +222,28 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region ExitPositions()
 		private void ExitPositions()
 		{
+			bool isLong = Position.MarketPosition == MarketPosition.Long;
+			bool isShort = Position.MarketPosition == MarketPosition.Short;
+
+//			if (isLong && signals[0] < 50)
+//			{
+//				ExitLong();
+//			}
+
+//			if (isShort && signals[0] > 50)
+//			{
+//				ExitShort();
+//			}
+
 			if (IsValidTradeTime()) {
 				return;
 			}
 
-			if (Position.MarketPosition == MarketPosition.Long) {
+			if (isLong) {
 				ExitLong();
 			}
 
-			if (Position.MarketPosition == MarketPosition.Short) {
+			if (isShort) {
 				ExitShort();
 			}
         }
@@ -247,8 +260,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 			maxHigherHighs = Math.Max(maxHigherHighs, higherHighs);
 			maxLowerLows = Math.Max(maxLowerLows, lowerLows);
 
-			longPatternMatched = (signals.Signals[0] == TrendDirection.Bullish) && (signals.LongScores[0] > 10);
-			shortPatternMatched = (signals.Signals[0] == TrendDirection.Bearish) && (signals.ShortScores[0] > 10);
+			double threshold = (1 - Math.Min(1, adx[0] / 60)) * LowerThreshold;
+
+//			Print(LowerThreshold + " " + threshold);
+
+			longPatternMatched = signals[0] > (100 - threshold);
+			shortPatternMatched = signals[0] < threshold;
+
+//			longPatternMatched = signals.Signals[0] == TrendDirection.Bullish;
+//			shortPatternMatched = signals.Signals[0] == TrendDirection.Bearish;
+
+//			longPatternMatched = (signals.Signals[0] == TrendDirection.Bullish) && (signals.LongScores[0] > 10);
+//			shortPatternMatched = (signals.Signals[0] == TrendDirection.Bearish) && (signals.ShortScores[0] > 10);
 		}
 		#endregion
 
@@ -268,6 +291,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			return true;
 		}
 		#endregion
+
 
 		#region IsValidTradeTime()
 		private bool IsValidTradeTime()
@@ -297,26 +321,26 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return;
 			}
 
-			double normalizedHigherHighs = Math.Max(0.1, (double) higherHighs / maxHigherHighs);
-			double normalizedLowerLows = Math.Max(0.1, (double) lowerLows / maxLowerLows);
-			double extremesMultiplier = longPatternMatched
-				? normalizedHigherHighs
-				: shortPatternMatched
-					? normalizedLowerLows
-					: (normalizedHigherHighs + normalizedLowerLows) * 0.5;
+//			double normalizedHigherHighs = Math.Max(0.1, (double) higherHighs / maxHigherHighs);
+//			double normalizedLowerLows = Math.Max(0.1, (double) lowerLows / maxLowerLows);
+//			double extremesMultiplier = longPatternMatched
+//				? normalizedHigherHighs
+//				: shortPatternMatched
+//					? normalizedLowerLows
+//					: (normalizedHigherHighs + normalizedLowerLows) * 0.5;
 
-			if (extremesMultiplier < 0.4 || adx[0] < 25)
-			{
-				longPatternMatched = false;
-				shortPatternMatched = false;
-			}
+//			if (extremesMultiplier < 0.4 || adx[0] < 25)
+//			{
+//				longPatternMatched = false;
+//				shortPatternMatched = false;
+//			}
 
 			double atrDistance = 2 - Math.Min(2, (atr[0] / atrMa[0]));
 			double atrDistanceFactor = atrDistance;
 
 			double slTarget = (2 - (Math.Abs((atr[0] - atrMa[0]) / atrMa[0]) + (1 - (adx[0] / 100)))) * 5;
 
-			double target = slTarget * extremesMultiplier;
+			double target = slTarget;// * extremesMultiplier;
 
 			double stopLossDistancePoints = (atrLong[0] * target);
 			stopLossDistance = stopLossDistancePoints / TickSize;
@@ -375,3 +399,4 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#endregion
 	}
 }
+

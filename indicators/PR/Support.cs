@@ -49,6 +49,13 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		Exit
 	};
 	#endregion
+
+	#region Timetrame
+	public enum Timeframe {
+		High,
+		Low
+	};
+	#endregion
 	#endregion
 
 	#region Utils

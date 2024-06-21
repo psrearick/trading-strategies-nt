@@ -79,7 +79,7 @@ namespace NinjaTrader.NinjaScript.OptimizationFitnesses
 			if (max == min)
 			{
 				return 0;
-			}		
+			}
 
 		    return Math.Min(Math.Max((value - min) / (max - min), 0), 1);
 		}

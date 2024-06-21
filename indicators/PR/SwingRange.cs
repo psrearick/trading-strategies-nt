@@ -37,7 +37,7 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 	public class SwingRange : Indicator
 	{
 		#region Variables
-		private ChoppinessIndex chop;
+		public ChoppinessIndex chop;
 		private ATR atr;
 
 		private Dictionary<ChopLevel, List<int>> chopBarCounts = new Dictionary<ChopLevel, List<int>>()

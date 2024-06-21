@@ -68,6 +68,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		private double ChoppinessThresholdHigh = 61.8;
 
 		private int overallScore = 0;
+		private double atrDeviations = 0;
 
 		private DateTime lastDay = DateTime.MinValue;
 		private int days = 0;
@@ -110,10 +111,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 				Risk = 0;
 				TradeQuantity = 1;
-//				StopLossTarget = 5;
 				LogTrades = false;
-				ATRMultiplier = 3;
-				ATRMultiplierAdjustment = 0.15;
+//				ATRMultiplier = 3;
 			}
 			#endregion
 
@@ -193,68 +192,67 @@ namespace NinjaTrader.NinjaScript.Strategies
 			double stdDev = atrStdDev[0];
 			double diff = atrValue - atrMA[0];
 			double devs = diff / stdDev;
-//			Print($"{stdDev},{diff},{devs}");
-//				Print(BarsArray[0].BarsPeriod.Value);
 
-			double normalizedTimeframe = (double)(BarsArray[0].BarsPeriod.Value - 1) / (double) 15;
+			atrDeviations = devs;
 
-			double multiplier = 10;
-			double timeframeMultiplied = normalizedTimeframe * 8;
+			double tfMax = 15;
+			double tfMin = 1;
+			double normalizedTimeframe = ((double)BarsArray[0].BarsPeriod.Value - tfMin) / (tfMax - tfMin);
 
-			if (diff > 1)
+			double multMax = 20;
+			double multMin = 1;
+			double multMid = 4;
+			double mid = ((multMax - multMin) * 0.5) + multMin;
+			double multiplier = mid;
+			double timeframeMultiplied = normalizedTimeframe * ((multMax - multMid) * 0.5);
+
+			if (devs < -1)
 			{
-				multiplier = timeframeMultiplied;
-
+				multiplier = (mid - (multMid / 2)) - timeframeMultiplied;
 			}
 
-			if (diff < -1)
+			if (devs > 1)
 			{
-				multiplier = timeframeMultiplied + 12;
+				multiplier = timeframeMultiplied + mid + multMid;
 			}
 
-			Print(multiplier);
-
-
-
-   			double shortEmaSlope = (emaShort[0] - emaShort[2]) / 2;
-    		double longEmaSlope = (emaLong[0] - emaLong[2]) / 2;
+			multiplier = Math.Max(1, Math.Min(multMax, multiplier));
 
 			double profitTargetMultiplier = Math.Min(10, Math.Max(1, (1 - (multiplier / 10)) * 10));
-
-//			double profitTarget = Math.Min(10, Math.Max(1, (1 - (StopLossTarget / 30)) * 10));
-//			stopLossMultiplier = StopLossTarget;
-//			profitTargetMultiplier = profitTarget;
 
 			// Reset the overall score
 		    overallScore = 0;
 
 //			// EMA score
-			if (shortEmaSlope > longEmaSlope)
-				overallScore++;
+   			double shortEmaSlope = (emaShort[0] - emaShort[2]) / 2;
+    		double longEmaSlope = (emaLong[0] - emaLong[2]) / 2;
 
-			if (shortEmaSlope < longEmaSlope)
+			if (shortEmaSlope > longEmaSlope)
 				overallScore--;
 
-//			// ATR score
-//			if (atrValue > atrMA[0])
-//				overallScore++;
+			if (shortEmaSlope < longEmaSlope)
+				overallScore++;
 
-//			if (atrValue < atrMA[0])
-//				overallScore--;
+			// ATR score
+			if (atrValue > atrMA[0])
+				overallScore--;
 
-//		    // MACD score
+			if (atrValue < atrMA[0])
+				overallScore++;
+
+		    // MACD score
 		    if (macd[0] > macdThreshold)
-		        overallScore++;
+		        overallScore--;
 
 			if (macd[0] < -macdThreshold)
-		        overallScore--;
-
-//		    // RSI score
-		    if (rsi[0] > rsiThresholdHigh)
 		        overallScore++;
 
-			if (rsi[0] < rsiThresholdLow)
+		    // RSI score
+		    if (rsi[0] > rsiThresholdHigh)
 		        overallScore--;
+
+			if (rsi[0] < rsiThresholdLow)
+		        overallScore++;
 
 		    // Bollinger Bands score
 		    if (Close[0] > bollingerBands.Upper[0])
@@ -264,36 +262,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 		        overallScore++;
 
 		    // Adjust stop loss multiplier based on overall score
-//			double scoreMultiplier = overallScore * 0.25;
-
-//		    if (overallScore > 0)
-//		    {
-//				scoreMultiplier += 1;
-//		        stopLossMultiplier = StopLossTarget * scoreMultiplier;
-//		        profitTargetMultiplier = profitTarget * scoreMultiplier;
-//		    }
-//		    else if (overallScore < 0)
-//		    {
-//				scoreMultiplier = 1 - scoreMultiplier;
-//		        stopLossMultiplier = StopLossTarget * scoreMultiplier;
-//		        profitTargetMultiplier = profitTarget * scoreMultiplier;
-//		    }
-
 			double adjustedATRMultiplier = multiplier;
 		    if (overallScore > 0)
-		    {
-		        adjustedATRMultiplier *= 1 - ATRMultiplierAdjustment;
-		    }
-		    else if (overallScore < 0)
-		    {
-		        adjustedATRMultiplier *= 1 + ATRMultiplierAdjustment;
-		    }
+		        adjustedATRMultiplier *= 0.85;
+
+		   	if (overallScore < 0)
+		        adjustedATRMultiplier *= 1.15;
+
 
 			stopLossDistance = atrValue * adjustedATRMultiplier * atrMultiple;
    	 		profitTargetDistance = atrValue * profitTargetMultiplier * atrMultiple;
-
-//		    stopLossDistance = atrValue * stopLossMultiplier;
-//		    profitTargetDistance = atrValue * profitTargetMultiplier;
 		}
 		#endregion
 
@@ -357,8 +335,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 			bool upTrend 			= higherHigh && highestInTrend;
 			bool downTrend			= lowerLow && lowestInTrend;
 
-			longPatternMatched 		= maRising && rising && newHigh && validChoppiness && upTrend;
-			shortPatternMatched		= maFalling && falling && newLow && validChoppiness && downTrend;
+//			bool validAtr = Math.Abs(atrDeviations) > 1;
+			bool validAtr = atrDeviations > 0;
+//			bool validAtr = atrDeviations > 1;
+//			bool validAtr = Math.Abs(atrDeviations) < 1;
+//			bool validAtr = atrDeviations < 1;
+
+			longPatternMatched 		= maRising && rising && newHigh && validChoppiness && upTrend && validAtr;
+			shortPatternMatched		= maFalling && falling && newLow && validChoppiness && downTrend && validAtr;
 		}
 		#endregion
 
@@ -441,22 +425,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 //		[NinjaScriptProperty]
 //		[Range(0, double.MaxValue)]
-//		[Display(Name="Stop Loss Target", Description="Stop Loss Target", Order=2, GroupName="Parameters")]
-//		public double StopLossTarget
+//		[Display(Name="ATR Multiplier", Description="ATR Multiplier for Stop Loss", Order=2, GroupName="Parameters")]
+//		public double ATRMultiplier
 //		{ get; set; }
 
-		[NinjaScriptProperty]
-		[Range(0, double.MaxValue)]
-		[Display(Name="ATR Multiplier", Description="ATR Multiplier for Stop Loss", Order=2, GroupName="Parameters")]
-		public double ATRMultiplier
-		{ get; set; }
-
-		[NinjaScriptProperty]
-		[Range(0, double.MaxValue)]
-		[Display(Name="ATR Multiplier Adjustment", Description="ATR Multiplier Adjustment", Order=2, GroupName="Parameters")]
-		public double ATRMultiplierAdjustment
-		{ get; set; }
-	
 		[NinjaScriptProperty]
 		[Display(Name="Log Trades", Description="Log Trades", Order=3, GroupName="Parameters")]
 		public bool LogTrades

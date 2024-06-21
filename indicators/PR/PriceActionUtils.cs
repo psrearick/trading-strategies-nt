@@ -891,6 +891,20 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region ConsecutiveHigherHighs()
+		public bool ConsecutiveHigherHighs(int barsAgo, int period)
+		{
+			return LeastHigherHighs(period, period, barsAgo);
+		}
+		#endregion
+
+		#region ConsecutiveLowerLows()
+		public bool ConsecutiveLowerLows(int barsAgo, int period)
+		{
+			return LeastLowerLows(period, period, barsAgo);
+		}
+		#endregion
+
 		#endregion
 
 		#region Number of Bars Matching Pattern
@@ -936,6 +950,68 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		}
 		#endregion
 
+		#region MaxNumberOfConsecutiveHigherHighs()
+		public int MaxNumberOfConsecutiveHigherHighs(int barsAgo, int period)
+		{
+			int maxHigherHighs = 0;
+			int consecutiveHigherHighs = 0;
+			int maxRange = Math.Min((period + barsAgo), Close.Count);
+
+			for (int i = barsAgo; i < maxRange; i++) {
+				bool isHigherHigh = IsHigherHigh(i);
+				if (!isHigherHigh)
+				{
+					consecutiveHigherHighs = 0;
+					continue;
+				}
+
+				consecutiveHigherHighs++;
+
+				maxHigherHighs = Math.Max(maxHigherHighs, consecutiveHigherHighs);
+			}
+
+			return maxHigherHighs;
+		}
+		#endregion
+
+		#region MaxNumberOfConsecutiveLowerLows()
+		public int MaxNumberOfConsecutiveLowerLows(int barsAgo, int period)
+		{
+			int maxLowerLows = 0;
+			int consecutiveLowerLows = 0;
+			int maxRange = Math.Min((period + barsAgo), Close.Count);
+
+			for (int i = barsAgo; i < maxRange; i++) {
+				bool isLowerLow = IsLowerLow(i);
+				if (!isLowerLow)
+				{
+					consecutiveLowerLows = 0;
+					continue;
+				}
+
+				consecutiveLowerLows++;
+
+				maxLowerLows = Math.Max(maxLowerLows, consecutiveLowerLows);
+			}
+
+			return maxLowerLows;
+		}
+		#endregion
+
+		#region NumberOfHigherHighs()
+		public int NumberOfHigherHighs(int barsAgo, int period)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsHigherHigh);
+		}
+		#endregion
+
+		#region NumberOfLowerLows()
+		public int NumberOfLowerLows(int barsAgo, int period)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsLowerLow);
+		}
+		#endregion
+
 		#endregion
 
 		#region Least Bars Matching Pattern
@@ -978,6 +1054,23 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		public bool LeastBiggerBars(int count, int period, int barsAgo = 0)
 		{
 			return NumberOfOccurrencesInPeriod(barsAgo, period, IsBigger) >= count;
+		}
+		#endregion
+
+		// NumberOfBearPullbacks
+		// NumberOfBullPullbacks
+
+		#region LeastHigherHighs()
+		public bool LeastHigherHighs(int count, int period, int barsAgo = 0)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsHigherHigh) >= count;
+		}
+		#endregion
+
+		#region LeastLowerLows()
+		public bool LeastLowerLows(int count, int period, int barsAgo = 0)
+		{
+			return NumberOfOccurrencesInPeriod(barsAgo, period, IsLowerLow) >= count;
 		}
 		#endregion
 		#endregion

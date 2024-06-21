@@ -44,6 +44,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 		private Brush brushDown1;
 		private Brush brushDown2;
 
+		public Brush background;
+
 
 		#endregion
 
@@ -69,9 +71,9 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 
 			if (State == State.Configure)
 			{
-				atr 				= ATR(8);
-				maShort				= SMA(20);
-				maLong				= SMA(50);
+				atr 				= ATR(Input, 8);
+				maShort				= SMA(Input, 20);
+				maLong				= SMA(Input, 50);
 
 				brushUp0 = Brushes.Green.Clone();
 				brushUp0.Opacity = 0.600;
@@ -117,6 +119,8 @@ namespace NinjaTrader.NinjaScript.Indicators.PR
 			Direction[0] = GetTrendDirection();
 
 			BackBrush = GetBackgroundBrush();
+
+			background = BackBrush;
 		}
 		#endregion
 
