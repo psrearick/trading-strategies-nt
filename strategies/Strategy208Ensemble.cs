@@ -108,7 +108,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 				IsInstantiatedOnEachOptimizationIteration		= true;
 				IsUnmanaged										= false;
 
-				LogTrades 										= false;
+				LogTrades = false;
+				ConsensusThreshold = 6;
 			}
 			#endregion
 
@@ -263,12 +264,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#endregion
 
 		#region SetExits()
-		private void SetExits()
+		private void SetExits(bool isLong)
 		{
 			double atrDistance = 2 - Math.Min(2, (atr[0] / atrMa[0]));
 			double atrDistanceFactor = atrDistance;
 			double slTarget = (2 - (Math.Abs((atr[0] - atrMa[0]) / atrMa[0]) + (1 - (adx[0] / 100)))) * 5;
-			double target = slTarget;
+			double target = slTarget * strategies[0].GetExtremesMultiplier(isLong);
 			double stopLossDistance = (atrLong[0] * target) / TickSize;
 			double profitDistance = stopLossDistance * (atrDistanceFactor);
 
@@ -280,7 +281,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region EnterLongTrade()
 		private void EnterLongTrade()
 		{
-			SetExits();
+			SetExits(true);
 			EnterLong(1, "longEntry");
 		}
 		#endregion
@@ -288,7 +289,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 		#region EnterShortTrade()
 		private void EnterShortTrade()
 		{
-			SetExits();
+			SetExits(false);
 			EnterShort(1, "shortEntry");
 		}
 		#endregion
@@ -313,16 +314,30 @@ namespace NinjaTrader.NinjaScript.Strategies
 		public Strategy208Ensemble BaseStrategy { get; set; }
 		public Strategy208Signals Signals {get; set; }
 
-		private int maxHigherHighs = 0;
-		private int maxLowerLows = 0;
+		private List<int> higherHighs = new List<int>();
+		private List<int> lowerLows = new List<int>();
 
 		public double GetExtremesMultiplier(bool isLong)
 		{
 			int consecutiveHigherHighs = BaseStrategy.pa.MaxNumberOfConsecutiveHigherHighs(0, 20);
 			int consecutiveLowerLows = BaseStrategy.pa.MaxNumberOfConsecutiveLowerLows(0, 20);
 
-			maxHigherHighs = Math.Max(maxHigherHighs, consecutiveHigherHighs);
-			maxLowerLows = Math.Max(maxLowerLows, consecutiveLowerLows);
+			higherHighs.Add(consecutiveHigherHighs);
+
+			if (higherHighs.Count() > 10)
+			{
+				higherHighs.RemoveAt(0);
+			}
+
+			lowerLows.Add(consecutiveLowerLows);
+
+			if (lowerLows.Count() > 10)
+			{
+				lowerLows.RemoveAt(0);
+			}
+
+			int maxHigherHighs = higherHighs.Max();
+			int maxLowerLows = lowerLows.Max();
 
 			double normalizedHigherHighs = Math.Max(0.1, (double) consecutiveHigherHighs / maxHigherHighs);
 			double normalizedLowerLows = Math.Max(0.1, (double) consecutiveLowerLows / maxLowerLows);
@@ -332,8 +347,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 		private bool ShouldEnter(bool isLong)
 		{
-			if (GetExtremesMultiplier(isLong) < 0.4)
-				return false;
+//			if (GetExtremesMultiplier(isLong) < 0.4)
+//				return false;
 
 			if (BaseStrategy.adx[0] < 25)
 				return false;
@@ -346,7 +361,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 			if (Signals.Signals[0] != TrendDirection.Bullish)
 				return false;
 
-			if (Signals.LongScores[0] <= 10)
+			if (Signals.LongScores[0] < 11)
 				return false;
 
 			return ShouldEnter(true);
@@ -356,10 +371,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 		{
 			if (Signals.Signals[0] != TrendDirection.Bearish)
 				return false;
-		
-			if (Signals.ShortScores[0] <= 10)
-				return false;
 
+			if (Signals.ShortScores[0] < 11)
+				return false;
+		
 			return ShouldEnter(false);
 		}
 	}
